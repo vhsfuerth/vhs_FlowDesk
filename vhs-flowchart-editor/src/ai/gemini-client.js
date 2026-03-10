@@ -8,41 +8,50 @@ export const generateFlowchartFromText = async (text) => {
     }
 
     try {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'gpt-4o',
-                response_format: { type: 'json_object' },
-                messages: [
-                    { role: 'system', content: SYSTEM_PROMPT },
-                    { role: 'user', content: text }
-                ],
-                temperature: 0.2
+                systemInstruction: {
+                    parts: [{ text: SYSTEM_PROMPT }]
+                },
+                contents: [{
+                    role: 'user',
+                    parts: [{ text: text }]
+                }],
+                generationConfig: {
+                    responseMimeType: 'application/json',
+                    temperature: 0.2
+                }
             })
         });
 
         if (!response.ok) {
-            if (response.status === 401) throw new Error('API_KEY_INVALID');
+            const errorData = await response.json().catch(() => ({}));
+            if (response.status === 400) throw new Error('API_KEY_INVALID');
             if (response.status === 429) throw new Error('RATE_LIMIT');
-            throw new Error(`OpenAI API Error: ${response.statusText}`);
+            throw new Error(`Gemini API Error: ${response.statusText}`);
         }
 
         const data = await response.json();
+        const contentText = data.candidates?.[0]?.content?.parts?.[0]?.text;
         
+        if (!contentText) {
+             throw new Error('INVALID_JSON_RESPONSE');
+        }
+
         let jsonResult = null;
         try {
-            jsonResult = JSON.parse(data.choices[0].message.content);
+            jsonResult = JSON.parse(contentText);
         } catch (e) {
             throw new Error('INVALID_JSON_RESPONSE');
         }
 
         return validateApiResponse(jsonResult);
     } catch (error) {
-        console.error("OpenAI Client Error", error);
+        console.error("Gemini Client Error", error);
         throw error;
     }
 };
@@ -55,7 +64,6 @@ const validateApiResponse = (json) => {
     // Ensure minimal viable graph
     const hasStart = json.nodes.some(n => n.type === 'start');
     if (!hasStart && json.nodes.length > 0) {
-        // Automatically make first node a start if missing
         json.nodes[0].type = 'start';
     }
 

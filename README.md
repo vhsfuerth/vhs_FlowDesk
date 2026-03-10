@@ -2,44 +2,68 @@
 
 Lokal laufendes PWA-Tool (Progressive Web App) zur Erstellung algorithmischer Ablaufpläne (Flowcharts, Entscheidungsbäume) basierend auf dem vhs Corporate Design.
 
-## Hauptfunktionen
+## ✨ Hauptfunktionen
 
-- **Visueller Editor**: Drag & Drop Flowchart-Editor basierend auf JointJS.
-- **KI-Diagramm-Generierung**: Erzeugt Diagramme direkt aus einer einfachen Prozessbeschreibung (Freitext) über die OpenAI API (GPT-4o).
-- **Offline-fähig**: Der Editor, das Laden, Speichern und der Export (PNG, SVG, PDF, JSON) funktionieren auch ohne Internetverbindung vollständig offline. Lediglich das KI-Generator-Feature benötigt Internet.
-- **Lokale Datenhaltung**: Alle Diagramme und der API-Key werden ausschließlich lokal im Browser (IndexedDB, localStorage) gespeichert. Keine Übertragung zu eigenen Servern!
+- **KI-Diagramm-Generierung**: Erzeugt Diagramme direkt aus einer einfachen Prozessbeschreibung (Freitext) über die Google Gemini API.
+- **Visueller Editor**: Drag & Drop Editor basierend auf JointJS im vhs Design.
+- **Dynamisches Sizing**: Automatische Anpassung der Element-Größe an den Textinhalt (inkl. Zeilenumbruch).
+- **Speicherverwaltung**: Mehrere Diagramme lokal speichern, laden, benennen und löschen (IndexedDB).
+- **Offline-fähig**: Der Editor, das Laden, Speichern und der Export (PNG, SVG, PDF, JSON) funktionieren auch ohne Internetverbindung. Lediglich das KI-Generator-Feature benötigt Internet.
+- **Lokale Datenhaltung**: Alle Diagramme und der API-Key werden ausschließlich lokal im Browser gespeichert.
 
-## Erste Schritte / Installation
+## 🛠️ Letzte Fixes & Updates
 
-Das Projekt erfordert Node.js zur Installation, lässt sich danach aber via Skript sehr leicht im lokalen Netzwerk/Rechner betreiben.
+- **Text-Overflow gelöst**: Elemente nutzen nun `textWrap` und skalieren automatisch mit der Textmenge.
+- **Manuelle Verbindungen**: Elemente besitzen nun "Ports" an den Rändern, von denen aus Verbindungen per Maus gezogen werden können (sichtbar bei Hover).
+- **Separates Ende-Element**: Das orangefarbene Ende-Oval ist jetzt separat in der Toolbar verfügbar.
+- **Speicher-Stabilität**: "Floating Links" (unfertige Verbindungen) wurden abgefangen und führen nicht mehr zu Fehlern beim Speichern.
+- **Echtzeit-Renaming**: Diagramm-Namen können direkt im Header per Klick editiert werden.
+- **Reset-Funktion**: Ein dedizierter "Leeren"-Button erlaubt das schnelle Zurücksetzen der Arbeitsfläche.
 
-1. Stelle sicher, dass [Node.js](https://nodejs.org) (LTS Version empfohlen) auf deinem Rechner installiert ist.
-2. Führe die Datei `install.bat` per **Doppelklick** aus. Dies lädt alle benötigten Module aus dem Internet herunter (dieser Prozess kann etwas dauern).
-3. Du bist startklar!
+## 🚀 Erste Schritte / Installation
 
-## Das Tool starten
+1. Stelle sicher, dass [Node.js](https://nodejs.org) installiert ist.
+2. Führe die Datei `install.bat` per Doppelklick aus.
+3. Starte das Tool zukünftig mit einem Klick auf die `start.bat`.
+4. Öffne die Adresse `http://localhost:5173` im Browser (Chrome/Edge empfohlen).
+5. Trage deinen Google Gemini API-Key in den Einstellungen (Zahnrad) ein.
 
-Nach der einmaligen Installation oben kannst du das Tool zukünftig mit einem Klick auf die `start.bat` starten.
+## 📖 Nutzungshintergrund
 
-1. **Doppelklick auf `start.bat`** in diesem Verzeichnis.
-2. In der Konsole siehst du eine Server-Adresse (in der Regel `http://localhost:5173`).
-3. Öffne diese Adresse im Google Chrome oder Microsoft Edge Browser.
+- **Gekennzeichnete Ports**: Fahre mit der Maus über den Rand eines Elements, klicke auf einen der erscheinenden gelben Punkte und ziehe die Linie zum Zielelement.
+- **Text bearbeiten**: Mache einen **Doppelklick** auf ein Element oder eine Verbindungslinie, um den Text manuell zu ändern. Die Box-Größe passt sich automatisch an.
+- **Speichern**: Nutze den "Speichern"-Button unten links. Deine Diagramme werden sicher in deinem Browser (IndexedDB) abgelegt.
+- **Laden**: Über den "Laden"-Button kannst du auf die Liste deiner gespeicherten Projekte zugreifen.
 
-## Nutzung der KI-Generierung
+## 💻 Technologien (Developer Info)
+- Frontend: React 19 + Vite
+- Styling: Tailwind CSS v4 (vhs Design System)
+- Engine: JointJS + Dagre.js (Auto-Layout)
+- Storage: IndexedDB
+- Export: jsPDF, SVG & PNG
 
-Damit die KI funktioniert, musst du in den Einstellungen einmalig einen eigenen OpenAI API-Key hinterlegen.
+## 📦 Weitergabe & Web-Hosting
 
-1. Starte das Tool.
-2. Klicke auf das Zahnrad-Symbol (Einstellungen) oben rechts in der Navigationsleiste.
-3. Trage deinen gültigen OpenAI API-Key ein und drücke Speichern.
-4. Du kannst nun das freie Textfeld ("Prozessbeschreibung für KI-Generierung") verwenden und auf "Diagramm generieren" klicken!
+Wenn du die Software an Kolleg*innen weitergeben möchtest, gibt es drei ideale Wege:
 
-*Der Key wird anschließend lokal im PC gespeichert und verlässt deinen Rechner nur, um direkt mit OpenAI zu kommunizieren.*
+### 1. Als Web-App (Empfohlen)
+Bevor du die Dateien hochlädst, musst du die Produktions-Dateien generieren:
+1. Führe die Datei **`build.bat`** im Hauptverzeichnis per Doppelklick aus.
+2. Warte, bis das Fenster meldet: "[ERFOLG] Der Build wurde erstellt!".
+3. Es ist nun ein neuer Ordner namens `vhs-flowchart-editor/dist/` entstanden. **Nur dieser Ordner** wird für den Webserver benötigt.
+Lade den Inhalt des Ordners `vhs-flowchart-editor/dist/` auf einen statischen Webserver (z. B. vhs-Intranet, GitHub Pages oder einen beliebigen Webspace) hoch. 
 
-## Technologien (Developer Info)
-- Frontend Framework: React 19 + Vite
-- Styling: Tailwind CSS v4
-- Diagramming Engine: JointJS (Open Source Version)
-- Auto-Layout Engine: Dagre.js
-- Local Storage: IndexedDB (`idb` wrapper)
-- PDF Export Engine: jsPDF
+### 2. Intranet-Hosting (Lokale Domain)
+Wenn ihr bereits Systeme wie Bookstack unter `bookstack.vhs.local` habt, funktioniert das hier exakt genauso:
+1. **Build**: Erstelle den `dist/`-Ordner mit `npm run build`.
+2. **Server**: Kopiere den Inhalt auf euren internen Webserver (Apache, Nginx oder IIS).
+3. **DNS**: Erstellt einen DNS-Eintrag (A-Record) für `workflow.vhs.local`, der auf die IP dieses Servers zeigt.
+4. **Fertig**: Die Software ist nun für alle Kolleg*innen im Netzwerk unter der Adresse erreichbar.
+
+### 3. Als ZIP-Archiv (Lokal)
+Du kannst den gesamten Projektordner als `.zip` verschicken. 
+- **Voraussetzung**: Der Empfänger muss [Node.js](https://nodejs.org) installiert haben.
+- **Start**: Der Empfänger entpackt das ZIP und startet die Software einfach über die `start.bat`.
+
+---
+*Erstellt für die vhs im Rahmen der Prozess-Digitalisierung 2026.*

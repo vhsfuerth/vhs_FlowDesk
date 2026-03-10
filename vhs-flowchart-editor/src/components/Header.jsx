@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, FilePlus, FolderOpen, Save } from 'lucide-react';
+import { Settings, FilePlus, FolderOpen, Save, Edit2, Check } from 'lucide-react';
 import { indexeddb } from '../storage/indexeddb';
 import { generateUUID } from '../utils/uuid';
 import { setLastDiagramId } from '../storage/settings';
 
-const Header = ({ onSettingsClick, currentDiagramName, onNewDiagram, onDiagramSelect }) => {
+const Header = ({ onSettingsClick, currentDiagram, onNewDiagram, onDiagramSelect, onRename }) => {
   const [diagrams, setDiagrams] = useState([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [tempName, setTempName] = useState('');
+
+  useEffect(() => {
+    if (currentDiagram) setTempName(currentDiagram.name);
+  }, [currentDiagram]);
 
   useEffect(() => {
      loadDiagrams();
@@ -36,16 +42,43 @@ const Header = ({ onSettingsClick, currentDiagramName, onNewDiagram, onDiagramSe
       }
   };
 
+  const handleSaveName = () => {
+    if (tempName.trim()) {
+      onRename(tempName.trim());
+      setIsEditingName(false);
+    }
+  };
+
   return (
-    <header className="bg-[var(--color-vhs-blau)] text-white shadow-md w-full h-16 flex items-center justify-between px-6 z-40 relative">
-      <div className="flex items-center">
-        {/* Placeholder for Logo - In a real app we'd load it from public/assets */}
-        <div className="bg-white rounded p-1 mr-4 overflow-hidden h-8 flex items-center shadow-inner">
-             <div className="font-bold text-[var(--color-vhs-blau)] text-xl tracking-tighter leading-none px-2">vhs</div>
+    <header className="bg-[var(--color-vhs-blau)] text-white shadow-md w-full h-16 flex items-center justify-between px-6 z-40 relative border-b border-white/10">
+      <div className="flex items-center space-x-4">
+        <div className="bg-white rounded p-1 overflow-hidden h-8 flex items-center shadow-md">
+             <div className="font-black text-[var(--color-vhs-blau)] text-xl tracking-tighter leading-none px-2">vhs</div>
         </div>
-        <div>
-            <h1 className="text-lg font-bold leading-none tracking-wide text-white">Workflow-Algorithm Editor</h1>
-            <p className="text-xs text-[var(--color-vhs-blau-20)]">{currentDiagramName || 'Unbenanntes Diagramm'}</p>
+        <div className="flex flex-col justify-center border-l border-white/20 pl-4">
+            <h1 className="text-sm font-black uppercase tracking-widest text-[var(--color-vhs-blau-20)] leading-none mb-1">Workflow Editor</h1>
+            <div className="flex items-center group">
+              {isEditingName ? (
+                <div className="flex items-center">
+                  <input
+                    autoFocus
+                    value={tempName}
+                    onChange={(e) => setTempName(e.target.value)}
+                    onBlur={handleSaveName}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                    className="bg-white/10 text-white font-bold border-b border-[var(--color-vhs-gelb)] focus:outline-none px-1 h-6 max-w-[250px]"
+                  />
+                  <Check className="w-4 h-4 ml-1 text-[var(--color-vhs-gelb)] cursor-pointer" onClick={handleSaveName} />
+                </div>
+              ) : (
+                <div className="flex items-center cursor-pointer" onClick={() => setIsEditingName(true)}>
+                  <span className="text-lg font-bold leading-none truncate max-w-[300px]">
+                    {currentDiagram?.name || 'Unbenanntes Diagramm'}
+                  </span>
+                  <Edit2 className="w-3 h-3 ml-2 text-white/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              )}
+            </div>
         </div>
       </div>
 

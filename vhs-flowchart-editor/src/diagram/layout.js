@@ -11,11 +11,11 @@ export class DiagramLayout {
         const layoutGraph = new dagre.graphlib.Graph();
         layoutGraph.setGraph({
             rankdir: direction,
-            marginx: 50,
-            marginy: 50,
-            nodesep: 80,
-            edgesep: 40,
-            ranksep: 100
+            marginx: 80,
+            marginy: 80,
+            nodesep: 100, 
+            edgesep: 50,
+            ranksep: 80 
         });
         layoutGraph.setDefaultEdgeLabel(() => ({}));
 
@@ -41,24 +41,50 @@ export class DiagramLayout {
         // Calculate layout
         dagre.layout(layoutGraph);
 
-        // Apply calculated positions to JointJS nodes
+        // Apply calculated positions
         this.graph.startBatch('layout');
         layoutGraph.nodes().forEach(nodeId => {
             const dagreNode = layoutGraph.node(nodeId);
-            if (dagreNode) { // check if node was successfully positioned
+            if (dagreNode) {
                 const jointNode = this.graph.getCell(nodeId);
                 const size = jointNode.size();
-                
-                // Dagre coordinates are for the center, JointJS uses top-left
-                jointNode.position(
-                    dagreNode.x - size.width / 2,
-                    dagreNode.y - size.height / 2
-                );
+                jointNode.position(dagreNode.x - size.width / 2, dagreNode.y - size.height / 2);
             }
         });
 
-        // Reset link vertices as Dagre calculates straight or custom paths that JointJS manhattan router handles better
-        links.forEach(link => link.vertices([]));
+        // Smart routing for decision labels
+        links.forEach(link => {
+            link.vertices([]); // Reset previous manual points
+            
+            const sourceId = link.source().id;
+            const targetId = link.target().id;
+            const sourceNode = this.graph.getCell(sourceId);
+            const targetNode = this.graph.getCell(targetId);
+            
+            if (sourceNode && targetNode) {
+                // If it's a decision, we want to avoid overlapping paths
+                if (sourceNode.get('type') === 'vhs.Decision') {
+                    const labelText = (link.labels()[0]?.attrs?.text?.text || '').toLowerCase();
+                    const sPos = sourceNode.position();
+                    const tPos = targetNode.position();
+
+                    // Logic: Ja goes DOWN (bottom port), Nein goes SIDE (left or right port)
+                    if (labelText === 'ja' || labelText === 'yes') {
+                        link.source({ id: sourceId, port: 'port-bottom' });
+                        link.target({ id: targetId, port: 'port-top' });
+                    } else if (labelText === 'nein' || labelText === 'no') {
+                        // Choose side based on target position relative to source
+                        const port = tPos.x < sPos.x ? 'port-left' : 'port-right';
+                        link.source({ id: sourceId, port: port });
+                        link.target({ id: targetId, port: 'port-top' });
+                    }
+                } else {
+                    // Standard flow: top to bottom
+                    link.source({ id: sourceId, port: 'port-bottom' });
+                    link.target({ id: targetId, port: 'port-top' });
+                }
+            }
+        });
         
         this.graph.stopBatch('layout');
     }

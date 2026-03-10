@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { generateFlowchartFromText } from '../ai/openai-client';
+import { generateFlowchartFromText } from '../ai/gemini-client';
 import { getApiKey } from '../storage/settings';
 import { Sparkles, Loader2 } from 'lucide-react';
 
@@ -29,9 +29,9 @@ const AiInputPanel = ({ onDiagramGenerated, onError }) => {
       }
     } catch (error) {
        console.error(error);
-       let errorMsg = "Beim Verbinden mit OpenAI ist ein Fehler aufgetreten.";
+       let errorMsg = "Beim Verbinden mit Google Gemini ist ein Fehler aufgetreten.";
        if (error.message === 'API_KEY_INVALID') errorMsg = "Der API-Key ist ungültig.";
-       if (error.message === 'RATE_LIMIT') errorMsg = "Anfragelimit bei OpenAI erreicht.";
+       if (error.message === 'RATE_LIMIT') errorMsg = "Anfragelimit bei Google Gemini erreicht.";
        if (error.message === 'INVALID_JSON_RESPONSE') errorMsg = "Die KI-Antwort konnte nicht interpretiert werden.";
 
        onError(errorMsg);

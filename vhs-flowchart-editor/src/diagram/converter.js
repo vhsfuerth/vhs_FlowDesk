@@ -63,6 +63,9 @@ export class JSONConverter {
                 if (sourceNode && targetNode) {
                     const link = createLink(sourceNode.id, targetNode.id, edge.label);
                     
+                    if (edge.sourcePort) link.source({ id: sourceNode.id, port: edge.sourcePort });
+                    if (edge.targetPort) link.target({ id: targetNode.id, port: edge.targetPort });
+
                     if (edge.id) {
                         link.set('id', edge.id);
                     }
@@ -100,8 +103,13 @@ export class JSONConverter {
                     size: { width: size.width, height: size.height }
                 });
             } else if (cell.isLink()) {
-                const sourceId = cell.get('source').id;
-                const targetId = cell.get('target').id;
+                const source = cell.get('source');
+                const target = cell.get('target');
+                
+                if (!source || !target || !source.id || !target.id) return; // Skip floating links
+                
+                const sourceId = source.id;
+                const targetId = target.id;
                 
                 let labelText = '';
                 const labels = cell.labels();
@@ -109,14 +117,14 @@ export class JSONConverter {
                     labelText = labels[0].attrs.text.text;
                 }
 
-                if (sourceId && targetId) {
-                    json.edges.push({
-                        id: cell.id,
-                        from: sourceId,
-                        to: targetId,
-                        label: labelText
-                    });
-                }
+                json.edges.push({
+                    id: cell.id,
+                    from: sourceId,
+                    to: targetId,
+                    sourcePort: source.port,
+                    targetPort: target.port,
+                    label: labelText
+                });
             }
         });
 

@@ -5,21 +5,22 @@ import Toolbar from './components/Toolbar';
 import DiagramCanvas from './components/DiagramCanvas';
 import ExportBar from './components/ExportBar';
 import SettingsModal from './components/SettingsModal';
+import DiagramListModal from './components/DiagramListModal';
 import Notification from './components/Notification';
 import { indexeddb } from './storage/indexeddb';
 import { getLastDiagramId, setLastDiagramId } from './storage/settings';
 import { generateUUID } from './utils/uuid';
-import { importJSON } from './storage/file-import';
 
 function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
   const [notification, setNotification] = useState({ isVisible: false, message: '', type: 'info' });
   const [currentDiagram, setCurrentDiagram] = useState(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
   
   const diagramCanvasRef = useRef(null);
 
   useEffect(() => {
-    // Initial Load - restore last opened diagram or create new
     const loadInitialDiagram = async () => {
        const lastId = getLastDiagramId();
        let diagram = null;
@@ -30,10 +31,10 @@ function App() {
        
        if (diagram) {
            setCurrentDiagram(diagram);
-           // Wait next tick for component mount
            setTimeout(() => {
                 if (diagramCanvasRef.current) {
                     diagramCanvasRef.current.loadDiagram(diagram);
+                    setZoomLevel(diagramCanvasRef.current.getZoom());
                 }
            }, 100);
        } else {
@@ -51,21 +52,26 @@ function App() {
     }, 4000);
   };
 
-  const handleDiagramChange = () => {
-      // Auto-save logic could go here, but for now we debounce saving to manual 'save' or significant events to avoid overhead
-      // The diagram object itself is not updated constantly, only when saving.
+  const getCleanFilename = () => {
+      const name = currentDiagram?.name || 'diagram';
+      return name.toLowerCase().replace(/[^a-z0-9]/g, '_');
   };
 
-  const saveCurrentDiagram = async (customName = null) => {
+  const saveCurrentDiagram = async (nameOrEvent = null) => {
       if (!diagramCanvasRef.current) return;
       
       const pwaData = diagramCanvasRef.current.getCurrentData();
+      
+      let customName = null;
+      if (typeof nameOrEvent === 'string') {
+          customName = nameOrEvent;
+      }
       
       const newDiagram = {
           ...(currentDiagram || {}),
           id: currentDiagram?.id || generateUUID(),
           name: customName || currentDiagram?.name || 'Unbenanntes Diagramm',
-          createdAt: currentDiagram?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
           diagram: pwaData
       };
       
@@ -81,55 +87,80 @@ function App() {
 
   const handleDiagramSelect = (diagram) => {
       setCurrentDiagram(diagram);
+      setLastDiagramId(diagram.id);
       if (diagramCanvasRef.current) {
           diagramCanvasRef.current.loadDiagram(diagram);
+          setZoomLevel(diagramCanvasRef.current.getZoom());
       }
       showNotification(`Diagramm "${diagram.name}" geladen`, 'info');
   };
 
   const handleNewDiagram = () => {
-      setCurrentDiagram({
-          id: generateUUID(),
+      const newId = generateUUID();
+      const newD = {
+          id: newId,
           name: 'Neues Diagramm',
-          createdAt: new Date().toISOString()
-      });
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          diagram: null
+      };
+      setCurrentDiagram(newD);
+      setLastDiagramId(newId);
+      if (diagramCanvasRef.current) {
+          diagramCanvasRef.current.clear();
+          setZoomLevel(1);
+      }
+  };
+
+  const handleRenameDiagram = async (newName) => {
+      if (!currentDiagram) return;
+      const updated = { ...currentDiagram, name: newName };
+      setCurrentDiagram(updated);
+      
+      const exists = await indexeddb.getDiagram(currentDiagram.id);
+      if (exists) {
+          await indexeddb.saveDiagram(updated);
+      }
+      showNotification('Diagramm umbenannt', 'info');
+  };
+
+  const handleClearDiagram = () => {
       if (diagramCanvasRef.current) {
           diagramCanvasRef.current.clear();
       }
+      showNotification('Arbeitsfläche geleert (Rückgängig möglich).', 'info');
   };
 
   const handleAIGenerated = (diagramData) => {
       if (!diagramCanvasRef.current) return;
       diagramCanvasRef.current.loadGeneratedData(diagramData);
-      showNotification('Diagramm erfolgreich per KI generiert', 'success');
-      // Autosave right after AI generation
+      showNotification('KI-Diagramm generiert', 'success');
       setTimeout(() => saveCurrentDiagram('KI Generiertes Diagramm'), 500); 
   };
 
-  // Export handlers
-  const handleExportPNG = () => {
-    diagramCanvasRef.current?.exportAsPNG('vhs-flowchart.png');
+  // Zoom handlers
+  const handleZoomIn = () => {
+    diagramCanvasRef.current?.zoomIn();
+    setZoomLevel(diagramCanvasRef.current?.getZoom() || 1);
   };
 
-  const handleExportSVG = () => {
-    diagramCanvasRef.current?.exportAsSVG('vhs-flowchart.svg');
+  const handleZoomOut = () => {
+    diagramCanvasRef.current?.zoomOut();
+    setZoomLevel(diagramCanvasRef.current?.getZoom() || 1);
   };
 
-  const handleExportPDF = () => {
-    diagramCanvasRef.current?.exportAsPDF('vhs-flowchart.pdf');
-  };
-
-  const handleExportJSON = () => {
-     diagramCanvasRef.current?.exportAsJSON('vhs-flowchart.json');
+  const handleCenter = () => {
+    diagramCanvasRef.current?.center();
   };
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[var(--color-vhs-blau-10)]">
       <Header 
         onSettingsClick={() => setIsSettingsOpen(true)} 
-        currentDiagramName={currentDiagram?.name}
+        currentDiagram={currentDiagram}
         onNewDiagram={handleNewDiagram}
         onDiagramSelect={handleDiagramSelect}
+        onRename={handleRenameDiagram}
       />
       
       <AiInputPanel 
@@ -141,21 +172,33 @@ function App() {
         <Toolbar />
         <DiagramCanvas 
            ref={diagramCanvasRef}
-           onGraphChange={handleDiagramChange}
+           onGraphChange={() => {}}
         />
       </div>
 
       <ExportBar 
-         onExportSVG={handleExportSVG}
-         onExportPNG={handleExportPNG}
-         onExportPDF={handleExportPDF}
-         onExportJSON={handleExportJSON}
+         onExportSVG={() => diagramCanvasRef.current?.exportAsSVG(`${getCleanFilename()}.svg`, currentDiagram?.name)}
+         onExportPNG={() => diagramCanvasRef.current?.exportAsPNG(`${getCleanFilename()}.png`, currentDiagram?.name)}
+         onExportPDF={() => diagramCanvasRef.current?.exportAsPDF(`${getCleanFilename()}.pdf`, currentDiagram?.name)}
+         onExportJSON={() => diagramCanvasRef.current?.exportAsJSON(`${getCleanFilename()}.json`)}
          onSave={saveCurrentDiagram}
+         onClear={handleClearDiagram}
+         onLoadClick={() => setIsLoadModalOpen(true)}
+         zoomLevel={zoomLevel}
+         onZoomIn={handleZoomIn}
+         onZoomOut={handleZoomOut}
+         onCenterContent={handleCenter}
       />
 
       <SettingsModal 
         isOpen={isSettingsOpen} 
         onClose={() => setIsSettingsOpen(false)} 
+      />
+
+      <DiagramListModal
+        isOpen={isLoadModalOpen}
+        onClose={() => setIsLoadModalOpen(false)}
+        onSelect={handleDiagramSelect}
       />
       
       <Notification 

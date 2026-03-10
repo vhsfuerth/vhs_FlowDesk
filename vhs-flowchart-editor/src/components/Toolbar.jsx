@@ -1,11 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import { Play, Square, Diamond, MessageSquareDashed, ArrowRight } from 'lucide-react';
+import { Play, CircleStop, Square, Diamond, MessageSquareDashed, ArrowRight } from 'lucide-react';
 import * as joint from 'jointjs';
 import { createStartNode, createEndNode, createProcessNode, createDecisionNode, createAnnotationNode } from '../diagram/shapes';
 
 const Toolbar = ({ onDragStart }) => {
   const tools = [
-    { type: 'start', icon: Play, label: 'Start / Ende', color: 'text-[var(--color-vhs-gelb)]', createFn: createStartNode },
+    { type: 'start', icon: Play, label: 'Start', color: 'text-[var(--color-vhs-gelb)]', createFn: createStartNode },
+    { type: 'end', icon: CircleStop, label: 'Ende', color: 'text-[var(--color-vhs-orange)]', createFn: createEndNode },
     { type: 'process', icon: Square, label: 'Prozess', color: 'text-[var(--color-vhs-blau)]', createFn: createProcessNode },
     { type: 'decision', icon: Diamond, label: 'Entscheidung', color: 'text-[var(--color-vhs-orange-hell)]', createFn: createDecisionNode },
     { type: 'annotation', icon: MessageSquareDashed, label: 'Kommentar', color: 'text-[var(--color-vhs-blau-60)]', createFn: createAnnotationNode },

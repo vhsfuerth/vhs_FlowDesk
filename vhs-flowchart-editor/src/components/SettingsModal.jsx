@@ -29,13 +29,13 @@ const SettingsModal = ({ isOpen, onClose }) => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
               <Key className="w-4 h-4 mr-1" />
-              OpenAI API-Key
+              Google Gemini API-Key
             </label>
             <input
               type="password"
               value={apiKey}
               onChange={(e) => setKeyValue(e.target.value)}
-              placeholder="sk-..."
+              placeholder="AIzaSy..."
               className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-[var(--color-vhs-orange-hell)] focus:border-transparent"
             />
             <p className="text-xs text-gray-500 mt-1">

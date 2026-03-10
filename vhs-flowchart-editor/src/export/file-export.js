@@ -1,109 +1,194 @@
 import { jsPDF } from 'jspdf';
 
-export const exportToSVG = (paper, filename = 'diagram.svg') => {
-    // JointJS paper.toSVG returns an SVG string
-    const svgString = paper.svg.outerHTML;
-    
-    // Add default namespace if missing
-    let svgWithNamespaces = svgString;
-    if (svgString.indexOf('xmlns') === -1) {
-        svgWithNamespaces = svgString.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+// Helper to convert an image URL to Base64
+const getBase64Image = async (url) => {
+    try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    } catch (e) {
+        console.error('Failed to load logo for export', e);
+        return null;
     }
+};
 
-    const blob = new Blob([svgWithNamespaces], { type: 'image/svg+xml;charset=utf-8' });
+const getSvgString = async (paper, title = '') => {
+    const paperSvg = paper.svg;
+    const serializer = new XMLSerializer();
+    
+    // JointJS content bbox
+    const bbox = paper.getContentBBox();
+    
+    // Create a clone to manipulate without affecting UI
+    const svgClone = paperSvg.cloneNode(true);
+    
+    // Set viewBox to include header space
+    const padding = 20;
+    const headerHeight = 70; // Space for Logo and Title
+    
+    const vx = bbox.x - padding;
+    const vy = bbox.y - padding - headerHeight;
+    const vw = bbox.width + padding * 2;
+    const vh = bbox.height + padding * 2 + headerHeight;
+    
+    svgClone.setAttribute('viewBox', `${vx} ${vy} ${vw} ${vh}`);
+    svgClone.setAttribute('width', vw);
+    svgClone.setAttribute('height', vh);
+    
+    // Embed CSS styles
+    const styles = document.querySelectorAll('style, link[rel="stylesheet"]');
+    let cssText = '';
+    styles.forEach(s => {
+        try {
+            if (s.tagName === 'STYLE') {
+                cssText += s.innerHTML;
+            } else if (s.sheet) {
+                const rules = s.sheet.cssRules;
+                for (let i = 0; i < rules.length; i++) {
+                    cssText += rules[i].cssText;
+                }
+            }
+        } catch (e) {}
+    });
+    
+    const styleElement = document.createElement('style');
+    styleElement.innerHTML = `<![CDATA[${cssText}]]>`;
+    svgClone.insertBefore(styleElement, svgClone.firstChild);
+
+    // Add Logo and Title to SVG
+    const svgNS = "http://www.w3.org/2000/svg";
+    const headerGroup = document.createElementNS(svgNS, "g");
+    
+    // CRITICAL: Embed Logo as Base64 to avoid tainted canvas issues
+    const logoBase64 = await getBase64Image('/Logo_HQ_pos.png');
+    if (logoBase64) {
+        const logoImg = document.createElementNS(svgNS, "image");
+        logoImg.setAttributeNS(null, "href", logoBase64);
+        logoImg.setAttributeNS(null, "x", vx + padding);
+        logoImg.setAttributeNS(null, "y", vy + padding + 10);
+        logoImg.setAttributeNS(null, "width", "100");
+        logoImg.setAttributeNS(null, "height", "40");
+        headerGroup.appendChild(logoImg);
+    }
+    
+    // Title Text
+    if (title) {
+        const titleText = document.createElementNS(svgNS, "text");
+        titleText.setAttributeNS(null, "x", vx + padding + 115);
+        titleText.setAttributeNS(null, "y", vy + padding + 40);
+        titleText.setAttributeNS(null, "font-family", "Outfit, sans-serif");
+        titleText.setAttributeNS(null, "font-size", "22px");
+        titleText.setAttributeNS(null, "font-weight", "900");
+        titleText.setAttributeNS(null, "fill", "#00285A");
+        titleText.textContent = title;
+        headerGroup.appendChild(titleText);
+    }
+    
+    svgClone.appendChild(headerGroup);
+
+    let svgString = serializer.serializeToString(svgClone);
+    if (!svgString.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
+        svgString = svgString.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+    }
+    if (!svgString.match(/^<svg[^>]+xmlns\:xlink="http\:\/\/www\.w3\.org\/1999\/xlink"/)) {
+        svgString = svgString.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+    }
+    
+    return {
+        svgString: '<?xml version="1.0" standalone="no"?>\r\n' + svgString,
+        width: vw,
+        height: vh
+    };
+};
+
+export const exportToSVG = async (paper, filename = 'vhs-flowchart.svg', title = '') => {
+    const { svgString } = await getSvgString(paper, title);
+    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
     downloadBlob(blob, filename);
 };
 
-export const exportToPNG = (paper, filename = 'diagram.png') => {
-     const svgString = paper.svg.outerHTML;
-     let svgWithNamespaces = svgString;
-     if (svgString.indexOf('xmlns') === -1) {
-        svgWithNamespaces = svgString.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
-     }
-     
-     // Need the actual paper dimensions
-     const bbox = paper.getContentBBox();
-     
-     const canvas = document.createElement('canvas');
-     canvas.width = bbox.width + bbox.x * 2 + 40; // Add some padding
-     canvas.height = bbox.height + bbox.y * 2 + 40;
-     const ctx = canvas.getContext('2d');
-     
-     // White background
-     ctx.fillStyle = '#ffffff';
-     ctx.fillRect(0, 0, canvas.width, canvas.height);
+export const exportToPNG = async (paper, filename = 'vhs-flowchart.png', title = '') => {
+    const { svgString, width, height } = await getSvgString(paper, title);
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
 
-     const img = new Image();
-     const blob = new Blob([svgWithNamespaces], { type: 'image/svg+xml;charset=utf-8' });
-     const url = URL.createObjectURL(blob);
-     
-     img.onload = () => {
-         // Draw starting from a bit of offset to map with the bbox
-         ctx.drawImage(img, 0, 0);
-         URL.revokeObjectURL(url);
-         
-         const pngUrl = canvas.toDataURL('image/png');
-         
-         const a = document.createElement('a');
-         a.href = pngUrl;
-         a.download = filename;
-         document.body.appendChild(a);
-         a.click();
-         document.body.removeChild(a);
-     };
-     img.src = url;
+    const img = new Image();
+    // Using a blob URL is safer
+    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    
+    img.onload = () => {
+        ctx.drawImage(img, 0, 0);
+        URL.revokeObjectURL(url);
+        
+        try {
+            const pngUrl = canvas.toDataURL('image/png');
+            const a = document.createElement('a');
+            a.href = pngUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        } catch (err) {
+            console.error('PNG Export failed', err);
+        }
+    };
+    img.onerror = () => URL.revokeObjectURL(url);
+    img.src = url;
 };
 
-export const exportToPDF = (paper, filename = 'diagram.pdf') => {
-    // Basic approach using the PNG data and embedding it into a PDF
-    const svgString = paper.svg.outerHTML;
-    let svgWithNamespaces = svgString;
-    if (svgString.indexOf('xmlns') === -1) {
-        svgWithNamespaces = svgString.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
-    }
-    
-    const bbox = paper.getContentBBox();
-    const width = bbox.width + bbox.x * 2 + 40;
-    const height = bbox.height + bbox.y * 2 + 40;
+export const exportToPDF = async (paper, filename = 'vhs-flowchart.pdf', title = '') => {
+    const { svgString, width, height } = await getSvgString(paper, title);
     
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, width, height);
 
     const img = new Image();
-    const blob = new Blob([svgWithNamespaces], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
+    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
     
     img.onload = () => {
         ctx.drawImage(img, 0, 0);
         URL.revokeObjectURL(url);
-        const imgData = canvas.toDataURL('image/png');
         
-        // Setup jsPDF based on diagram proportions
-        const orientation = width > height ? 'l' : 'p';
-        const doc = new jsPDF({
-            orientation: orientation,
-            unit: 'px',
-            format: [width, height]
-        });
-        
-        doc.addImage(imgData, 'PNG', 0, 0, width, height);
-        doc.save(filename);
+        try {
+            const imgData = canvas.toDataURL('image/png');
+            const orientation = width > height ? 'l' : 'p';
+            const doc = new jsPDF({
+                orientation: orientation,
+                unit: 'px',
+                format: [width, height]
+            });
+            
+            doc.addImage(imgData, 'PNG', 0, 0, width, height);
+            doc.save(filename);
+        } catch (err) {
+            console.error('PDF Export failed', err);
+        }
     };
+    img.onerror = () => URL.revokeObjectURL(url);
     img.src = url;
 };
 
-export const exportToJSON = (jsonObj, filename = 'diagram.json') => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(jsonObj, null, 2));
-    const a = document.createElement('a');
-    a.href = dataStr;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+export const exportToJSON = (jsonObj, filename = 'vhs-flowchart.json') => {
+    const dataStr = JSON.stringify(jsonObj, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    downloadBlob(blob, filename);
 };
 
 const downloadBlob = (blob, filename) => {
