@@ -1,0 +1,35 @@
+/* Specific overrides for joint.js Canvas and Elements */
+
+.joint-theme-default .joint-paper.joint-theme-default {
+    background: transparent; /* Override because we set it via paper configuration */
+}
+
+/* Custom Selection borders */
+.joint-theme-default.joint-paper svg .vhs.Start.selectedbody { stroke: var(--color-vhs-orange-hell); stroke-width: 4px;}
+.joint-theme-default.joint-paper svg .vhs.End.selectedbody { stroke: var(--color-vhs-orange-hell); stroke-width: 4px; }
+.joint-theme-default.joint-paper svg .vhs.Process.selectedbody { stroke: var(--color-vhs-orange-hell); stroke-width: 4px; }
+.joint-theme-default.joint-paper svg .vhs.Decision.selectedbody { stroke: var(--color-vhs-orange-hell); stroke-width: 4px; }
+.joint-theme-default.joint-paper svg .vhs.Annotation.selectedbody { stroke: var(--color-vhs-orange-hell); stroke-width: 2px; }
+
+/* Connection styling */
+.connection-wrap {
+    cursor: pointer;
+}
+.marker-arrowheads {
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.joint-link:hover .marker-arrowheads,
+.joint-link.selected .marker-arrowheads {
+    opacity: 1;
+}
+
+.joint-element {
+    cursor: move;
+}
+
+[data-type="vhs.Start"] label { font-weight: bold; pointer-events: none; }
+[data-type="vhs.End"] label { font-weight: bold; pointer-events: none; }
+[data-type="vhs.Process"] label { font-weight: bold; pointer-events: none; }
+[data-type="vhs.Decision"] label { font-weight: bold; pointer-events: none; }
+[data-type="vhs.Annotation"] label { pointer-events: none; }

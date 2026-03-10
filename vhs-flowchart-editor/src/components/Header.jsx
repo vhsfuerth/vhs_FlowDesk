@@ -1,0 +1,113 @@
+import React, { useState, useEffect } from 'react';
+import { Settings, FilePlus, FolderOpen, Save } from 'lucide-react';
+import { indexeddb } from '../storage/indexeddb';
+import { generateUUID } from '../utils/uuid';
+import { setLastDiagramId } from '../storage/settings';
+
+const Header = ({ onSettingsClick, currentDiagramName, onNewDiagram, onDiagramSelect }) => {
+  const [diagrams, setDiagrams] = useState([]);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  useEffect(() => {
+     loadDiagrams();
+  }, [isMenuOpen]);
+
+  const loadDiagrams = async () => {
+      const all = await indexeddb.getAllDiagrams();
+      setDiagrams(all.sort((a,b) => new Date(b.updatedAt) - new Date(a.updatedAt)));
+  };
+
+  const handleSelect = (dgrm) => {
+      setIsMenuOpen(false);
+      setLastDiagramId(dgrm.id);
+      onDiagramSelect(dgrm);
+  };
+
+  const handleNew = () => {
+      setIsMenuOpen(false);
+      onNewDiagram();
+  };
+
+  const handleDelete = async (e, id) => {
+      e.stopPropagation();
+      if(window.confirm('Diagramm wirklich löschen?')) {
+          await indexeddb.deleteDiagram(id);
+          loadDiagrams();
+      }
+  };
+
+  return (
+    <header className="bg-[var(--color-vhs-blau)] text-white shadow-md w-full h-16 flex items-center justify-between px-6 z-40 relative">
+      <div className="flex items-center">
+        {/* Placeholder for Logo - In a real app we'd load it from public/assets */}
+        <div className="bg-white rounded p-1 mr-4 overflow-hidden h-8 flex items-center shadow-inner">
+             <div className="font-bold text-[var(--color-vhs-blau)] text-xl tracking-tighter leading-none px-2">vhs</div>
+        </div>
+        <div>
+            <h1 className="text-lg font-bold leading-none tracking-wide text-white">Workflow-Algorithm Editor</h1>
+            <p className="text-xs text-[var(--color-vhs-blau-20)]">{currentDiagramName || 'Unbenanntes Diagramm'}</p>
+        </div>
+      </div>
+
+      <div className="flex items-center space-x-2">
+        
+        <div className="relative">
+            <button
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            className="flex items-center px-4 py-2 hover:bg-[var(--color-vhs-blau-80)] rounded-md transition-colors font-medium border border-transparent hover:border-[var(--color-vhs-blau-60)]"
+            >
+            <FolderOpen className="w-4 h-4 mr-2" />
+            Diagramme
+            </button>
+
+            {isMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-md shadow-xl overflow-hidden border border-gray-100 z-50 text-gray-800">
+                    <div className="p-2 bg-gray-50 border-b flex justify-between items-center">
+                        <span className="text-sm font-bold text-gray-600">Gespeicherte Diagramme</span>
+                        <button onClick={handleNew} className="text-xs bg-[var(--color-vhs-blau)] text-white px-2 py-1 rounded hover:bg-[var(--color-vhs-blau-80)] flex items-center">
+                            <FilePlus className="w-3 h-3 mr-1"/> Neu
+                        </button>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto">
+                        {diagrams.length === 0 ? (
+                            <div className="p-4 text-center text-sm text-gray-500">Keine Diagramme gespeichert</div>
+                        ) : (
+                            <ul className="divide-y divide-gray-100">
+                                {diagrams.map(d => (
+                                    <li key={d.id} 
+                                        onClick={() => handleSelect(d)}
+                                        className="p-3 flex flex-col hover:bg-[var(--color-vhs-blau-10)] cursor-pointer group"
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-medium text-[var(--color-vhs-blau)] text-sm truncate pr-2">{d.name}</span>
+                                            <button 
+                                                onClick={(e) => handleDelete(e, d.id)}
+                                                className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 p-1"
+                                                title="Löschen"
+                                            >
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                                            </button>
+                                        </div>
+                                        <span className="text-xs text-gray-500">{new Date(d.updatedAt).toLocaleString()}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+
+        <button
+          onClick={onSettingsClick}
+          className="p-2 hover:bg-[var(--color-vhs-blau-80)] rounded-full transition-colors"
+          title="Einstellungen"
+        >
+          <Settings className="w-5 h-5 text-[var(--color-vhs-gelb)]" />
+        </button>
+      </div>
+    </header>
+  );
+};
+
+export default Header;

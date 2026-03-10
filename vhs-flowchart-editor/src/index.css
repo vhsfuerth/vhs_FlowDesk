@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@theme {
+  --color-vhs-blau: #00285A;
+  --color-vhs-blau-80: #375578;
+  --color-vhs-blau-60: #69829B;
+  --color-vhs-blau-40: #9BAABE;
+  --color-vhs-blau-20: #CDD7DC;
+  --color-vhs-blau-10: #E6EBF0;
+  
+  --color-vhs-gelb: #FAB90F;
+  --color-vhs-orange-hell: #F7A746;
+  --color-vhs-rot: #E1000F;
+  --color-vhs-gruen: #AFC805;
+  --color-vhs-violett: #7D5AA5;
+  --color-vhs-hellblau: #64B9E6;
+  --color-vhs-orange: #EB640F;
+
+  --color-vhs-gelb-b: #FF9100;
+  --color-vhs-orange-hell-b: #A25C2E;
+  --color-vhs-rot-b: #8C0A23;
+  --color-vhs-gruen-b: #4BA02D;
+  --color-vhs-violett-b: #371964;
+  --color-vhs-hellblau-b: #1E73AF;
+  --color-vhs-orange-b: #B42D0F;
+
+  --font-primary: Arial, Calibri, Helvetica, sans-serif;
+}
+
+:root {
+  font-family: var(--font-primary);
+  background-color: #f7f9fa;
+  color: #333;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* JointJS overrides for default aesthetics */
+.joint-paper {
+  background-color: #ffffff;
+  border: 1px solid var(--color-vhs-blau-20);
+}
