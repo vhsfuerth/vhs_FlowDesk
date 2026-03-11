@@ -52,8 +52,8 @@ const Header = ({ onSettingsClick, currentDiagram, onNewDiagram, onDiagramSelect
   return (
     <header className="bg-[var(--color-vhs-blau)] text-white shadow-md w-full h-16 flex items-center justify-between px-6 z-40 relative border-b border-white/10">
       <div className="flex items-center space-x-4">
-        <div className="bg-white rounded p-1 overflow-hidden h-8 flex items-center shadow-md">
-             <div className="font-black text-[var(--color-vhs-blau)] text-xl tracking-tighter leading-none px-2">vhs</div>
+        <div className="bg-white rounded p-1 overflow-hidden h-10 flex items-center shadow-md">
+             <img src="/Logo_HQ_pos.png" alt="vhs Logo" className="h-full w-auto object-contain px-1" />
         </div>
         <div className="flex flex-col justify-center border-l border-white/20 pl-4">
             <h1 className="text-sm font-black uppercase tracking-widest text-[var(--color-vhs-blau-20)] leading-none mb-1">Workflow Editor</h1>

@@ -269,11 +269,8 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded }, ref) => {
 
     try {
       const nodeData = JSON.parse(dataStr);
-      const rect = canvasRef.current.getBoundingClientRect();
-      const container = canvasRef.current.parentNode;
-      
-      const x = (e.clientX - rect.left + container.scrollLeft) / zoomLevel;
-      const y = (e.clientY - rect.top + container.scrollTop) / zoomLevel;
+      const point = paperRef.current.clientToLocalPoint(e.clientX, e.clientY);
+      const { x, y } = point;
 
       let newNode;
       switch (nodeData.type) {

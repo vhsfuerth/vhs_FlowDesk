@@ -60,6 +60,25 @@ Wenn ihr bereits Systeme wie Bookstack unter `bookstack.vhs.local` habt, funktio
 3. **DNS**: Erstellt einen DNS-Eintrag (A-Record) für `workflow.vhs.local`, der auf die IP dieses Servers zeigt.
 4. **Fertig**: Die Software ist nun für alle Kolleg*innen im Netzwerk unter der Adresse erreichbar.
 
+### 4. Hosting auf einem Ubuntu-Server (Expert)
+Für den Betrieb auf einem Linux-Server (z.B. mit Nginx) folge diesen Schritten:
+
+1. **Build lokal**: Erstelle den `dist/`-Ordner mit der `build.bat` auf deinem Rechner.
+2. **Transfer**: Kopiere den Inhalt des `dist/`-Ordners auf den Server nach `/var/www/workflow-editor`.
+3. **Nginx Konfiguration**: Erstelle eine Config-Datei unter `/etc/nginx/sites-available/workflow-editor`:
+   ```nginx
+   server {
+       listen 80;
+       server_name workflow.vhs.local;
+       root /var/www/workflow-editor;
+       index index.html;
+       location / {
+           try_files $uri $uri/ /index.html;
+       }
+   }
+   ```
+4. **Aktivieren**: `sudo ln -s /etc/nginx/sites-available/workflow-editor /etc/nginx/sites-enabled/` und Nginx neu starten: `sudo systemctl restart nginx`.
+
 ### 3. Als ZIP-Archiv (Lokal)
 Du kannst den gesamten Projektordner als `.zip` verschicken. 
 - **Voraussetzung**: Der Empfänger muss [Node.js](https://nodejs.org) installiert haben.
