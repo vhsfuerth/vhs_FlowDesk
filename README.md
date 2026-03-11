@@ -28,6 +28,14 @@ Lokal laufendes PWA-Tool (Progressive Web App) zur Erstellung algorithmischer Ab
 4. Öffne die Adresse `http://localhost:5173` im Browser (Chrome/Edge empfohlen).
 5. Trage deinen Google Gemini API-Key in den Einstellungen (Zahnrad) ein.
 
+## 📱 Lokale Nutzung & PWA (Installation als App)
+
+Da das Tool als **Progressive Web App (PWA)** entwickelt wurde, kannst du es wie eine normale Desktop-Anwendung installieren:
+
+1. **In Chrome/Edge**: Klicke oben rechts in der Adresszeile auf das kleine Icon "App installieren" (oder über das Drei-Punkte-Menü -> "App installieren").
+2. **Vorteil**: Du hast dann ein eigenes Programm-Icon auf deinem Desktop und die App öffnet sich in einem eigenen Fenster ohne Browser-Leisten.
+3. **Daten**: Alle Diagramme bleiben weiterhin ausschließlich auf deinem Rechner gespeichert und werden nicht in eine Cloud geladen.
+
 ## 📖 Nutzungshintergrund
 
 - **Gekennzeichnete Ports**: Fahre mit der Maus über den Rand eines Elements, klicke auf einen der erscheinenden gelben Punkte und ziehe die Linie zum Zielelement.
