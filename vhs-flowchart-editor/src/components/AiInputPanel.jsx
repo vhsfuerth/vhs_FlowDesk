@@ -42,7 +42,7 @@ const AiInputPanel = ({ onDiagramGenerated, onError }) => {
   };
 
   return (
-    <div className="bg-white border-b border-[var(--color-vhs-blau-20)] p-2 px-4 shadow-sm flex flex-col md:flex-row md:items-center gap-3">
+    <div className="bg-white border-b border-[var(--color-vhs-blau-20)] py-1.5 px-4 shadow-sm flex flex-col md:flex-row md:items-center gap-2">
       <div className="flex-grow">
         <label htmlFor="ai-input" className="block text-xs font-bold text-[var(--color-vhs-blau)] mb-0.5">
           KI-Assistent: Prozessbeschreibung eingeben
@@ -52,7 +52,7 @@ const AiInputPanel = ({ onDiagramGenerated, onError }) => {
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder='z.B. "Ein Antrag geht ein. Bei Erfolg genehmigen..."'
-          className="w-full text-sm p-1.5 px-3 border border-[var(--color-vhs-blau-40)] rounded-md focus:ring-2 focus:ring-[var(--color-vhs-orange-hell)] focus:border-transparent min-h-[50px] max-h-[120px] resize-y"
+          className="w-full text-sm py-1 px-3 border border-[var(--color-vhs-blau-40)] rounded-md focus:ring-2 focus:ring-[var(--color-vhs-orange-hell)] focus:border-transparent min-h-[40px] max-h-[96px] resize-y"
           disabled={isGenerating}
         />
       </div>
@@ -60,7 +60,7 @@ const AiInputPanel = ({ onDiagramGenerated, onError }) => {
         <button
           onClick={handleGenerate}
           disabled={isGenerating || text.trim().length < 10}
-          className="bg-[var(--color-vhs-blau)] text-white px-5 py-2 rounded-md font-bold hover:bg-[var(--color-vhs-blau-80)] transition-colors flex items-center justify-center min-w-[150px] disabled:bg-[var(--color-vhs-blau-40)] disabled:cursor-not-allowed group text-sm"
+          className="bg-[var(--color-vhs-blau)] text-white px-5 py-1.5 rounded-md font-bold hover:bg-[var(--color-vhs-blau-80)] transition-colors flex items-center justify-center min-w-[150px] disabled:bg-[var(--color-vhs-blau-40)] disabled:cursor-not-allowed group text-sm"
         >
           {isGenerating ? (
             <>

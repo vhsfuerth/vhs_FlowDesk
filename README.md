@@ -1,96 +1,170 @@
 # vhs Workflow-Algorithm Editor
 
-Lokal laufendes PWA-Tool (Progressive Web App) zur Erstellung algorithmischer Ablaufpläne (Flowcharts, Entscheidungsbäume) basierend auf dem vhs Corporate Design.
+Lokal laufendes PWA-Tool (Progressive Web App) zur Erstellung algorithmischer Ablaufplaene, Flowcharts und Entscheidungsbaeume im vhs Corporate Design.
 
-## ✨ Hauptfunktionen
+## Hauptfunktionen
 
-- **KI-Diagramm-Generierung**: Erzeugt Diagramme direkt aus einer einfachen Prozessbeschreibung (Freitext) über die Google Gemini API.
-- **Visueller Editor**: Drag & Drop Editor basierend auf JointJS im vhs Design.
-- **Dynamisches Sizing**: Automatische Anpassung der Element-Größe an den Textinhalt (inkl. Zeilenumbruch).
-- **Speicherverwaltung**: Mehrere Diagramme lokal speichern, laden, benennen und löschen (IndexedDB).
-- **Offline-fähig**: Der Editor, das Laden, Speichern und der Export (PNG, SVG, PDF, JSON) funktionieren auch ohne Internetverbindung. Lediglich das KI-Generator-Feature benötigt Internet.
-- **Lokale Datenhaltung**: Alle Diagramme und der API-Key werden ausschließlich lokal im Browser gespeichert.
+- **KI-Diagramm-Generierung**: Erzeugt Diagramme direkt aus einer Prozessbeschreibung per Google Gemini API.
+- **Visueller Editor**: Drag-and-drop-basierter Diagrammeditor mit JointJS.
+- **vhs-Starter-Vorlagen**: Sofort nutzbare Vorlagen fuer typische vhs-Prozesse wie Kursplanung, Dozierenden-Onboarding, Beschwerdebearbeitung oder Raumbuchung.
+- **Prozess-Check und Selbstbewertung**: Automatische Strukturpruefung plus schlanke Reflexion in fuenf OE-Feldern.
+- **Massnahmen-Overlay**: Verbesserungsmassnahmen mit Bezug auf einzelne Prozessschritte direkt am Diagramm pflegen.
+- **Workshop-Modus**: Schrittweise Moderationsansicht fuer Teamgespraeche und Prozessworkshops.
+- **Speicherverwaltung**: Mehrere Diagramme lokal speichern, laden, umbenennen und loeschen.
+- **Offline-faehig**: Editor, Laden, Speichern und Exporte funktionieren auch ohne Internet. Nur die KI-Funktion benoetigt Netzverbindung.
+- **Lokale Datenhaltung**: Diagramme, Projektmetadaten und API-Key bleiben lokal im Browser gespeichert.
 
-## 🛠️ Letzte Fixes & Updates
+## Letzte Erweiterungen
 
-- **Text-Overflow gelöst**: Elemente nutzen nun `textWrap` und skalieren automatisch mit der Textmenge.
-- **Manuelle Verbindungen**: Elemente besitzen nun "Ports" an den Rändern, von denen aus Verbindungen per Maus gezogen werden können (sichtbar bei Hover).
-- **Separates Ende-Element**: Das orangefarbene Ende-Oval ist jetzt separat in der Toolbar verfügbar.
-- **Speicher-Stabilität**: "Floating Links" (unfertige Verbindungen) wurden abgefangen und führen nicht mehr zu Fehlern beim Speichern.
-- **Echtzeit-Renaming**: Diagramm-Namen können direkt im Header per Klick editiert werden.
-- **Reset-Funktion**: Ein dedizierter "Leeren"-Button erlaubt das schnelle Zurücksetzen der Arbeitsfläche.
+- **Vorlagenbibliothek**: Neue Starter-Vorlagen erleichtern den Einstieg in typische Volkshochschulprozesse.
+- **Qualitaetsleiste**: Rechte Seitenleiste mit Strukturpruefung, EFQM-naher Selbstbewertung und Massnahmenverwaltung.
+- **Workshop-Modus**: Moderationsansicht mit Schritt-Navigation, Fokusmodus und Export einer Workshop-Zusammenfassung.
+- **Erweiterte Exporte**: Projektdatei mit Metadaten, Massnahmenliste als CSV und Workshop-Notizen als TXT.
+- **Manuelle Verbindungen**: Elemente besitzen Ports an den Raendern, von denen aus Verbindungen per Maus gezogen werden koennen.
+- **Dynamisches Text-Sizing**: Elemente skalieren automatisch mit der Textmenge.
+- **Reset-Funktion**: Ein dedizierter Button erlaubt das schnelle Leeren der Arbeitsflaeche.
 
-## 🚀 Erste Schritte / Installation
+## Erste Schritte / Installation
 
 1. Stelle sicher, dass [Node.js](https://nodejs.org) installiert ist.
-2. Führe die Datei `install.bat` per Doppelklick aus.
-3. Starte das Tool zukünftig mit einem Klick auf die `start.bat`.
-4. Öffne die Adresse `http://localhost:5173` im Browser (Chrome/Edge empfohlen).
-5. Trage deinen Google Gemini API-Key in den Einstellungen (Zahnrad) ein.
+2. Fuehre die Datei `install.bat` per Doppelklick aus.
+3. Starte das Tool kuenftig mit einem Klick auf `start.bat`.
+4. Oeffne `http://localhost:5173` im Browser. Chrome oder Edge werden empfohlen.
+5. Trage deinen Google-Gemini-API-Key in den Einstellungen ein.
 
-## 📱 Lokale Nutzung & PWA (Installation als App)
+## Lokale Nutzung und PWA
 
-Da das Tool als **Progressive Web App (PWA)** entwickelt wurde, kannst du es wie eine normale Desktop-Anwendung installieren:
+Da das Tool als Progressive Web App entwickelt wurde, kann es wie eine normale Desktop-Anwendung installiert werden:
 
-1. **In Chrome/Edge**: Klicke oben rechts in der Adresszeile auf das kleine Icon "App installieren" (oder über das Drei-Punkte-Menü -> "App installieren").
-2. **Vorteil**: Du hast dann ein eigenes Programm-Icon auf deinem Desktop und die App öffnet sich in einem eigenen Fenster ohne Browser-Leisten.
-3. **Daten**: Alle Diagramme bleiben weiterhin ausschließlich auf deinem Rechner gespeichert und werden nicht in eine Cloud geladen.
+1. In Chrome oder Edge in der Adresszeile auf "App installieren" klicken.
+2. Die App erscheint danach mit eigenem Icon und ohne Browserleisten.
+3. Alle Daten bleiben weiterhin lokal auf dem jeweiligen Geraet.
 
-## 📖 Nutzungshintergrund
+## Nutzung im Alltag
 
-- **Gekennzeichnete Ports**: Fahre mit der Maus über den Rand eines Elements, klicke auf einen der erscheinenden gelben Punkte und ziehe die Linie zum Zielelement.
-- **Text bearbeiten**: Mache einen **Doppelklick** auf ein Element oder eine Verbindungslinie, um den Text manuell zu ändern. Die Box-Größe passt sich automatisch an.
-- **Speichern**: Nutze den "Speichern"-Button unten links. Deine Diagramme werden sicher in deinem Browser (IndexedDB) abgelegt.
-- **Laden**: Über den "Laden"-Button kannst du auf die Liste deiner gespeicherten Projekte zugreifen.
+- **Elemente verbinden**: Mit der Maus ueber einen Knoten fahren, einen Port anklicken und die Verbindung zum Zielelement ziehen.
+- **Text bearbeiten**: Doppelklick auf ein Element oder eine Verbindung, um den Text direkt anzupassen.
+- **Speichern**: Ueber den Button "Speichern" wird das aktuelle Projekt lokal in IndexedDB gesichert.
+- **Laden**: Ueber "Oeffnen" lassen sich gespeicherte Diagramme wieder aufrufen.
 
-## 💻 Technologien (Developer Info)
+## Neue Funktionen nutzen
+
+### 1. Mit Vorlagen starten
+
+1. Im Header auf **"Vorlagen"** klicken.
+2. Eine passende vhs-Starter-Vorlage auswaehlen.
+3. Das Diagramm wird geladen und kann direkt angepasst oder mit KI weiterentwickelt werden.
+
+Sinnvoll fuer:
+- schnelle Einstiege in Workshops
+- erste Prozessaufnahme ohne leeres Blatt
+- Standardprozesse mit wenig Vorbereitungszeit
+
+### 2. Prozess-Check verwenden
+
+In der rechten Seitenleiste unter **"Prozess-Check"** gibt es zwei Ebenen:
+
+- **Automatische Pruefung**:
+  Erkennt typische Probleme wie fehlenden Start- oder Endknoten, isolierte Elemente, Sackgassen und unvollstaendige Entscheidungen.
+- **Selbstbewertung**:
+  Bewertet den Prozess mit `0` bis `3` Punkten in diesen fuenf Feldern:
+  - Klarheit
+  - Medienbruch
+  - Risiko
+  - Teilnehmendenorientierung
+  - Verantwortlichkeit
+
+Hinweis:
+Ein Klick auf eine Meldung mit Knotenzug zeigt die betroffene Stelle direkt im Diagramm an.
+
+### 3. Massnahmen dokumentieren
+
+Unter **"Massnahmen"** in der rechten Seitenleiste lassen sich Verbesserungen strukturiert festhalten:
+
+- Massnahme benennen
+- Bezugsknoten auswaehlen
+- Verantwortliche Person erfassen
+- Prioritaet und Status pflegen
+- Zieltermin setzen
+
+Die Liste kann anschliessend als **CSV** exportiert werden, zum Beispiel fuer Excel oder andere Nachverfolgungslisten.
+
+### 4. Workshop-Modus fuer Teamgespraeche
+
+Der Button **"Workshop"** in der unteren Leiste aktiviert den Moderationsmodus.
+
+Moeglichkeiten:
+- Schrittweise Navigation durch den Prozess
+- Fokus auf den jeweils aktuellen Prozessschritt
+- Diskussionspunkte direkt pro Schritt dokumentieren
+- Export einer kompakten Workshop-Zusammenfassung als `.txt`
+
+Typischer Ablauf:
+1. Diagramm oder Vorlage laden.
+2. Workshop-Modus starten.
+3. Schritt fuer Schritt durch den Prozess gehen.
+4. Beobachtungen, Entscheidungen oder offene Fragen als Diskussionspunkte notieren.
+5. Ergebnisse speichern oder als Workshop-Datei exportieren.
+
+### 5. Erweiterte Exporte
+
+Neben PNG, SVG und PDF stehen nun weitere Exporte zur Verfuegung:
+
+- **Projekt-JSON**: Enthaeelt Diagramm plus Metadaten wie Bewertungen, Massnahmen und Workshop-Notizen.
+- **Massnahmen-CSV**: Fuer Aufgabenlisten und Nachverfolgung.
+- **Workshop-TXT**: Fuer Besprechungsdokumentation und Protokolle.
+
+## Technologien
+
 - Frontend: React 19 + Vite
-- Styling: Tailwind CSS v4 (vhs Design System)
-- Engine: JointJS + Dagre.js (Auto-Layout)
+- Styling: Tailwind CSS v4
+- Diagramm-Engine: JointJS + Dagre.js
 - Storage: IndexedDB
-- Export: jsPDF, SVG & PNG
+- Export: jsPDF, SVG, PNG, JSON, CSV, TXT
 
-## 📦 Weitergabe & Web-Hosting
+## Weitergabe und Hosting
 
-Wenn du die Software an Kolleg*innen weitergeben möchtest, gibt es drei ideale Wege:
+Wenn du die Software an Kolleginnen und Kollegen weitergeben moechtest, gibt es drei praktikable Wege:
 
-### 1. Als Web-App (Empfohlen)
-Bevor du die Dateien hochlädst, musst du die Produktions-Dateien generieren:
-1. Führe die Datei **`build.bat`** im Hauptverzeichnis per Doppelklick aus.
-2. Warte, bis das Fenster meldet: "[ERFOLG] Der Build wurde erstellt!".
-3. Es ist nun ein neuer Ordner namens `vhs-flowchart-editor/dist/` entstanden. **Nur dieser Ordner** wird für den Webserver benötigt.
-Lade den Inhalt des Ordners `vhs-flowchart-editor/dist/` auf einen statischen Webserver (z. B. vhs-Intranet, GitHub Pages oder einen beliebigen Webspace) hoch. 
+### 1. Als Web-App
 
-### 2. Intranet-Hosting (Lokale Domain)
-Wenn ihr bereits Systeme wie Bookstack unter `bookstack.vhs.local` habt, funktioniert das hier exakt genauso:
-1. **Build**: Erstelle den `dist/`-Ordner mit `npm run build`.
-2. **Server**: Kopiere den Inhalt auf euren internen Webserver (Apache, Nginx oder IIS).
-3. **DNS**: Erstellt einen DNS-Eintrag (A-Record) für `workflow.vhs.local`, der auf die IP dieses Servers zeigt.
-4. **Fertig**: Die Software ist nun für alle Kolleg*innen im Netzwerk unter der Adresse erreichbar.
+1. Die Datei `build.bat` im Hauptverzeichnis ausfuehren.
+2. Warten, bis der Build abgeschlossen ist.
+3. Den Inhalt von `vhs-flowchart-editor/dist/` auf einen statischen Webserver hochladen.
 
-### 4. Hosting auf einem Ubuntu-Server (Expert)
-Für den Betrieb auf einem Linux-Server (z.B. mit Nginx) folge diesen Schritten:
+Geeignet fuer Intranet, GitHub Pages oder allgemeinen Webspace.
 
-1. **Build lokal**: Erstelle den `dist/`-Ordner mit der `build.bat` auf deinem Rechner.
-2. **Transfer**: Kopiere den Inhalt des `dist/`-Ordners auf den Server nach `/var/www/workflow-editor`.
-3. **Nginx Konfiguration**: Erstelle eine Config-Datei unter `/etc/nginx/sites-available/workflow-editor`:
-   ```nginx
-   server {
-       listen 80;
-       server_name workflow.vhs.local;
-       root /var/www/workflow-editor;
-       index index.html;
-       location / {
-           try_files $uri $uri/ /index.html;
-       }
-   }
-   ```
-4. **Aktivieren**: `sudo ln -s /etc/nginx/sites-available/workflow-editor /etc/nginx/sites-enabled/` und Nginx neu starten: `sudo systemctl restart nginx`.
+### 2. Intranet-Hosting
 
-### 3. Als ZIP-Archiv (Lokal)
-Du kannst den gesamten Projektordner als `.zip` verschicken. 
-- **Voraussetzung**: Der Empfänger muss [Node.js](https://nodejs.org) installiert haben.
-- **Start**: Der Empfänger entpackt das ZIP und startet die Software einfach über die `start.bat`.
+1. `npm run build` ausfuehren.
+2. Den Inhalt von `dist/` auf den internen Webserver kopieren.
+3. Eine interne URL wie `workflow.vhs.local` auf diesen Server zeigen lassen.
+
+### 3. Als ZIP-Archiv
+
+- Den gesamten Projektordner als `.zip` weitergeben.
+- Voraussetzung: Node.js ist auf dem Zielrechner installiert.
+- Start ueber `start.bat`.
+
+### Beispiel fuer Ubuntu/Nginx
+
+1. Build lokal erstellen.
+2. Inhalt von `dist/` nach `/var/www/workflow-editor` kopieren.
+3. Nginx fuer den Ordner konfigurieren:
+
+```nginx
+server {
+    listen 80;
+    server_name workflow.vhs.local;
+    root /var/www/workflow-editor;
+    index index.html;
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+4. Site aktivieren und Nginx neu starten.
 
 ---
-*Erstellt für die vhs im Rahmen der Prozess-Digitalisierung 2026.*
+Erstellt fuer die vhs im Rahmen der Prozess-Digitalisierung 2026.

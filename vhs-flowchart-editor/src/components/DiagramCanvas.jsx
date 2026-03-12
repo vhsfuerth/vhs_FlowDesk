@@ -18,6 +18,7 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded }, ref) => {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const highlightTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (initializedRef.current) return;
@@ -200,6 +201,9 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded }, ref) => {
     });
 
     return () => {
+        if (highlightTimeoutRef.current) {
+            window.clearTimeout(highlightTimeoutRef.current);
+        }
         window.removeEventListener('mousemove', onMouseMove);
         window.removeEventListener('mouseup', onMouseUp);
     };
@@ -219,26 +223,74 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded }, ref) => {
       container.scrollTop = (bbox.y * zoomLevel) - 20;
   };
 
+  const loadJsonData = (json, shouldLayout = false) => {
+      if (!graphRef.current) return;
+      graphRef.current.clear();
+      if (json) {
+          converterRef.current.fromJson(json);
+      }
+      if (shouldLayout) {
+          layoutRef.current.applyLayout();
+      }
+      historyRef.current?.clear();
+      historyRef.current?.saveState();
+      setTimeout(centerContent, 100);
+  };
+
+  const focusNode = (nodeId) => {
+      const node = graphRef.current?.getCell(nodeId);
+      if (!node || !node.isElement()) return;
+
+      const position = node.position();
+      const size = node.size();
+      const container = canvasRef.current.parentNode;
+
+      container.scrollLeft = (position.x * zoomLevel) - (container.clientWidth / 2) + (size.width * zoomLevel / 2);
+      container.scrollTop = (position.y * zoomLevel) - (container.clientHeight / 2) + (size.height * zoomLevel / 2);
+
+      const currentStroke = node.attr('body/stroke');
+      const currentWidth = node.attr('body/strokeWidth');
+      node.attr('body/stroke', '#E1000F');
+      node.attr('body/strokeWidth', 4);
+
+      if (highlightTimeoutRef.current) {
+          window.clearTimeout(highlightTimeoutRef.current);
+      }
+      highlightTimeoutRef.current = window.setTimeout(() => {
+          node.attr('body/stroke', currentStroke);
+          node.attr('body/strokeWidth', currentWidth);
+      }, 1800);
+  };
+
+  const setPresentationFocus = (nodeId = null) => {
+      const cells = graphRef.current?.getCells() || [];
+      cells.forEach((cell) => {
+          const isFocus = !nodeId || cell.id === nodeId;
+          const baseOpacity = !nodeId ? 1 : (isFocus ? 1 : 0.18);
+          if (cell.isElement()) {
+              cell.attr('root/opacity', baseOpacity);
+          } else if (cell.isLink()) {
+              const sourceId = cell.get('source')?.id;
+              const targetId = cell.get('target')?.id;
+              const linkFocused = !nodeId || sourceId === nodeId || targetId === nodeId;
+              cell.attr('line/opacity', linkFocused ? 1 : 0.12);
+          }
+      });
+      if (nodeId) {
+          focusNode(nodeId);
+      }
+  };
+
   useImperativeHandle(ref, () => ({
     loadDiagram: (data) => {
-        if (!graphRef.current) return;
-        graphRef.current.clear();
-        if (data && data.diagram) {
-            converterRef.current.fromJson(data.diagram);
-        }
-        historyRef.current?.clear();
-        setTimeout(centerContent, 100);
+        loadJsonData(data?.diagram || null, false);
         if (onDiagramLoaded) onDiagramLoaded(data);
     },
     
     loadGeneratedData: (json) => {
-        if (!graphRef.current) return;
-        graphRef.current.clear();
-        converterRef.current.fromJson(json);
-        layoutRef.current.applyLayout();
-        historyRef.current?.saveState();
-        setTimeout(centerContent, 100);
+        loadJsonData(json, true);
     },
+    loadJson: (json, options = {}) => loadJsonData(json, options.shouldLayout || false),
 
     getCurrentData: () => converterRef.current?.toJson(),
     clear: () => {
@@ -250,6 +302,8 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded }, ref) => {
     zoomOut: () => handleZoom(-0.1),
     center: () => centerContent(),
     getZoom: () => zoomLevel,
+    focusNode,
+    setPresentationFocus,
 
     exportAsPNG: (filename, title) => exportToPNG(paperRef.current, filename, title),
     exportAsSVG: (filename, title) => exportToSVG(paperRef.current, filename, title),

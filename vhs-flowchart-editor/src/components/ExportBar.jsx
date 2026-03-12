@@ -1,14 +1,16 @@
 import React from 'react';
-import { Download, Share2, Printer, CheckSquare, Trash2, FolderOpen, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import { Share2, Printer, CheckSquare, Trash2, FolderOpen, ZoomIn, ZoomOut, Maximize, Presentation } from 'lucide-react';
 
-const ExportBar = ({ 
-  onExportSVG, 
-  onExportPNG, 
-  onExportPDF, 
-  onExportJSON, 
-  onSave, 
-  onClear, 
+const ExportBar = ({
+  onExportSVG,
+  onExportPNG,
+  onExportPDF,
+  onExportJSON,
+  onSave,
+  onClear,
   onLoadClick,
+  onToggleWorkshop,
+  isWorkshopMode,
   zoomLevel,
   onZoomIn,
   onZoomOut,
@@ -31,12 +33,20 @@ const ExportBar = ({
           className="flex items-center bg-white border border-[var(--color-vhs-blau)] text-[var(--color-vhs-blau)] px-4 py-2 rounded-md hover:bg-[var(--color-vhs-blau-10)] text-sm font-bold transition-all shadow-sm active:scale-95"
         >
           <FolderOpen className="w-4 h-4 mr-2" />
-          Öffnen
+          Oeffnen
+        </button>
+        <button
+          onClick={onToggleWorkshop}
+          title="Workshop-Modus"
+          className={`flex items-center px-4 py-2 rounded-md text-sm font-bold transition-all shadow-sm active:scale-95 ${isWorkshopMode ? 'bg-[var(--color-vhs-orange)] text-white' : 'bg-white border border-[var(--color-vhs-blau)] text-[var(--color-vhs-blau)] hover:bg-[var(--color-vhs-blau-10)]'}`}
+        >
+          <Presentation className="w-4 h-4 mr-2" />
+          Workshop
         </button>
         <div className="w-px h-8 bg-gray-200 mx-1" />
         <button
           onClick={onClear}
-          title="Arbeitsfläche leeren"
+          title="Arbeitsflaeche leeren"
           className="flex items-center text-red-500 hover:text-red-700 px-3 py-2 rounded-md hover:bg-red-50 text-sm font-medium transition-colors"
         >
           <Trash2 className="w-4 h-4 mr-2" />
@@ -44,11 +54,10 @@ const ExportBar = ({
         </button>
       </div>
 
-      {/* Integrated Navigation Controls */}
       <div className="flex items-center space-x-1 bg-gray-50 border border-gray-200 rounded-lg p-1">
-        <button 
-          onClick={onZoomOut} 
-          className="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-gray-500" 
+        <button
+          onClick={onZoomOut}
+          className="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-gray-500"
           title="Herauszoomen"
         >
           <ZoomOut className="w-4 h-4" />
@@ -56,17 +65,17 @@ const ExportBar = ({
         <div className="text-xs font-black w-12 text-center text-[var(--color-vhs-blau)]">
           {Math.round(zoomLevel * 100)}%
         </div>
-        <button 
-          onClick={onZoomIn} 
-          className="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-gray-500" 
+        <button
+          onClick={onZoomIn}
+          className="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-gray-500"
           title="Hineinzoomen"
         >
           <ZoomIn className="w-4 h-4" />
         </button>
         <div className="w-px h-6 bg-gray-200 mx-1" />
-        <button 
-          onClick={onCenterContent} 
-          className="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-gray-500" 
+        <button
+          onClick={onCenterContent}
+          className="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-gray-500"
           title="Zentrieren"
         >
           <Maximize className="w-4 h-4" />

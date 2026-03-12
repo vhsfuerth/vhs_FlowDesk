@@ -191,6 +191,51 @@ export const exportToJSON = (jsonObj, filename = 'vhs-flowchart.json') => {
     downloadBlob(blob, filename);
 };
 
+export const exportMeasuresToCSV = (items, nodeLabelLookup, filename = 'vhs-massnahmen.csv') => {
+    const header = ['Bezugsknoten', 'Massnahme', 'Verantwortlich', 'Prioritaet', 'Status', 'Zieltermin'];
+    const rows = items.map((item) => ([
+        escapeCsv(nodeLabelLookup(item.nodeId)),
+        escapeCsv(item.title),
+        escapeCsv(item.owner),
+        escapeCsv(item.priority),
+        escapeCsv(item.status),
+        escapeCsv(item.dueDate)
+    ].join(';')));
+
+    const csv = [header.join(';'), ...rows].join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    downloadBlob(blob, filename);
+};
+
+export const exportWorkshopSummary = (title, steps, notes, filename = 'vhs-workshop.txt') => {
+    const lines = [
+        `Workshop-Zusammenfassung: ${title || 'Unbenanntes Diagramm'}`,
+        '',
+        'Schritte im Fokus:'
+    ];
+
+    steps.forEach((step, index) => {
+        lines.push(`${index + 1}. ${step.label}`);
+    });
+
+    lines.push('');
+    lines.push('Diskussionspunkte:');
+
+    notes.forEach((note, index) => {
+        const stepLabel = steps.find((step) => step.id === note.nodeId)?.label || 'Nicht zugeordnet';
+        lines.push(`${index + 1}. ${note.title || 'Ohne Titel'} [${stepLabel}]`);
+        lines.push(`   Status: ${note.status || 'open'}`);
+        if (note.note) {
+            lines.push(`   Notiz: ${note.note}`);
+        }
+    });
+
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/plain;charset=utf-8;' });
+    downloadBlob(blob, filename);
+};
+
+const escapeCsv = (value) => `"${String(value || '').replace(/"/g, '""')}"`;
+
 const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

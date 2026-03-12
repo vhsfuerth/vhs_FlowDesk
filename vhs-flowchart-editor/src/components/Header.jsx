@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, FilePlus, FolderOpen, Save, Edit2, Check } from 'lucide-react';
+import { Settings, FilePlus, FolderOpen, Edit2, Check, LayoutTemplate } from 'lucide-react';
 import { indexeddb } from '../storage/indexeddb';
-import { generateUUID } from '../utils/uuid';
 import { setLastDiagramId } from '../storage/settings';
 
-const Header = ({ onSettingsClick, currentDiagram, onNewDiagram, onDiagramSelect, onRename }) => {
+const Header = ({ onSettingsClick, currentDiagram, onNewDiagram, onDiagramSelect, onRename, onTemplateOpen }) => {
   const [diagrams, setDiagrams] = useState([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -83,6 +82,13 @@ const Header = ({ onSettingsClick, currentDiagram, onNewDiagram, onDiagramSelect
       </div>
 
       <div className="flex items-center space-x-2">
+        <button
+          onClick={onTemplateOpen}
+          className="flex items-center px-4 py-2 hover:bg-[var(--color-vhs-blau-80)] rounded-md transition-colors font-medium border border-transparent hover:border-[var(--color-vhs-blau-60)]"
+        >
+          <LayoutTemplate className="w-4 h-4 mr-2" />
+          Vorlagen
+        </button>
         
         <div className="relative">
             <button
