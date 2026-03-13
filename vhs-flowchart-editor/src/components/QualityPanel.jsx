@@ -99,11 +99,12 @@ const QualityPanel = ({
           onClick={onToggleCollapsed}
           className="mt-4 flex h-10 w-10 items-center justify-center rounded-full border border-[var(--color-vhs-blau-20)] text-[var(--color-vhs-blau)] hover:bg-[var(--color-vhs-blau-10)]"
           title="Seitenleiste einblenden"
+          aria-label="Qualitätspanel einblenden"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
         <div className="mt-6 [writing-mode:vertical-rl] rotate-180 text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">
-          Qualitaet
+          Qualität
         </div>
       </aside>
     );
@@ -124,7 +125,7 @@ const QualityPanel = ({
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="font-bold text-[var(--color-vhs-blau)] text-sm uppercase tracking-wider">
-              Qualitaet & Massnahmen
+              Qualität & Maßnahmen
             </h3>
             <p className="text-xs text-gray-500 mt-1">
               Schlanke EFQM-nahe Reflexion direkt am Diagramm.
@@ -134,6 +135,7 @@ const QualityPanel = ({
             onClick={onToggleCollapsed}
             className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--color-vhs-blau-20)] text-[var(--color-vhs-blau)] hover:bg-[var(--color-vhs-blau-10)] shrink-0"
             title="Seitenleiste ausblenden"
+            aria-label="Qualitätspanel ausblenden"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -151,7 +153,7 @@ const QualityPanel = ({
           onClick={() => setActiveTab('measures')}
           className={`px-3 py-2 rounded-md text-sm font-bold transition-colors ${activeTab === 'measures' ? 'bg-white text-[var(--color-vhs-blau)] shadow-sm' : 'text-gray-500 hover:bg-white'}`}
         >
-          Massnahmen
+          Maßnahmen
         </button>
         <button
           onClick={() => setActiveTab('workshop')}
@@ -167,9 +169,9 @@ const QualityPanel = ({
             <section className="rounded-xl border border-[var(--color-vhs-blau-20)] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-xs uppercase tracking-widest font-black text-gray-400">Automatische Pruefung</div>
+                  <div className="text-xs uppercase tracking-widest font-black text-gray-400">Automatische Prüfung</div>
                   <div className="text-lg font-bold text-[var(--color-vhs-blau)] mt-1">
-                    {validation.isValid ? 'Struktur grundsaetzlich stimmig' : 'Pruefbedarf vorhanden'}
+                    {validation.isValid ? 'Struktur grundsätzlich stimmig' : 'Prüfbedarf vorhanden'}
                   </div>
                 </div>
                 {validation.isValid ? (
@@ -228,7 +230,7 @@ const QualityPanel = ({
             <section className="space-y-2">
               {validation.findings.length === 0 ? (
                 <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
-                  Keine Auffaelligkeiten im aktuellen Diagramm gefunden.
+                  Keine Auffälligkeiten im aktuellen Diagramm gefunden.
                 </div>
               ) : (
                 validation.findings.map((finding, index) => (
@@ -254,7 +256,7 @@ const QualityPanel = ({
                 <div>
                   <div className="text-xs uppercase tracking-widest font-black text-gray-400">Verbesserungen</div>
                   <div className="text-lg font-bold text-[var(--color-vhs-blau)] mt-1">
-                    {metadata.improvementItems.length} Massnahmen hinterlegt
+                    {metadata.improvementItems.length} Maßnahmen hinterlegt
                   </div>
                 </div>
                 <button
@@ -280,7 +282,7 @@ const QualityPanel = ({
             <section className="space-y-3">
               {metadata.improvementItems.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-gray-300 p-5 text-sm text-gray-500">
-                  Noch keine Massnahmen erfasst. Typischer Einsatz: Medienbrueche, unklare Zustaendigkeiten oder Schleifen direkt aus dem Diagramm ableiten.
+                  Noch keine Maßnahmen erfasst. Typischer Einsatz: Medienbrüche, unklare Zuständigkeiten oder Schleifen direkt aus dem Diagramm ableiten.
                 </div>
               ) : (
                 metadata.improvementItems.map((item) => (
@@ -303,7 +305,7 @@ const QualityPanel = ({
                       <input
                         value={item.title}
                         onChange={(event) => updateMeasure(item.id, { title: event.target.value })}
-                        placeholder="Massnahme, z. B. Medienbruch reduzieren"
+                        placeholder="Maßnahme, z. B. Medienbruch reduzieren"
                         className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
                       />
                       <label className="block">
@@ -335,7 +337,7 @@ const QualityPanel = ({
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <label className="block">
-                          <div className="text-xs font-bold text-gray-500 mb-1">Prioritaet</div>
+                          <div className="text-xs font-bold text-gray-500 mb-1">Priorität</div>
                           <select
                             value={item.priority}
                             onChange={(event) => updateMeasure(item.id, { priority: event.target.value })}
@@ -382,7 +384,7 @@ const QualityPanel = ({
       </div>
 
       <div className="border-t border-[var(--color-vhs-blau-10)] p-4 pl-5 bg-gray-50 text-xs text-gray-500">
-        Massnahmen und Workshop-Notizen sind lokal gespeichert und werden mit dem Diagramm gesichert.
+        Maßnahmen und Workshop-Notizen sind lokal gespeichert und werden mit dem Diagramm gesichert.
       </div>
     </aside>
   );

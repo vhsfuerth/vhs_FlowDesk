@@ -14,8 +14,19 @@ const initDB = async () => {
   });
 };
 
+const checkStorageQuota = async () => {
+  if (navigator.storage && navigator.storage.estimate) {
+    const { usage, quota } = await navigator.storage.estimate();
+    const remaining = quota - usage;
+    if (remaining < 1024 * 1024) {
+      throw new Error('Speicherplatz fast voll. Bitte alte Diagramme löschen.');
+    }
+  }
+};
+
 export const indexeddb = {
   async saveDiagram(diagramData) {
+    await checkStorageQuota();
     const db = await initDB();
     const copy = { ...diagramData, updatedAt: new Date().toISOString() };
     await db.put(STORE_NAME, copy);

@@ -70,7 +70,7 @@ const WorkshopPanel = ({
       </div>
 
       <div className="mt-3 text-sm text-gray-500">
-        Fuehrt Schritt fuer Schritt durch das Diagramm und sammelt Diskussionspunkte direkt am Prozess.
+        Führt Schritt für Schritt durch das Diagramm und sammelt Diskussionspunkte direkt am Prozess.
       </div>
 
       <div className="mt-4 rounded-xl bg-gray-50 p-3 border border-gray-200">

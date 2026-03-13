@@ -5,8 +5,11 @@ import './styles/diagram.css'
 // Register vhs custom shapes in JointJS namespace BEFORE any component mounts
 import './diagram/shapes'
 import App from './App.jsx'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 
 createRoot(document.getElementById('root')).render(
-  <App />,
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>,
 )
 

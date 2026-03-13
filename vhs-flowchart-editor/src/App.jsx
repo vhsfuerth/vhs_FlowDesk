@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import Header from './components/Header';
 import AiInputPanel from './components/AiInputPanel';
 import Toolbar from './components/Toolbar';
@@ -11,6 +11,7 @@ import { indexeddb } from './storage/indexeddb';
 import { getLastDiagramId, setLastDiagramId } from './storage/settings';
 import { generateUUID } from './utils/uuid';
 import TemplateModal from './components/TemplateModal';
+import GuideModal from './components/GuideModal';
 import QualityPanel from './components/QualityPanel';
 import { STARTER_TEMPLATES } from './data/templates';
 import { getDefaultMetadata, normalizeMetadata } from './analysis/diagram-validation';
@@ -20,6 +21,7 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
   const [notification, setNotification] = useState({ isVisible: false, message: '', type: 'info' });
   const [currentDiagram, setCurrentDiagram] = useState(null);
   const [diagramMetadata, setDiagramMetadata] = useState(getDefaultMetadata());
@@ -30,7 +32,9 @@ function App() {
   const [isQualityPanelCollapsed, setIsQualityPanelCollapsed] = useState(false);
   const [qualityPanelWidth, setQualityPanelWidth] = useState(460);
   const [zoomLevel, setZoomLevel] = useState(1);
-  
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
   const diagramCanvasRef = useRef(null);
   const resizeStateRef = useRef({ isActive: false, startX: 0, startWidth: 460 });
   const workshopSteps = useMemo(() => (
@@ -44,32 +48,37 @@ function App() {
       })
   ), [liveDiagramData]);
 
+  const [pendingDiagram, setPendingDiagram] = useState(null);
+
   useEffect(() => {
     const loadInitialDiagram = async () => {
        const lastId = getLastDiagramId();
        let diagram = null;
-       
+
        if (lastId) {
            diagram = await indexeddb.getDiagram(lastId);
        }
-       
+
        if (diagram) {
            setCurrentDiagram(diagram);
            setDiagramMetadata(normalizeMetadata(diagram.metadata));
-           setTimeout(() => {
-                if (diagramCanvasRef.current) {
-                    diagramCanvasRef.current.loadDiagram(diagram);
-                    setLiveDiagramData(diagram.diagram || { nodes: [], edges: [] });
-                    setZoomLevel(diagramCanvasRef.current.getZoom());
-                }
-           }, 100);
+           setPendingDiagram(diagram);
        } else {
            handleNewDiagram();
        }
     };
-    
+
     loadInitialDiagram();
   }, []);
+
+  useEffect(() => {
+    if (pendingDiagram && diagramCanvasRef.current) {
+      diagramCanvasRef.current.loadDiagram(pendingDiagram);
+      setLiveDiagramData(pendingDiagram.diagram || { nodes: [], edges: [] });
+      setZoomLevel(diagramCanvasRef.current.getZoom());
+      setPendingDiagram(null);
+    }
+  }, [pendingDiagram]);
 
   useEffect(() => {
     if (!isWorkshopMode) return;
@@ -99,12 +108,33 @@ function App() {
     };
   }, []);
 
-  const showNotification = (message, type = 'info') => {
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const isInput = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
+      if (isInput) return;
+      if (e.ctrlKey && e.key === 'z') {
+        e.preventDefault();
+        diagramCanvasRef.current?.undo();
+      }
+      if (e.ctrlKey && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
+        e.preventDefault();
+        diagramCanvasRef.current?.redo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const notificationTimerRef = useRef(null);
+
+  const showNotification = useCallback((message, type = 'info') => {
+    if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
     setNotification({ isVisible: true, message, type });
-    setTimeout(() => {
+    const duration = Math.max(4000, Math.min(10000, message.length * 60));
+    notificationTimerRef.current = setTimeout(() => {
       setNotification((prev) => ({ ...prev, isVisible: false }));
-    }, 4000);
-  };
+    }, duration);
+  }, []);
 
   const getCleanFilename = () => {
       const name = currentDiagram?.name || 'diagram';
@@ -343,6 +373,7 @@ function App() {
         onDiagramSelect={handleDiagramSelect}
         onRename={handleRenameDiagram}
         onTemplateOpen={() => setIsTemplateModalOpen(true)}
+        onGuideOpen={() => setIsGuideModalOpen(true)}
       />
       
       <AiInputPanel 
@@ -355,9 +386,10 @@ function App() {
           isCollapsed={isToolbarCollapsed}
           onToggleCollapsed={() => setIsToolbarCollapsed((prev) => !prev)}
         />
-        <DiagramCanvas 
+        <DiagramCanvas
            ref={diagramCanvasRef}
            onGraphChange={handleGraphChange}
+           onHistoryChange={(u, r) => { setCanUndo(u); setCanRedo(r); }}
         />
         <QualityPanel
           diagramData={liveDiagramData}
@@ -387,10 +419,10 @@ function App() {
         />
       </div>
 
-      <ExportBar 
+      <ExportBar
          onExportSVG={() => diagramCanvasRef.current?.exportAsSVG(`${getCleanFilename()}.svg`, currentDiagram?.name)}
-         onExportPNG={() => diagramCanvasRef.current?.exportAsPNG(`${getCleanFilename()}.png`, currentDiagram?.name)}
-         onExportPDF={() => diagramCanvasRef.current?.exportAsPDF(`${getCleanFilename()}.pdf`, currentDiagram?.name)}
+         onExportPNG={() => diagramCanvasRef.current?.exportAsPNG(`${getCleanFilename()}.png`, currentDiagram?.name)?.catch((err) => showNotification(err.message, 'error'))}
+         onExportPDF={() => diagramCanvasRef.current?.exportAsPDF(`${getCleanFilename()}.pdf`, currentDiagram?.name)?.catch((err) => showNotification(err.message, 'error'))}
          onExportJSON={handleExportProjectJSON}
          onSave={saveCurrentDiagram}
          onClear={handleClearDiagram}
@@ -401,6 +433,10 @@ function App() {
          onZoomIn={handleZoomIn}
          onZoomOut={handleZoomOut}
          onCenterContent={handleCenter}
+         onUndo={() => diagramCanvasRef.current?.undo()}
+         onRedo={() => diagramCanvasRef.current?.redo()}
+         canUndo={canUndo}
+         canRedo={canRedo}
       />
 
       <SettingsModal 
@@ -419,6 +455,11 @@ function App() {
         onClose={() => setIsTemplateModalOpen(false)}
         templates={STARTER_TEMPLATES}
         onApply={handleTemplateApply}
+      />
+
+      <GuideModal
+        isOpen={isGuideModalOpen}
+        onClose={() => setIsGuideModalOpen(false)}
       />
       
       <Notification 

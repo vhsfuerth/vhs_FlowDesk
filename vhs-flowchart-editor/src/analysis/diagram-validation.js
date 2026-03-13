@@ -89,8 +89,12 @@ export const validateDiagram = (diagram) => {
     const nodeIncoming = incoming.get(node.id) || [];
     const nodeOutgoing = outgoing.get(node.id) || [];
 
+    if (node.type !== 'annotation' && (!node.label || !node.label.trim())) {
+      findings.push(createFinding('error', 'empty_label', `Ein Knoten vom Typ „${node.type}” hat keinen Text. Bitte Label vergeben.`, node.id));
+    }
+
     if (node.type !== 'annotation' && nodeIncoming.length === 0 && nodeOutgoing.length === 0) {
-      findings.push(createFinding('warning', 'isolated_node', `„${node.label || 'Unbenannter Knoten'}“ ist nicht verbunden.`, node.id));
+      findings.push(createFinding('warning', 'isolated_node', `„${node.label || 'Unbenannter Knoten'}” ist nicht verbunden.`, node.id));
     }
 
     if (node.type === 'decision') {

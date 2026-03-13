@@ -29,13 +29,16 @@ const AiInputPanel = ({ onDiagramGenerated, onError }) => {
       }
     } catch (error) {
        console.error(error);
-       let errorMsg = error.message;
-       
-       if (error.message.startsWith('API_KEY_INVALID')) errorMsg = "Der API-Key ist ungültig oder abgelaufen.";
-       if (error.message.startsWith('RATE_LIMIT')) errorMsg = "Anfragelimit bei Google Gemini erreicht. Bitte kurz warten.";
-       if (error.message.startsWith('INVALID_JSON_RESPONSE')) errorMsg = "Die KI-Antwort konnte nicht als Diagramm interpretiert werden.";
+       const msg = error.message || '';
+       const ERROR_MAP = {
+         API_KEY_INVALID: 'Der API-Key ist ungültig oder abgelaufen.',
+         API_KEY_MISSING: 'API-Key fehlt. Bitte in den Einstellungen hinterlegen.',
+         RATE_LIMIT: 'Anfragelimit bei Google Gemini erreicht. Bitte kurz warten.',
+         INVALID_JSON_RESPONSE: 'Die KI-Antwort konnte nicht als Diagramm interpretiert werden.'
+       };
 
-       onError(errorMsg);
+       const matchedKey = Object.keys(ERROR_MAP).find((key) => msg.includes(key));
+       onError(matchedKey ? ERROR_MAP[matchedKey] : msg);
     } finally {
       setIsGenerating(false);
     }

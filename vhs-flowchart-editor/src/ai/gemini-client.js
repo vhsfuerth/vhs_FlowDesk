@@ -1,20 +1,36 @@
 import { getApiKey, getCustomPrompt } from '../storage/settings';
 import { SYSTEM_PROMPT } from './prompts';
 
+const API_TIMEOUT_MS = 30000;
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function callGeminiApi(modelName, apiKey, prompt, userText) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`;
-    
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            systemInstruction: { parts: [{ text: prompt }] },
-            contents: [{ role: 'user', parts: [{ text: userText }] }],
-            generationConfig: { responseMimeType: 'application/json', temperature: 0.2 }
-        })
-    });
 
-    return response;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                systemInstruction: { parts: [{ text: prompt }] },
+                contents: [{ role: 'user', parts: [{ text: userText }] }],
+                generationConfig: { responseMimeType: 'application/json', temperature: 0.2 }
+            }),
+            signal: controller.signal
+        });
+        return response;
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            throw new Error(`Zeitüberschreitung: ${modelName} hat nicht innerhalb von ${API_TIMEOUT_MS / 1000}s geantwortet.`);
+        }
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
+    }
 }
 
 export const generateFlowchartFromText = async (text) => {
@@ -31,10 +47,13 @@ export const generateFlowchartFromText = async (text) => {
     ];
     
     let lastError = null;
-    for (const model of modelsToTry) {
+    for (let i = 0; i < modelsToTry.length; i++) {
+        const model = modelsToTry[i];
         try {
+            if (i > 0) await delay(1500);
+
             const response = await callGeminiApi(model, apiKey, activePrompt, text);
-            
+
             if (response.ok) {
                 const data = await response.json();
                 const contentText = data.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -44,7 +63,7 @@ export const generateFlowchartFromText = async (text) => {
 
             if (response.status === 404) {
                 console.warn(`Model ${model} not found, trying next...`);
-                continue; 
+                continue;
             }
 
             const errorData = await response.json().catch(() => ({}));

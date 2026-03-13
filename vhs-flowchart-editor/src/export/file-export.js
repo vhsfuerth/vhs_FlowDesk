@@ -114,75 +114,92 @@ export const exportToSVG = async (paper, filename = 'vhs-flowchart.svg', title =
 
 export const exportToPNG = async (paper, filename = 'vhs-flowchart.png', title = '') => {
     const { svgString, width, height } = await getSvgString(paper, title);
-    
+
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
-    
+
+    if (!ctx) {
+        throw new Error('PNG-Export fehlgeschlagen: Canvas konnte nicht erstellt werden.');
+    }
+
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, width, height);
 
-    const img = new Image();
-    // Using a blob URL is safer
     const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(svgBlob);
-    
-    img.onload = () => {
-        ctx.drawImage(img, 0, 0);
-        URL.revokeObjectURL(url);
-        
-        try {
-            const pngUrl = canvas.toDataURL('image/png');
-            const a = document.createElement('a');
-            a.href = pngUrl;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        } catch (err) {
-            console.error('PNG Export failed', err);
-        }
-    };
-    img.onerror = () => URL.revokeObjectURL(url);
-    img.src = url;
+
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(url);
+            try {
+                const pngUrl = canvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = pngUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                resolve();
+            } catch (err) {
+                reject(new Error('PNG-Export fehlgeschlagen: ' + err.message));
+            }
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('PNG-Export fehlgeschlagen: SVG konnte nicht als Bild geladen werden.'));
+        };
+        img.src = url;
+    });
 };
 
 export const exportToPDF = async (paper, filename = 'vhs-flowchart.pdf', title = '') => {
     const { svgString, width, height } = await getSvgString(paper, title);
-    
+
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+        throw new Error('PDF-Export fehlgeschlagen: Canvas konnte nicht erstellt werden.');
+    }
+
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, width, height);
 
-    const img = new Image();
     const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(svgBlob);
-    
-    img.onload = () => {
-        ctx.drawImage(img, 0, 0);
-        URL.revokeObjectURL(url);
-        
-        try {
-            const imgData = canvas.toDataURL('image/png');
-            const orientation = width > height ? 'l' : 'p';
-            const doc = new jsPDF({
-                orientation: orientation,
-                unit: 'px',
-                format: [width, height]
-            });
-            
-            doc.addImage(imgData, 'PNG', 0, 0, width, height);
-            doc.save(filename);
-        } catch (err) {
-            console.error('PDF Export failed', err);
-        }
-    };
-    img.onerror = () => URL.revokeObjectURL(url);
-    img.src = url;
+
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(url);
+            try {
+                const imgData = canvas.toDataURL('image/png');
+                const orientation = width > height ? 'l' : 'p';
+                const doc = new jsPDF({
+                    orientation: orientation,
+                    unit: 'px',
+                    format: [width, height]
+                });
+                doc.addImage(imgData, 'PNG', 0, 0, width, height);
+                doc.save(filename);
+                resolve();
+            } catch (err) {
+                reject(new Error('PDF-Export fehlgeschlagen: ' + err.message));
+            }
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('PDF-Export fehlgeschlagen: SVG konnte nicht als Bild geladen werden.'));
+        };
+        img.src = url;
+    });
 };
 
 export const exportToJSON = (jsonObj, filename = 'vhs-flowchart.json') => {
@@ -192,7 +209,7 @@ export const exportToJSON = (jsonObj, filename = 'vhs-flowchart.json') => {
 };
 
 export const exportMeasuresToCSV = (items, nodeLabelLookup, filename = 'vhs-massnahmen.csv') => {
-    const header = ['Bezugsknoten', 'Massnahme', 'Verantwortlich', 'Prioritaet', 'Status', 'Zieltermin'];
+    const header = ['Bezugsknoten', 'Maßnahme', 'Verantwortlich', 'Priorität', 'Status', 'Zieltermin'];
     const rows = items.map((item) => ([
         escapeCsv(nodeLabelLookup(item.nodeId)),
         escapeCsv(item.title),

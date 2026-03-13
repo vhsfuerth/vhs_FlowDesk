@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, FilePlus, FolderOpen, Edit2, Check, LayoutTemplate } from 'lucide-react';
+import { Settings, FilePlus, FolderOpen, Edit2, Check, LayoutTemplate, BookOpen } from 'lucide-react';
 import { indexeddb } from '../storage/indexeddb';
 import { setLastDiagramId } from '../storage/settings';
 
-const Header = ({ onSettingsClick, currentDiagram, onNewDiagram, onDiagramSelect, onRename, onTemplateOpen }) => {
+const Header = ({ onSettingsClick, currentDiagram, onNewDiagram, onDiagramSelect, onRename, onTemplateOpen, onGuideOpen }) => {
   const [diagrams, setDiagrams] = useState([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -89,7 +89,14 @@ const Header = ({ onSettingsClick, currentDiagram, onNewDiagram, onDiagramSelect
           <LayoutTemplate className="w-4 h-4 mr-2" />
           Vorlagen
         </button>
-        
+        <button
+          onClick={onGuideOpen}
+          className="flex items-center px-4 py-2 hover:bg-[var(--color-vhs-blau-80)] rounded-md transition-colors font-medium border border-transparent hover:border-[var(--color-vhs-blau-60)]"
+        >
+          <BookOpen className="w-4 h-4 mr-2" />
+          Anleitung
+        </button>
+
         <div className="relative">
             <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -141,6 +148,7 @@ const Header = ({ onSettingsClick, currentDiagram, onNewDiagram, onDiagramSelect
           onClick={onSettingsClick}
           className="p-2 hover:bg-[var(--color-vhs-blau-80)] rounded-full transition-colors"
           title="Einstellungen"
+          aria-label="Einstellungen"
         >
           <Settings className="w-5 h-5 text-[var(--color-vhs-gelb)]" />
         </button>

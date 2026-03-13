@@ -27,6 +27,7 @@ const Toolbar = ({ onDragStart, isCollapsed, onToggleCollapsed }) => {
           onClick={onToggleCollapsed}
           className="mt-4 flex h-10 w-10 items-center justify-center rounded-full border border-[var(--color-vhs-blau-20)] text-[var(--color-vhs-blau)] hover:bg-[var(--color-vhs-blau-10)]"
           title="Elementleiste einblenden"
+          aria-label="Elementleiste einblenden"
         >
           <ChevronRight className="w-5 h-5" />
         </button>
@@ -46,13 +47,14 @@ const Toolbar = ({ onDragStart, isCollapsed, onToggleCollapsed }) => {
               Elemente
             </h3>
             <p className="text-xs text-gray-500 mt-1">
-              Ziehe Elemente auf die Arbeitsflaeche
+              Ziehe Elemente auf die Arbeitsfläche
             </p>
           </div>
           <button
             onClick={onToggleCollapsed}
             className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--color-vhs-blau-20)] text-[var(--color-vhs-blau)] hover:bg-[var(--color-vhs-blau-10)] shrink-0"
             title="Elementleiste ausblenden"
+            aria-label="Elementleiste ausblenden"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -68,7 +70,7 @@ const Toolbar = ({ onDragStart, isCollapsed, onToggleCollapsed }) => {
               draggable
               onDragStart={(event) => handleDragStart(event, tool)}
               className="flex items-center p-3 rounded-md border border-[var(--color-vhs-blau-20)] bg-white hover:bg-[var(--color-vhs-blau-10)] cursor-grab active:cursor-grabbing transition-colors group shadow-sm"
-              title={`${tool.label} hinzufuegen`}
+              title={`${tool.label} hinzufügen`}
             >
               <div className="mr-3 p-2 rounded bg-gray-50 group-hover:bg-white transition-colors">
                 <Icon className={`w-5 h-5 ${tool.color}`} />
@@ -87,7 +89,7 @@ const Toolbar = ({ onDragStart, isCollapsed, onToggleCollapsed }) => {
           <div className="p-1.5 bg-white border border-gray-300 rounded">
             <ArrowRight className="w-3 h-3 text-[var(--color-vhs-blau-60)]" />
           </div>
-          <span className="leading-tight">Klicke und ziehe vom Rand eines Elements zum naechsten</span>
+          <span className="leading-tight">Klicke und ziehe vom Rand eines Elements zum nächsten</span>
         </div>
       </div>
     </aside>

@@ -5,8 +5,9 @@ import { JSONConverter } from '../diagram/converter';
 import { DiagramLayout } from '../diagram/layout';
 import { createStartNode, createEndNode, createProcessNode, createDecisionNode, createAnnotationNode, autoSizeForText, linkLabelStyle } from '../diagram/shapes';
 import { exportToPNG, exportToSVG, exportToPDF, exportToJSON } from '../export/file-export';
+import EditTextModal from './EditTextModal';
 
-const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded }, ref) => {
+const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryChange }, ref) => {
   const canvasRef = useRef(null);
   const graphRef = useRef(null);
   const paperRef = useRef(null);
@@ -19,6 +20,7 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded }, ref) => {
   const [canRedo, setCanRedo] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const highlightTimeoutRef = useRef(null);
+  const [editModal, setEditModal] = useState({ isOpen: false, title: '', value: '', onSave: null });
 
   useEffect(() => {
     if (initializedRef.current) return;
@@ -89,8 +91,11 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded }, ref) => {
     history.isTracking = true;
 
     graph.on('all', (eventName) => {
-      setCanUndo(history.canUndo());
-      setCanRedo(history.canRedo());
+      const nextCanUndo = history.canUndo();
+      const nextCanRedo = history.canRedo();
+      setCanUndo(nextCanUndo);
+      setCanRedo(nextCanRedo);
+      if (onHistoryChange) onHistoryChange(nextCanUndo, nextCanRedo);
       if (onGraphChange && (eventName === 'add' || eventName === 'remove' || eventName.includes('change:'))) {
           onGraphChange();
       }
@@ -148,41 +153,46 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded }, ref) => {
       paper.removeTools();
     });
 
-    // DOUBLE CLICK TO EDIT TEXT
+    // DOUBLE CLICK TO EDIT TEXT (modal-based)
     paper.on('element:pointerdblclick', (elementView) => {
         const node = elementView.model;
         const currentText = node.attr('label/text');
-        const newText = window.prompt('Text bearbeiten:', currentText);
-        
-        if (newText !== null) {
-            node.attr('label/text', newText);
-            
-            // Re-calculate size based on type
-            const vhsType = node.get('type').split('.')[1]?.toLowerCase();
-            if (vhsType) {
-                autoSizeForText(node, newText, vhsType);
+        setEditModal({
+            isOpen: true,
+            title: 'Text bearbeiten',
+            value: currentText || '',
+            onSave: (newText) => {
+                node.attr('label/text', newText);
+                const vhsType = node.get('type').split('.')[1]?.toLowerCase();
+                if (vhsType) {
+                    autoSizeForText(node, newText, vhsType);
+                }
+                if (onGraphChange) onGraphChange();
+                setEditModal((prev) => ({ ...prev, isOpen: false }));
             }
-            if (onGraphChange) onGraphChange();
-        }
+        });
     });
 
     paper.on('link:pointerdblclick', (linkView) => {
         const link = linkView.model;
         const currentLabels = link.labels();
         const currentText = currentLabels[0]?.attrs?.text?.text || '';
-        const newText = window.prompt('Verbindungstext bearbeiten (z.B. Ja/Nein):', currentText);
-
-        if (newText !== null) {
-            if (newText.trim() === '') {
-                link.labels([]); 
-            } else {
-                // Apply our standard style but with the new text
-                const newLabel = JSON.parse(JSON.stringify(linkLabelStyle));
-                newLabel.attrs.text.text = newText;
-                link.label(0, newLabel);
+        setEditModal({
+            isOpen: true,
+            title: 'Verbindungstext bearbeiten (z.B. Ja/Nein)',
+            value: currentText,
+            onSave: (newText) => {
+                if (newText.trim() === '') {
+                    link.labels([]);
+                } else {
+                    const newLabel = JSON.parse(JSON.stringify(linkLabelStyle));
+                    newLabel.attrs.text.text = newText;
+                    link.label(0, newLabel);
+                }
+                if (onGraphChange) onGraphChange();
+                setEditModal((prev) => ({ ...prev, isOpen: false }));
             }
-            if (onGraphChange) onGraphChange();
-        }
+        });
     });
 
     // Hover Ports
@@ -298,6 +308,19 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded }, ref) => {
         historyRef.current?.clear();
     },
 
+    undo: () => {
+        const ok = historyRef.current?.undo();
+        if (ok && onHistoryChange) onHistoryChange(historyRef.current.canUndo(), historyRef.current.canRedo());
+        if (ok && onGraphChange) onGraphChange();
+    },
+    redo: () => {
+        const ok = historyRef.current?.redo();
+        if (ok && onHistoryChange) onHistoryChange(historyRef.current.canUndo(), historyRef.current.canRedo());
+        if (ok && onGraphChange) onGraphChange();
+    },
+    canUndo: () => historyRef.current?.canUndo() || false,
+    canRedo: () => historyRef.current?.canRedo() || false,
+
     zoomIn: () => handleZoom(0.1),
     zoomOut: () => handleZoom(-0.1),
     center: () => centerContent(),
@@ -346,12 +369,19 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded }, ref) => {
 
   return (
     <div className="flex-grow h-full relative overflow-auto bg-[var(--color-vhs-blau-10)] rounded-tl-lg border-l border-t border-[var(--color-vhs-blau-20)]" style={{ scrollBehavior: 'auto' }}>
-      <div 
-        ref={canvasRef} 
+      <div
+        ref={canvasRef}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
         className="cursor-grab active:cursor-grabbing"
         id="vhs-jointjs-paper"
+      />
+      <EditTextModal
+        isOpen={editModal.isOpen}
+        title={editModal.title}
+        initialValue={editModal.value}
+        onSave={editModal.onSave || (() => {})}
+        onCancel={() => setEditModal((prev) => ({ ...prev, isOpen: false }))}
       />
     </div>
   );

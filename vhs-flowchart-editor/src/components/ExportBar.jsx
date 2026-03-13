@@ -1,5 +1,5 @@
 import React from 'react';
-import { Share2, Printer, CheckSquare, Trash2, FolderOpen, ZoomIn, ZoomOut, Maximize, Presentation } from 'lucide-react';
+import { Share2, Printer, CheckSquare, Trash2, FolderOpen, ZoomIn, ZoomOut, Maximize, Presentation, Undo2, Redo2 } from 'lucide-react';
 
 const ExportBar = ({
   onExportSVG,
@@ -14,7 +14,11 @@ const ExportBar = ({
   zoomLevel,
   onZoomIn,
   onZoomOut,
-  onCenterContent
+  onCenterContent,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo
 }) => {
   return (
     <div className="bg-white border-t border-[var(--color-vhs-blau-20)] p-4 flex justify-between items-center shadow-[0_-4px_10px_-1px_rgba(0,0,0,0.1)] z-30">
@@ -33,7 +37,7 @@ const ExportBar = ({
           className="flex items-center bg-white border border-[var(--color-vhs-blau)] text-[var(--color-vhs-blau)] px-4 py-2 rounded-md hover:bg-[var(--color-vhs-blau-10)] text-sm font-bold transition-all shadow-sm active:scale-95"
         >
           <FolderOpen className="w-4 h-4 mr-2" />
-          Oeffnen
+          Öffnen
         </button>
         <button
           onClick={onToggleWorkshop}
@@ -46,7 +50,7 @@ const ExportBar = ({
         <div className="w-px h-8 bg-gray-200 mx-1" />
         <button
           onClick={onClear}
-          title="Arbeitsflaeche leeren"
+          title="Arbeitsfläche leeren"
           className="flex items-center text-red-500 hover:text-red-700 px-3 py-2 rounded-md hover:bg-red-50 text-sm font-medium transition-colors"
         >
           <Trash2 className="w-4 h-4 mr-2" />
@@ -56,9 +60,29 @@ const ExportBar = ({
 
       <div className="flex items-center space-x-1 bg-gray-50 border border-gray-200 rounded-lg p-1">
         <button
+          onClick={onUndo}
+          disabled={!canUndo}
+          className="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Rückgängig (Strg+Z)"
+          aria-label="Rückgängig"
+        >
+          <Undo2 className="w-4 h-4" />
+        </button>
+        <button
+          onClick={onRedo}
+          disabled={!canRedo}
+          className="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Wiederholen (Strg+Y)"
+          aria-label="Wiederholen"
+        >
+          <Redo2 className="w-4 h-4" />
+        </button>
+        <div className="w-px h-6 bg-gray-200 mx-1" />
+        <button
           onClick={onZoomOut}
           className="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-gray-500"
           title="Herauszoomen"
+          aria-label="Herauszoomen"
         >
           <ZoomOut className="w-4 h-4" />
         </button>
@@ -69,6 +93,7 @@ const ExportBar = ({
           onClick={onZoomIn}
           className="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-gray-500"
           title="Hineinzoomen"
+          aria-label="Hineinzoomen"
         >
           <ZoomIn className="w-4 h-4" />
         </button>
@@ -77,6 +102,7 @@ const ExportBar = ({
           onClick={onCenterContent}
           className="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-gray-500"
           title="Zentrieren"
+          aria-label="Inhalt zentrieren"
         >
           <Maximize className="w-4 h-4" />
         </button>
@@ -107,7 +133,8 @@ const ExportBar = ({
         </button>
         <button
           onClick={onExportJSON}
-          title="Als Projektdatei (.json) laden"
+          title="Als Projektdatei (.json) exportieren"
+          aria-label="Als JSON exportieren"
           className="p-2 text-gray-400 hover:text-[var(--color-vhs-blau)] transition-colors"
         >
           <Share2 className="w-5 h-5" />
