@@ -39,14 +39,6 @@ const ExportBar = ({
           <FolderOpen className="w-4 h-4 mr-2" />
           Öffnen
         </button>
-        <button
-          onClick={onToggleWorkshop}
-          title="Workshop-Modus"
-          className={`flex items-center px-4 py-2 rounded-md text-sm font-bold transition-all shadow-sm active:scale-95 ${isWorkshopMode ? 'bg-[var(--color-vhs-orange)] text-white' : 'bg-white border border-[var(--color-vhs-blau)] text-[var(--color-vhs-blau)] hover:bg-[var(--color-vhs-blau-10)]'}`}
-        >
-          <Presentation className="w-4 h-4 mr-2" />
-          Workshop
-        </button>
         <div className="w-px h-8 bg-gray-200 mx-1" />
         <button
           onClick={onClear}

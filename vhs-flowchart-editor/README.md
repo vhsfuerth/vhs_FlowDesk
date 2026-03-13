@@ -13,9 +13,11 @@ Ein browserbasierter Flussdiagramm-Editor für Volkshochschulen – mit KI-Unter
 | **Verbindungen** | Hover über Element zeigt Ports → zum Ziel ziehen |
 | **Rückgängig/Wiederholen** | Strg+Z / Strg+Y oder Buttons in der unteren Leiste |
 | **Speichern & Laden** | Lokal im Browser (IndexedDB), mehrere Diagramme verwaltbar |
-| **Export** | PNG, SVG, PDF (mit Logo + Titel), JSON |
-| **Qualitätspanel** | Automatische Strukturprüfung + Selbstbewertung (EFQM-nah) + Maßnahmenliste (CSV-Export) |
-| **Workshop-Modus** | Schritt-für-Schritt-Durchgang mit Diskussionspunkten |
+| **Export** | PNG, SVG, PDF (Diagramm mit Logo + Titel), JSON |
+| **Qualitätspanel** | Automatische Strukturprüfung + Maßnahmenliste (CSV-Export) |
+| **Prozess-Check Wizard** | Geführte 5-Schritt-Selbstbewertung: Leitfrage + Score-Buttons + Notizfeld je Kriterium; Schritt 6 = Zusammenfassung mit Hotspot-Markierung; Kompakt-Toggle für schnelle Ansicht |
+| **PDF-Qualitätsbericht** | Zweiseitiger Geschäftsbericht im vhs-Layout: Deckblatt mit Flowchart, Detailseite mit Befunden, Selbstbewertung (inkl. Notizen) und Maßnahmen |
+| **Workshop-Modus** | Schritt-für-Schritt-Präsentation mit Diskussionspunkten |
 | **Vorlagen** | Starter-Templates für häufige vhs-Prozesse |
 | **Anleitung** | Integriertes Hilfe-Modal mit allen Funktionen erklärt |
 | **PWA** | Installierbar, offline nutzbar |
@@ -44,6 +46,27 @@ Der Gemini-API-Key wird über die **Einstellungen** (Zahnrad-Icon im Header) kon
 ---
 
 ## Changelog
+
+### 2026-03-13 – Wizard-Selbstbewertung + PDF-Qualitätsbericht
+
+**Prozess-Check als geführter Wizard (5+1 Schritte)**
+- Selbstbewertungs-Sektion im Prozess-Check vollständig umgebaut
+- Pro Schritt (1 Kriterium): Leitfrage, 4 Klick-Buttons (0 kritisch / 1 schwach / 2 solide / 3 stark), optionales Notizfeld, Fortschrittsbalken, Vor-/Zurück-Navigation
+- Schritt 6 = Zusammenfassung: alle Scores auf einen Blick, Hotspot-Markierung `(!)` bei Score ≤ 1, Klick auf Zeile springt zurück zum Kriterium
+- Toggle „Alle auf einmal" wechselt zur kompakten Dropdown-Ansicht
+- Neue Datenstruktur `metadata.reviewNotes` (je Feld ein Notizfeld, persistent)
+- `REVIEW_SCORE_GUIDES` in `diagram-validation.js` exportiert (Leitfragen je Kriterium)
+- TXT-Export enthält jetzt Notizen je Kriterium
+
+**PDF-Qualitätsbericht im vhs-Layout**
+- Neuer Button „PDF-Bericht" neben „TXT" in Wizard-Schritt 6 und Kompaktansicht
+- **Seite 1 (Deckblatt):** vhs-Kopfzeile mit proportional skaliertem Logo + orangenem Akzentstreifen, Diagrammtitel, Erstellungsdatum, Status-Badge, Durchschnitts-Scorebalken, vollständiges Flowchart-Bild
+- **Seite 2+ (Bericht):** Automatische Prüfung (farbige Badges + Befundliste), Selbstbewertung (Scorebalken + Notizen je Kriterium, Zusammenfassungs-Box), Maßnahmen (zebra-gestreift mit allen Metadaten)
+- Blauer VHS-Footer mit Seitenzahl auf jeder Seite; automatischer Seitenumbruch mit Mini-Header
+- Technisch: `exportQualityReportPDF` in `file-export.js`, `captureDiagramImage` in `DiagramCanvas` (gibt `{dataUrl, width, height}` zurück), `onGetDiagramImage`-Prop durch `App.jsx → QualityPanel`
+- Bug-Fixes: Latin-1-sicherer `safe()`-Filter (keine Artefakte mehr), proportionale Logo-Skalierung, korrekter Zeilenumbruch via `splitTextToSize` nach Font-Setzung
+
+---
 
 ### 2026-03-13 – Anleitung-Modal + Umlaute
 

@@ -22,6 +22,14 @@ export const REVIEW_SCORE_LABELS = {
   ownership: 'Verantwortlichkeit'
 };
 
+export const REVIEW_SCORE_GUIDES = {
+  clarity:          'Würde eine außenstehende Person den Ablauf sofort verstehen?',
+  mediaBreaks:      'Wie viele Übergänge zwischen digital und analog gibt es im Prozess?',
+  risk:             'Gibt es Schritte, bei denen häufig Fehler oder Verzögerungen auftreten?',
+  participantFocus: 'Ist die Perspektive der Teilnehmenden in allen Schritten sichtbar?',
+  ownership:        'Ist für jeden Schritt klar, wer die Aufgabe übernimmt?'
+};
+
 const createFinding = (severity, code, message, nodeId = null) => ({
   severity,
   code,
@@ -29,10 +37,19 @@ const createFinding = (severity, code, message, nodeId = null) => ({
   nodeId
 });
 
+const DEFAULT_REVIEW_NOTES = {
+  clarity: '',
+  mediaBreaks: '',
+  risk: '',
+  participantFocus: '',
+  ownership: ''
+};
+
 export const getDefaultMetadata = () => ({
   templateId: null,
   improvementItems: [],
-  reviewScores: { ...DEFAULT_REVIEW_SCORES }
+  reviewScores: { ...DEFAULT_REVIEW_SCORES },
+  reviewNotes: { ...DEFAULT_REVIEW_NOTES }
 });
 
 export const normalizeMetadata = (metadata = {}) => ({
@@ -42,6 +59,10 @@ export const normalizeMetadata = (metadata = {}) => ({
   reviewScores: {
     ...DEFAULT_REVIEW_SCORES,
     ...(metadata.reviewScores || {})
+  },
+  reviewNotes: {
+    ...DEFAULT_REVIEW_NOTES,
+    ...(metadata.reviewNotes || {})
   }
 });
 
@@ -58,7 +79,7 @@ export const getReviewScoreSummary = (reviewScores = DEFAULT_REVIEW_SCORES) => {
   };
 };
 
-export const validateDiagram = (diagram) => {
+export const validateDiagram = (diagram, improvementItems = []) => {
   const nodes = Array.isArray(diagram?.nodes) ? diagram.nodes : [];
   const edges = Array.isArray(diagram?.edges) ? diagram.edges : [];
 
@@ -117,14 +138,43 @@ export const validateDiagram = (diagram) => {
     }
   });
 
-  const linearNodes = nodes.filter((node) => {
-    if (node.type === 'annotation' || node.type === 'decision') return false;
-    const nodeIncoming = incoming.get(node.id) || [];
-    const nodeOutgoing = outgoing.get(node.id) || [];
-    return nodeIncoming.length === 1 && nodeOutgoing.length === 1;
-  });
-  if (linearNodes.length >= 6) {
-    findings.push(createFinding('info', 'long_linear_chain', 'Das Diagramm enthält eine längere lineare Kette. Prüfen Sie, ob Teilprozesse gebündelt werden können.'));
+  const decisionNodes = nodes.filter(n => n.type === 'decision');
+  const processNodes = nodes.filter(n => n.type !== 'annotation' && n.type !== 'start' && n.type !== 'end');
+  if (processNodes.length >= 3 && decisionNodes.length / processNodes.length > 0.4) {
+    findings.push(createFinding('warning', 'high_decision_ratio',
+      `${decisionNodes.length} von ${processNodes.length} Prozessschritten sind Entscheidungen – der Prozess könnte zu komplex sein.`));
+  }
+
+  const getChainLength = (startNodeId, visited = new Set()) => {
+    if (visited.has(startNodeId)) return 0;
+    visited.add(startNodeId);
+    const outs = outgoing.get(startNodeId) || [];
+    if (outs.length !== 1) return 0;
+    const nextId = outs[0].to;
+    const next = nodeMap.get(nextId);
+    if (!next || next.type === 'annotation' || next.type === 'decision') return 0;
+    const nextIns = incoming.get(nextId) || [];
+    if (nextIns.length !== 1) return 0;
+    return 1 + getChainLength(nextId, visited);
+  };
+
+  const maxChain = nodes
+    .filter(n => n.type !== 'annotation' && n.type !== 'decision')
+    .reduce((max, n) => {
+      const ins = incoming.get(n.id) || [];
+      if (ins.length !== 1) return Math.max(max, getChainLength(n.id, new Set()));
+      return max;
+    }, 0);
+
+  if (maxChain >= 5) {
+    findings.push(createFinding('info', 'long_linear_chain',
+      `Der Prozess enthält eine lineare Kette von ${maxChain} aufeinanderfolgenden Schritten. Prüfen Sie, ob Teilprozesse gebündelt werden können.`));
+  }
+
+  const annotationNodes = nodes.filter(n => n.type === 'annotation');
+  if (annotationNodes.length > 0 && improvementItems.length === 0) {
+    findings.push(createFinding('info', 'annotations_without_measures',
+      `${annotationNodes.length} Kommentare vorhanden, aber keine Maßnahmen erfasst. Kommentare oft als Ausgangspunkt für Maßnahmen nutzen.`));
   }
 
   const counts = findings.reduce((acc, finding) => {

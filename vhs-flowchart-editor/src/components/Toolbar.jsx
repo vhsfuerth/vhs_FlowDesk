@@ -1,7 +1,15 @@
-import React from 'react';
-import { Play, CircleStop, Square, Diamond, MessageSquareDashed, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, CircleStop, Square, Diamond, MessageSquareDashed, ArrowRight, ChevronLeft, ChevronRight, CheckCircle2, AlertTriangle, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState } from 'react';
 
-const Toolbar = ({ onDragStart, isCollapsed, onToggleCollapsed }) => {
+const Toolbar = ({ onDragStart, isCollapsed, onToggleCollapsed, validation, onFocusNode }) => {
+  const [isCheckCollapsed, setIsCheckCollapsed] = useState(false);
+
+  const severityClasses = {
+    error: 'bg-red-50 text-red-700 border-red-200',
+    warning: 'bg-amber-50 text-amber-800 border-amber-200',
+    info: 'bg-blue-50 text-blue-700 border-blue-200'
+  };
+
   const tools = [
     { type: 'start', icon: Play, label: 'Start', color: 'text-[var(--color-vhs-gelb)]' },
     { type: 'end', icon: CircleStop, label: 'Ende', color: 'text-[var(--color-vhs-orange)]' },
@@ -61,26 +69,98 @@ const Toolbar = ({ onDragStart, isCollapsed, onToggleCollapsed }) => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {tools.map((tool) => {
-          const Icon = tool.icon;
-          return (
-            <div
-              key={tool.type}
-              draggable
-              onDragStart={(event) => handleDragStart(event, tool)}
-              className="flex items-center p-3 rounded-md border border-[var(--color-vhs-blau-20)] bg-white hover:bg-[var(--color-vhs-blau-10)] cursor-grab active:cursor-grabbing transition-colors group shadow-sm"
-              title={`${tool.label} hinzufügen`}
-            >
-              <div className="mr-3 p-2 rounded bg-gray-50 group-hover:bg-white transition-colors">
-                <Icon className={`w-5 h-5 ${tool.color}`} />
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col">
+        <div className="space-y-3 mb-6">
+          {tools.map((tool) => {
+            const Icon = tool.icon;
+            return (
+              <div
+                key={tool.type}
+                draggable
+                onDragStart={(event) => handleDragStart(event, tool)}
+                className="flex items-center p-3 rounded-md border border-[var(--color-vhs-blau-20)] bg-white hover:bg-[var(--color-vhs-blau-10)] cursor-grab active:cursor-grabbing transition-colors group shadow-sm"
+                title={`${tool.label} hinzufügen`}
+              >
+                <div className="mr-3 p-2 rounded bg-gray-50 group-hover:bg-white transition-colors">
+                  <Icon className={`w-5 h-5 ${tool.color}`} />
+                </div>
+                <span className="text-sm font-medium text-gray-700 select-none">
+                  {tool.label}
+                </span>
               </div>
-              <span className="text-sm font-medium text-gray-700 select-none">
-                {tool.label}
-              </span>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+
+        {validation && (
+          <div className="mt-auto pt-4 border-t border-[var(--color-vhs-blau-10)]">
+            <section className="rounded-xl border border-[var(--color-vhs-blau-20)] overflow-hidden bg-white">
+              <button
+                onClick={() => setIsCheckCollapsed(!isCheckCollapsed)}
+                className="w-full text-left p-3 hover:bg-gray-50 transition-colors flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="shrink-0">
+                    {validation.isValid ? (
+                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    ) : (
+                      <AlertTriangle className="w-5 h-5 text-[var(--color-vhs-orange)]" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase font-black text-gray-400 tracking-wider">Struktur-Check</div>
+                    <div className="text-sm font-bold text-[var(--color-vhs-blau)] leading-tight">
+                      {validation.isValid ? 'Diagramm valide' : 'Hinweise prüfen'}
+                    </div>
+                  </div>
+                </div>
+                {isCheckCollapsed ? (
+                  <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-[var(--color-vhs-blau)]" />
+                ) : (
+                  <ChevronUp className="w-4 h-4 text-gray-400 group-hover:text-[var(--color-vhs-blau)]" />
+                )}
+              </button>
+
+              {!isCheckCollapsed && (
+                <div className="px-3 pb-3 pt-2 space-y-3 border-t border-gray-50">
+                  <div className="grid grid-cols-3 gap-1.5 text-center text-[9px] font-black uppercase tracking-wider">
+                    <div className="rounded bg-red-50 text-red-700 p-1.5 border border-red-100">
+                      {validation.counts.error} Err
+                    </div>
+                    <div className="rounded bg-amber-50 text-amber-700 p-1.5 border border-amber-100">
+                      {validation.counts.warning} Warn
+                    </div>
+                    <div className="rounded bg-blue-50 text-blue-700 p-1.5 border border-blue-100">
+                      {validation.counts.info} Hinw
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-[250px] overflow-y-auto pr-1">
+                    {validation.findings.length === 0 ? (
+                      <div className="rounded border border-green-200 bg-green-50 p-2 text-[10px] text-green-700 font-medium text-center italic">
+                        Keine Strukturmängel gefunden.
+                      </div>
+                    ) : (
+                      validation.findings.map((finding, index) => (
+                        <button
+                          key={`${finding.code}-${index}`}
+                          onClick={() => finding.nodeId && onFocusNode(finding.nodeId)}
+                          disabled={!finding.nodeId}
+                          className={`w-full text-left rounded border p-2 transition-all ${severityClasses[finding.severity]} ${finding.nodeId ? 'hover:shadow-sm hover:translate-x-0.5 active:translate-x-0' : 'cursor-default'} border-opacity-40 shadow-xs`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="font-bold text-[11px] leading-tight">{finding.message}</div>
+                            {finding.nodeId ? <Search className="w-3 h-3 shrink-0 opacity-40" /> : null}
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </section>
+          </div>
+        )}
       </div>
 
       <div className="p-4 border-t border-[var(--color-vhs-blau-10)] bg-gray-50">

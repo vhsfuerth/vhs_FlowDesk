@@ -14,7 +14,7 @@ import TemplateModal from './components/TemplateModal';
 import GuideModal from './components/GuideModal';
 import QualityPanel from './components/QualityPanel';
 import { STARTER_TEMPLATES } from './data/templates';
-import { getDefaultMetadata, normalizeMetadata } from './analysis/diagram-validation';
+import { getDefaultMetadata, normalizeMetadata, validateDiagram } from './analysis/diagram-validation';
 import { exportMeasuresToCSV, exportToJSON, exportWorkshopSummary } from './export/file-export';
 
 function App() {
@@ -149,12 +149,26 @@ function App() {
       let customName = null;
       if (typeof nameOrEvent === 'string') {
           customName = nameOrEvent;
+      } else {
+          customName = currentDiagram?.name || 'Unbenanntes Diagramm';
+      }
+      
+      let targetId = currentDiagram?.id;
+      
+      // Prüfen, ob wir einen neuen Speicherstand anlegen müssen (Namensänderung)
+      if (targetId) {
+          const existingInDb = await indexeddb.getDiagram(targetId);
+          if (existingInDb && existingInDb.name !== customName) {
+              // Name hat sich geändert -> Neuer Speicherstand (ID neu generieren)
+              targetId = generateUUID();
+              showNotification(`Neuer Speicherstand "${customName}" erstellt`, 'success');
+          }
       }
       
       const newDiagram = {
           ...(currentDiagram || {}),
-          id: currentDiagram?.id || generateUUID(),
-          name: customName || currentDiagram?.name || 'Unbenanntes Diagramm',
+          id: targetId || generateUUID(),
+          name: customName,
           updatedAt: new Date().toISOString(),
           diagram: pwaData,
           metadata: normalizeMetadata(diagramMetadata)
@@ -164,7 +178,11 @@ function App() {
           const saved = await indexeddb.saveDiagram(newDiagram);
           setCurrentDiagram(saved);
           setLastDiagramId(saved.id);
-          showNotification('Diagramm erfolgreich gespeichert', 'success');
+          
+          // Falls wir nicht gerade wegen Namensänderung schon benachrichtigt haben
+          if (targetId === currentDiagram?.id) {
+            showNotification('Diagramm erfolgreich gespeichert', 'success');
+          }
       } catch(e) {
           showNotification('Fehler beim Speichern', 'error');
       }
@@ -202,20 +220,16 @@ function App() {
       setLastDiagramId(newId);
       if (diagramCanvasRef.current) {
           diagramCanvasRef.current.clear();
+          diagramCanvasRef.current.resetHistory();
           setZoomLevel(1);
       }
   };
 
-  const handleRenameDiagram = async (newName) => {
+  const handleRenameDiagram = (newName) => {
       if (!currentDiagram) return;
-      const updated = { ...currentDiagram, name: newName, metadata: normalizeMetadata(diagramMetadata) };
+      const updated = { ...currentDiagram, name: newName };
       setCurrentDiagram(updated);
-      
-      const exists = await indexeddb.getDiagram(currentDiagram.id);
-      if (exists) {
-          await indexeddb.saveDiagram(updated);
-      }
-      showNotification('Diagramm umbenannt', 'info');
+      showNotification('Name geändert (Speichern zum Sichern)', 'info');
   };
 
   const handleClearDiagram = () => {
@@ -385,6 +399,8 @@ function App() {
         <Toolbar
           isCollapsed={isToolbarCollapsed}
           onToggleCollapsed={() => setIsToolbarCollapsed((prev) => !prev)}
+          validation={useMemo(() => validateDiagram(liveDiagramData, diagramMetadata.improvementItems), [liveDiagramData, diagramMetadata.improvementItems])}
+          onFocusNode={handleFocusNode}
         />
         <DiagramCanvas
            ref={diagramCanvasRef}
@@ -394,9 +410,11 @@ function App() {
         <QualityPanel
           diagramData={liveDiagramData}
           metadata={diagramMetadata}
+          title={currentDiagram?.name}
           onMetadataChange={setDiagramMetadata}
           onFocusNode={handleFocusNode}
           onExportMeasures={handleExportMeasures}
+          onGetDiagramImage={() => diagramCanvasRef.current?.captureDiagramImage('')}
           isCollapsed={isQualityPanelCollapsed}
           width={qualityPanelWidth}
           onToggleCollapsed={handleQualityPanelToggle}

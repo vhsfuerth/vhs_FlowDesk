@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { generateFlowchartFromText } from '../ai/gemini-client';
 import { getApiKey } from '../storage/settings';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 
 const AiInputPanel = ({ onDiagramGenerated, onError }) => {
   const [text, setText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const handleGenerate = async () => {
     if (!text || text.trim().length < 20) {
@@ -45,39 +46,67 @@ const AiInputPanel = ({ onDiagramGenerated, onError }) => {
   };
 
   return (
-    <div className="bg-white border-b border-[var(--color-vhs-blau-20)] py-1.5 px-4 shadow-sm flex flex-col md:flex-row md:items-center gap-2">
-      <div className="flex-grow">
-        <label htmlFor="ai-input" className="block text-xs font-bold text-[var(--color-vhs-blau)] mb-0.5">
-          KI-Assistent: Prozessbeschreibung eingeben
-        </label>
-        <textarea
-          id="ai-input"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder='z.B. "Ein Antrag geht ein. Bei Erfolg genehmigen..."'
-          className="w-full text-sm py-1 px-3 border border-[var(--color-vhs-blau-40)] rounded-md focus:ring-2 focus:ring-[var(--color-vhs-orange-hell)] focus:border-transparent min-h-[40px] max-h-[96px] resize-y"
-          disabled={isGenerating}
-        />
-      </div>
-      <div className="flex items-center shrink-0 self-end md:self-center">
-        <button
-          onClick={handleGenerate}
-          disabled={isGenerating || text.trim().length < 10}
-          className="bg-[var(--color-vhs-blau)] text-white px-5 py-1.5 rounded-md font-bold hover:bg-[var(--color-vhs-blau-80)] transition-colors flex items-center justify-center min-w-[150px] disabled:bg-[var(--color-vhs-blau-40)] disabled:cursor-not-allowed group text-sm"
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              Generiere...
-            </>
-          ) : (
-            <>
-               <Sparkles className="w-5 h-5 mr-2 text-[var(--color-vhs-gelb)] group-hover:scale-110 transition-transform" />
-               Diagramm generieren
-            </>
+    <div className="bg-white border-b border-[var(--color-vhs-blau-20)] shadow-sm">
+      <div 
+        className="flex items-center justify-between px-4 py-1.5 cursor-pointer hover:bg-gray-50 transition-colors"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+      >
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-[var(--color-vhs-orange)]" />
+          <span className="text-xs font-bold text-[var(--color-vhs-blau)] uppercase tracking-wider">
+            KI-Assistent
+          </span>
+          {isCollapsed && text.trim() && (
+            <span className="text-[10px] text-gray-400 truncate max-w-[200px] font-normal italic">
+              - {text.substring(0, 40)}...
+            </span>
           )}
-        </button>
+        </div>
+        <div className="flex items-center gap-2">
+          {isCollapsed ? (
+            <ChevronDown className="w-4 h-4 text-gray-400" />
+          ) : (
+            <ChevronUp className="w-4 h-4 text-gray-400" />
+          )}
+        </div>
       </div>
+
+      {!isCollapsed && (
+        <div className="px-4 pb-3 pt-1 flex flex-col md:flex-row md:items-center gap-3 border-t border-gray-50">
+          <div className="flex-grow">
+            <label htmlFor="ai-input" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+              Prozessbeschreibung
+            </label>
+            <textarea
+              id="ai-input"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder='z.B. "Ein Antrag geht ein. Bei Erfolg genehmigen..."'
+              className="w-full text-sm py-2 px-3 border border-[var(--color-vhs-blau-20)] rounded-md focus:ring-2 focus:ring-[var(--color-vhs-orange-hell)] focus:border-transparent min-h-[44px] max-h-[120px] resize-y"
+              disabled={isGenerating}
+            />
+          </div>
+          <div className="flex items-center shrink-0 self-end md:self-center pt-4 md:pt-0">
+            <button
+              onClick={handleGenerate}
+              disabled={isGenerating || text.trim().length < 10}
+              className="bg-[var(--color-vhs-blau)] text-white px-5 py-2 rounded-md font-bold hover:bg-[var(--color-vhs-blau-80)] transition-colors flex items-center justify-center min-w-[200px] shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed group text-sm"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Generiere...
+                </>
+              ) : (
+                <>
+                   <Sparkles className="w-4 h-4 mr-2 text-[var(--color-vhs-gelb)] group-hover:scale-110 transition-transform" />
+                   Diagramm generieren
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -2,7 +2,7 @@ import React from 'react';
 import {
   X, BookOpen, Sparkles, Square, Maximize, ArrowRight,
   Undo2, CheckSquare, Printer, AlertTriangle, Presentation,
-  LayoutTemplate, Settings
+  LayoutTemplate, Settings, ClipboardList, FileText
 } from 'lucide-react';
 
 const sections = [
@@ -39,12 +39,22 @@ const sections = [
   {
     icon: Printer,
     title: 'Export',
-    text: 'Exportiere dein Diagramm als PNG, SVG, PDF oder JSON über die Buttons in der unteren Leiste. Das JSON-Format eignet sich zum Teilen und Archivieren.'
+    text: 'Exportiere dein Diagramm als PNG, SVG, PDF oder JSON über die Buttons in der unteren Leiste. Den vollständigen Qualitätsbericht kannst du direkt im Prozess-Check als PDF herunterladen.'
   },
   {
     icon: AlertTriangle,
-    title: 'Qualität & Maßnahmen',
-    text: 'Die rechte Sidebar bietet eine automatische Strukturprüfung, eine Selbstbewertung (Prozess-Check) und eine Maßnahmenliste zum Festhalten von Verbesserungen.'
+    title: 'Automatische Prüfung',
+    text: 'Die rechte Sidebar prüft dein Diagramm automatisch auf Strukturfehler: fehlender Start- oder Endknoten, nicht verbundene Elemente, unbeschriftete Entscheidungsausgänge und mehr. Klicke auf einen Befund, um den betroffenen Knoten direkt anzuspringen.'
+  },
+  {
+    icon: ClipboardList,
+    title: 'Prozess-Check (Selbstbewertung)',
+    text: 'Der geführte Wizard bewertet deinen Prozess in 5 Schritten: Klarheit, Medienbruch, Risiko, Teilnehmendenorientierung und Verantwortlichkeit. Pro Schritt gibt es eine Leitfrage, vier Score-Buttons (0–3) und ein Notizfeld. Schritt 6 zeigt die Zusammenfassung mit Hotspot-Markierung. Über „Alle auf einmal" wechselst du zur kompakten Ansicht.'
+  },
+  {
+    icon: FileText,
+    title: 'PDF-Qualitätsbericht',
+    text: 'Im Prozess-Check kannst du einen professionellen Qualitätsbericht als PDF exportieren. Seite 1 enthält Deckblatt, Status, Durchschnittswert und das Flowchart. Seite 2 listet alle Befunde, Selbstbewertungs-Scores mit Notizen und die erfassten Maßnahmen im vhs-Layout.'
   },
   {
     icon: Presentation,

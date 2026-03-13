@@ -1,14 +1,17 @@
 import React, { useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, FileDown, Plus, Search, Target } from 'lucide-react';
-import { REVIEW_SCORE_LABELS, getReviewScoreSummary, validateDiagram } from '../analysis/diagram-validation';
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FileDown, Plus, Search, Target } from 'lucide-react';
+import { REVIEW_SCORE_GUIDES, REVIEW_SCORE_LABELS, getReviewScoreSummary, validateDiagram } from '../analysis/diagram-validation';
+import { exportQualityReport, exportQualityReportPDF } from '../export/file-export';
 import WorkshopPanel from './WorkshopPanel';
 
 const SCORE_OPTIONS = [
-  { value: 0, label: '0 - kritisch' },
-  { value: 1, label: '1 - schwach' },
-  { value: 2, label: '2 - solide' },
-  { value: 3, label: '3 - stark' }
+  { value: 0, label: '0', sublabel: 'kritisch' },
+  { value: 1, label: '1', sublabel: 'schwach' },
+  { value: 2, label: '2', sublabel: 'solide' },
+  { value: 3, label: '3', sublabel: 'stark' }
 ];
+
+const WIZARD_FIELDS = ['clarity', 'mediaBreaks', 'risk', 'participantFocus', 'ownership'];
 
 const emptyMeasure = (nodeId = '') => ({
   id: `measure-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -38,15 +41,20 @@ const QualityPanel = ({
   onMetadataChange,
   onFocusNode,
   onExportMeasures,
+  onGetDiagramImage,
   workshopProps,
   isCollapsed,
   width,
   onToggleCollapsed,
-  onResizeStart
+  onResizeStart,
+  title
 }) => {
   const [activeTab, setActiveTab] = useState('check');
+  const [isEvaluationCollapsed, setIsEvaluationCollapsed] = useState(false);
+  const [wizardStep, setWizardStep] = useState(1);
+  const [wizardCompact, setWizardCompact] = useState(false);
 
-  const validation = useMemo(() => validateDiagram(diagramData), [diagramData]);
+  const validation = useMemo(() => validateDiagram(diagramData, metadata.improvementItems), [diagramData, metadata.improvementItems]);
   const reviewSummary = useMemo(() => getReviewScoreSummary(metadata.reviewScores), [metadata.reviewScores]);
   const nodes = useMemo(
     () => (Array.isArray(diagramData?.nodes) ? diagramData.nodes.filter((node) => node.type !== 'annotation') : []),
@@ -59,6 +67,16 @@ const QualityPanel = ({
       reviewScores: {
         ...metadata.reviewScores,
         [field]: Number(value)
+      }
+    });
+  };
+
+  const updateReviewNote = (field, value) => {
+    onMetadataChange({
+      ...metadata,
+      reviewNotes: {
+        ...metadata.reviewNotes,
+        [field]: value
       }
     });
   };
@@ -86,6 +104,43 @@ const QualityPanel = ({
   };
 
   const nodeLabel = (nodeId) => nodes.find((node) => node.id === nodeId)?.label || 'Nicht zugeordnet';
+
+  const handleExportQualityReport = () => {
+    exportQualityReport(
+      title,
+      validation.findings,
+      validation.counts,
+      metadata.reviewScores,
+      reviewSummary,
+      metadata.improvementItems,
+      nodeLabel,
+      metadata.reviewNotes
+    );
+  };
+
+  const [pdfExporting, setPdfExporting] = useState(false);
+
+  const handleExportQualityReportPDF = async () => {
+    setPdfExporting(true);
+    try {
+      const diagramImage = onGetDiagramImage ? await onGetDiagramImage() : null;
+      const cleanName = (title || 'qualitaetsbericht').toLowerCase().replace(/[^a-z0-9]/g, '_');
+      await exportQualityReportPDF(
+        title,
+        validation.findings,
+        validation.counts,
+        metadata.reviewScores,
+        reviewSummary,
+        metadata.improvementItems,
+        nodeLabel,
+        metadata.reviewNotes,
+        diagramImage,
+        `${cleanName}_qualitaetsbericht.pdf`
+      );
+    } finally {
+      setPdfExporting(false);
+    }
+  };
 
   if (isCollapsed) {
     return (
@@ -166,88 +221,243 @@ const QualityPanel = ({
       <div className="flex-1 overflow-y-auto p-4 pl-5 space-y-5">
         {activeTab === 'check' ? (
           <>
-            <section className="rounded-xl border border-[var(--color-vhs-blau-20)] p-4">
-              <div className="flex items-center justify-between gap-3">
+
+
+            <section className="rounded-xl border border-[var(--color-vhs-blau-20)] overflow-hidden">
+              <button
+                onClick={() => setIsEvaluationCollapsed(!isEvaluationCollapsed)}
+                className="w-full text-left p-4 hover:bg-gray-50 transition-colors flex items-center justify-between group"
+              >
                 <div>
-                  <div className="text-xs uppercase tracking-widest font-black text-gray-400">Automatische Prüfung</div>
-                  <div className="text-lg font-bold text-[var(--color-vhs-blau)] mt-1">
-                    {validation.isValid ? 'Struktur grundsätzlich stimmig' : 'Prüfbedarf vorhanden'}
-                  </div>
+                  <div className="text-xs uppercase tracking-widest font-black text-gray-400">Selbstbewertung</div>
+                  <div className="mt-1 text-lg font-bold text-[var(--color-vhs-blau)]">Kurzer Prozess-Check</div>
                 </div>
-                {validation.isValid ? (
-                  <CheckCircle2 className="w-6 h-6 text-green-600 shrink-0" />
+                {isEvaluationCollapsed ? (
+                  <ChevronDown className="w-5 h-5 text-gray-400 group-hover:text-[var(--color-vhs-blau)]" />
                 ) : (
-                  <AlertTriangle className="w-6 h-6 text-[var(--color-vhs-orange)] shrink-0" />
+                  <ChevronUp className="w-5 h-5 text-gray-400 group-hover:text-[var(--color-vhs-blau)]" />
                 )}
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs font-bold">
-                <div className="rounded-lg bg-red-50 text-red-700 p-2">{validation.counts.error} Fehler</div>
-                <div className="rounded-lg bg-amber-50 text-amber-700 p-2">{validation.counts.warning} Warnungen</div>
-                <div className="rounded-lg bg-blue-50 text-blue-700 p-2">{validation.counts.info} Hinweise</div>
-              </div>
-            </section>
+              </button>
 
-            <section className="rounded-xl border border-[var(--color-vhs-blau-20)] p-4">
-              <div className="text-xs uppercase tracking-widest font-black text-gray-400">Selbstbewertung</div>
-              <div className="mt-1 text-lg font-bold text-[var(--color-vhs-blau)]">Kurzer Prozess-Check</div>
-              <div className="mt-2 text-sm text-gray-500">
-                0 bis 3 Punkte je Feld. Niedrige Werte markieren Verbesserungsbedarf.
-              </div>
-              <div className="mt-4 space-y-3">
-                {Object.entries(REVIEW_SCORE_LABELS).map(([field, label]) => (
-                  <label key={field} className="block">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-gray-700">{label}</span>
-                      <span className={`text-xs font-black ${scoreToTone(metadata.reviewScores[field])}`}>
-                        {metadata.reviewScores[field]}/3
-                      </span>
-                    </div>
-                    <select
-                      value={metadata.reviewScores[field]}
-                      onChange={(event) => updateScores(field, event.target.value)}
-                      className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white"
+              {!isEvaluationCollapsed && (
+                <div className="px-4 pb-4 border-t border-[var(--color-vhs-blau-10)] pt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-xs text-gray-400">0 bis 3 Punkte je Kriterium.</span>
+                    <button
+                      onClick={() => setWizardCompact(!wizardCompact)}
+                      className="text-xs text-[var(--color-vhs-blau)] underline underline-offset-2"
                     >
-                      {SCORE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                  </label>
-                ))}
-              </div>
-              <div className="mt-4 rounded-lg bg-gray-50 p-3">
-                <div className="text-xs uppercase tracking-widest font-black text-gray-400">Kurzfazit</div>
-                <div className="mt-1 text-sm text-gray-700">
-                  Durchschnitt: <span className="font-bold text-[var(--color-vhs-blau)]">{reviewSummary.average.toFixed(1)} / 3</span>
-                </div>
-                <div className="mt-1 text-sm text-gray-600">
-                  Hotspots: {reviewSummary.hotspots.length > 0
-                    ? reviewSummary.hotspots.map((field) => REVIEW_SCORE_LABELS[field]).join(', ')
-                    : 'keine akuten Schwachstellen markiert'}
-                </div>
-              </div>
-            </section>
+                      {wizardCompact ? 'Geführt bewerten' : 'Alle auf einmal'}
+                    </button>
+                  </div>
 
-            <section className="space-y-2">
-              {validation.findings.length === 0 ? (
-                <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
-                  Keine Auffälligkeiten im aktuellen Diagramm gefunden.
-                </div>
-              ) : (
-                validation.findings.map((finding, index) => (
-                  <button
-                    key={`${finding.code}-${index}`}
-                    onClick={() => finding.nodeId && onFocusNode(finding.nodeId)}
-                    disabled={!finding.nodeId}
-                    className={`w-full text-left rounded-xl border p-3 transition-colors ${severityClasses[finding.severity]} ${finding.nodeId ? 'hover:shadow-sm' : 'cursor-default'}`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="font-bold text-sm">{finding.message}</div>
-                      {finding.nodeId ? <Search className="w-4 h-4 shrink-0" /> : null}
+                  {wizardCompact ? (
+                    /* Kompaktansicht: alle 5 Kriterien auf einmal */
+                    <>
+                      <div className="space-y-3">
+                        {WIZARD_FIELDS.map((field) => (
+                          <label key={field} className="block">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-medium text-gray-700">{REVIEW_SCORE_LABELS[field]}</span>
+                              <span className={`text-xs font-black ${scoreToTone(metadata.reviewScores[field])}`}>
+                                {metadata.reviewScores[field]}/3
+                              </span>
+                            </div>
+                            <select
+                              value={metadata.reviewScores[field]}
+                              onChange={(event) => updateScores(field, event.target.value)}
+                              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white"
+                            >
+                              {SCORE_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>{option.label} – {option.sublabel}</option>
+                              ))}
+                            </select>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="mt-4 rounded-lg bg-gray-50 p-3">
+                        <div className="text-xs uppercase tracking-widest font-black text-gray-400">Kurzfazit</div>
+                        <div className="mt-1 text-sm text-gray-700">
+                          Durchschnitt: <span className="font-bold text-[var(--color-vhs-blau)]">{reviewSummary.average.toFixed(1)} / 3</span>
+                        </div>
+                        <div className="mt-1 text-sm text-gray-600">
+                          Hotspots: {reviewSummary.hotspots.length > 0
+                            ? reviewSummary.hotspots.map((field) => REVIEW_SCORE_LABELS[field]).join(', ')
+                            : 'keine akuten Schwachstellen markiert'}
+                        </div>
+                      </div>
+                      <div className="mt-4 flex gap-2 flex-wrap">
+                        <button
+                          onClick={handleExportQualityReport}
+                          className="inline-flex items-center px-3 py-2 rounded-md border border-[var(--color-vhs-blau)] text-[var(--color-vhs-blau)] text-xs font-bold hover:bg-[var(--color-vhs-blau-10)]"
+                        >
+                          <FileDown className="w-3.5 h-3.5 mr-1" />
+                          TXT
+                        </button>
+                        <button
+                          onClick={handleExportQualityReportPDF}
+                          disabled={pdfExporting}
+                          className="inline-flex items-center px-3 py-2 rounded-md bg-[var(--color-vhs-blau)] text-white text-xs font-bold hover:bg-[var(--color-vhs-blau-80)] disabled:opacity-50"
+                        >
+                          <FileDown className="w-3.5 h-3.5 mr-1" />
+                          {pdfExporting ? 'Erstelle…' : 'PDF-Bericht'}
+                        </button>
+                      </div>
+                    </>
+                  ) : wizardStep <= 5 ? (
+                    /* Wizard-Ansicht: Schritt 1–5 */
+                    (() => {
+                      const field = WIZARD_FIELDS[wizardStep - 1];
+                      const currentScore = metadata.reviewScores[field];
+                      return (
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                              Schritt {wizardStep} von 5: {REVIEW_SCORE_LABELS[field]}
+                            </span>
+                          </div>
+                          <div className="flex gap-1 mb-4">
+                            {WIZARD_FIELDS.map((_, i) => (
+                              <div
+                                key={i}
+                                className={`h-1.5 flex-1 rounded-full ${i < wizardStep ? 'bg-[var(--color-vhs-blau)]' : 'bg-gray-200'}`}
+                              />
+                            ))}
+                          </div>
+                          <p className="text-sm text-gray-700 mb-4 leading-relaxed">
+                            {REVIEW_SCORE_GUIDES[field]}
+                          </p>
+                          <div className="grid grid-cols-4 gap-1.5 mb-4">
+                            {SCORE_OPTIONS.map((option) => {
+                              const selected = currentScore === option.value;
+                              let btnClass = 'flex flex-col items-center py-2 px-1 rounded-lg border-2 text-xs font-bold transition-colors cursor-pointer ';
+                              if (selected) {
+                                if (option.value === 0) btnClass += 'bg-red-600 text-white border-red-600';
+                                else if (option.value === 1) btnClass += 'bg-amber-500 text-white border-amber-500';
+                                else if (option.value === 2) btnClass += 'bg-amber-400 text-white border-amber-400';
+                                else btnClass += 'bg-green-600 text-white border-green-600';
+                              } else {
+                                btnClass += 'bg-white text-gray-600 border-gray-200 hover:border-gray-400';
+                              }
+                              return (
+                                <button
+                                  key={option.value}
+                                  onClick={() => updateScores(field, option.value)}
+                                  className={btnClass}
+                                >
+                                  <span className="text-base leading-none">{option.label}</span>
+                                  <span className="mt-1 font-normal text-[10px] leading-none">{option.sublabel}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <label className="block mb-4">
+                            <div className="text-xs font-bold text-gray-500 mb-1">Notiz (optional)</div>
+                            <textarea
+                              value={metadata.reviewNotes?.[field] || ''}
+                              onChange={(e) => updateReviewNote(field, e.target.value)}
+                              rows={2}
+                              placeholder="Beobachtungen oder Verbesserungsideen …"
+                              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm resize-none"
+                            />
+                          </label>
+                          <div className="flex justify-between">
+                            <button
+                              onClick={() => setWizardStep(wizardStep - 1)}
+                              disabled={wizardStep === 1}
+                              className="inline-flex items-center px-3 py-2 rounded-md border border-gray-200 text-gray-600 text-sm font-bold hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              <ChevronLeft className="w-4 h-4 mr-1" />
+                              Zurück
+                            </button>
+                            <button
+                              onClick={() => setWizardStep(wizardStep + 1)}
+                              className="inline-flex items-center px-3 py-2 rounded-md bg-[var(--color-vhs-blau)] text-white text-sm font-bold hover:bg-[var(--color-vhs-blau-80)]"
+                            >
+                              {wizardStep === 5 ? 'Zusammenfassung' : 'Weiter'}
+                              <ChevronRight className="w-4 h-4 ml-1" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    /* Wizard-Ansicht: Schritt 6 – Zusammenfassung */
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Zusammenfassung</span>
+                        <span className={`text-sm font-black ${scoreToTone(reviewSummary.average)}`}>
+                          Ø {reviewSummary.average.toFixed(1)}/3
+                        </span>
+                      </div>
+                      <div className="flex gap-1 mb-4">
+                        {WIZARD_FIELDS.map((_, i) => (
+                          <div key={i} className="h-1.5 flex-1 rounded-full bg-[var(--color-vhs-blau)]" />
+                        ))}
+                      </div>
+                      <div className="space-y-2 mb-4">
+                        {WIZARD_FIELDS.map((field) => {
+                          const score = metadata.reviewScores[field];
+                          const isHotspot = score <= 1;
+                          const scoreLabelText = score === 0 ? 'kritisch' : score === 1 ? 'schwach' : score === 2 ? 'solide' : 'stark';
+                          return (
+                            <button
+                              key={field}
+                              onClick={() => setWizardStep(WIZARD_FIELDS.indexOf(field) + 1)}
+                              className="w-full text-left rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 hover:bg-gray-100 transition-colors"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-700">{REVIEW_SCORE_LABELS[field]}</span>
+                                <div className="flex items-center gap-1.5">
+                                  {isHotspot && <span title="Verbesserungsbedarf">⚠</span>}
+                                  <span className={`text-xs font-black ${scoreToTone(score)}`}>
+                                    {score}/3
+                                  </span>
+                                  <span className={`text-xs ${isHotspot ? 'text-red-600' : 'text-gray-400'}`}>
+                                    {scoreLabelText}
+                                  </span>
+                                </div>
+                              </div>
+                              {metadata.reviewNotes?.[field] && (
+                                <p className="text-xs text-gray-500 mt-1 truncate">{metadata.reviewNotes[field]}</p>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <button
+                          onClick={() => setWizardStep(5)}
+                          className="inline-flex items-center px-3 py-2 rounded-md border border-gray-200 text-gray-600 text-sm font-bold hover:bg-gray-50"
+                        >
+                          <ChevronLeft className="w-4 h-4 mr-1" />
+                          Zurück
+                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleExportQualityReport}
+                            className="inline-flex items-center px-3 py-2 rounded-md border border-[var(--color-vhs-blau)] text-[var(--color-vhs-blau)] text-xs font-bold hover:bg-[var(--color-vhs-blau-10)]"
+                          >
+                            <FileDown className="w-3.5 h-3.5 mr-1" />
+                            TXT
+                          </button>
+                          <button
+                            onClick={handleExportQualityReportPDF}
+                            disabled={pdfExporting}
+                            className="inline-flex items-center px-3 py-2 rounded-md bg-[var(--color-vhs-blau)] text-white text-xs font-bold hover:bg-[var(--color-vhs-blau-80)] disabled:opacity-50"
+                          >
+                            <FileDown className="w-3.5 h-3.5 mr-1" />
+                            {pdfExporting ? 'Erstelle…' : 'PDF-Bericht'}
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </button>
-                ))
+                  )}
+                </div>
               )}
             </section>
+
+
           </>
         ) : activeTab === 'measures' ? (
           <>

@@ -4,7 +4,7 @@ import { HistoryManager } from '../diagram/history';
 import { JSONConverter } from '../diagram/converter';
 import { DiagramLayout } from '../diagram/layout';
 import { createStartNode, createEndNode, createProcessNode, createDecisionNode, createAnnotationNode, autoSizeForText, linkLabelStyle } from '../diagram/shapes';
-import { exportToPNG, exportToSVG, exportToPDF, exportToJSON } from '../export/file-export';
+import { exportToPNG, exportToSVG, exportToPDF, exportToJSON, getDiagramPngDataUrl } from '../export/file-export';
 import EditTextModal from './EditTextModal';
 
 const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryChange }, ref) => {
@@ -305,6 +305,10 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
     getCurrentData: () => converterRef.current?.toJson(),
     clear: () => {
         graphRef.current?.clear();
+        historyRef.current?.saveState();
+        if (onHistoryChange) onHistoryChange(historyRef.current?.canUndo() || false, historyRef.current?.canRedo() || false);
+    },
+    resetHistory: () => {
         historyRef.current?.clear();
     },
 
@@ -331,7 +335,8 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
     exportAsPNG: (filename, title) => exportToPNG(paperRef.current, filename, title),
     exportAsSVG: (filename, title) => exportToSVG(paperRef.current, filename, title),
     exportAsPDF: (filename, title) => exportToPDF(paperRef.current, filename, title),
-    exportAsJSON: (filename) => exportToJSON(converterRef.current.toJson(), filename)
+    exportAsJSON: (filename) => exportToJSON(converterRef.current.toJson(), filename),
+    captureDiagramImage: (title) => getDiagramPngDataUrl(paperRef.current, title)
   }));
 
   const handleDragOver = (e) => {
