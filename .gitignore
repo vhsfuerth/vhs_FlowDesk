@@ -1,0 +1,8 @@
+# Windows-Skripte (lokal behalten, nicht pushen)
+*.bat
+
+# Screenshots & Debugging-Bilder im Projektstamm
+*.png
+
+# Claude Code Konfiguration
+.claude/

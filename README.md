@@ -140,7 +140,44 @@ Geeignet fuer Intranet, GitHub Pages oder allgemeinen Webspace.
 2. Den Inhalt von `dist/` auf den internen Webserver kopieren.
 3. Eine interne URL wie `workflow.vhs.local` auf diesen Server zeigen lassen.
 
-### 3. Als ZIP-Archiv
+### 3. Hosting auf Vercel (öffentlich, kostenlos)
+
+Vercel ist ein kostenloser Hosting-Dienst, der sich für dieses Projekt besonders eignet, weil es keine Server-Komponente gibt. Der Build läuft automatisch bei jedem Git-Push.
+
+**Voraussetzungen:**
+- Projekt liegt auf GitHub (oder GitLab / Bitbucket)
+- Kostenloses Vercel-Konto unter [vercel.com](https://vercel.com)
+
+**Einmalige Einrichtung:**
+
+1. Auf [vercel.com/new](https://vercel.com/new) einloggen und „Import Git Repository" wählen.
+2. Das GitHub-Repo auswählen und auf **Deploy** klicken.
+3. Vercel erkennt `vercel.json` automatisch – kein manuelles Konfigurieren nötig.
+4. Nach wenigen Sekunden ist die App unter einer `*.vercel.app`-URL erreichbar.
+
+**Alternativ per CLI:**
+
+```bash
+npx vercel --prod
+```
+
+**Automatische Updates:**
+
+Ab sofort löst jeder `git push` auf den `master`-Branch automatisch einen neuen Build und Deploy auf Vercel aus.
+
+**Enthaltene Sicherheits-Header (via `vercel.json`):**
+
+| Header | Schutz gegen |
+|---|---|
+| Content-Security-Policy | XSS, unerlaubte externe Ressourcen |
+| X-Frame-Options: DENY | Clickjacking |
+| X-Content-Type-Options: nosniff | MIME-Sniffing |
+| Referrer-Policy | Datenlecks über Referer-Header |
+| Permissions-Policy | Kamera, Mikrofon, Geolocation gesperrt |
+
+> **Hinweis zum API-Key:** Der Google-Gemini-API-Key wird weiterhin lokal im Browser gespeichert und nicht an Vercel oder andere Server übertragen.
+
+### 4. Als ZIP-Archiv
 
 - Den gesamten Projektordner als `.zip` weitergeben.
 - Voraussetzung: Node.js ist auf dem Zielrechner installiert.
