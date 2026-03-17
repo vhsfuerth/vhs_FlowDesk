@@ -2,7 +2,26 @@
   "permissions": {
     "allow": [
       "Bash(npm run:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(find /d/80_SoftwareProjekte/202601_vhs_Flowcharts/vhs-flowchart-editor -maxdepth 2 -type f \\\\\\( -name \"*.json\" -o -name \"*.html\" -o -name \"*env*\" -o -name \"manifest*\" -o -name \"worker*\" \\\\\\) 2>/dev/null | grep -v node_modules)",
+      "Bash(find /d/80_SoftwareProjekte/202601_vhs_Flowcharts -type f -name \"*manifest*\" -o -name \"*worker*\" 2>/dev/null | grep -v node_modules)",
+      "Bash(find /d/80_SoftwareProjekte/202601_vhs_Flowcharts -maxdepth 3 -type f \\\\\\( -name \".env*\" -o -name \"*config*\" \\\\\\) 2>/dev/null | grep -v node_modules | head -20)",
+      "Bash(tree -L 2 -I 'node_modules|dist' /d/80_SoftwareProjekte/202601_vhs_Flowcharts/vhs-flowchart-editor/ 2>/dev/null || find /d/80_SoftwareProjekte/202601_vhs_Flowcharts/vhs-flowchart-editor -maxdepth 2 -not -path '*/node_modules/*' -not -path '*/.git/*' | sort)",
+      "Bash(ls -la /d/80_SoftwareProjekte/202601_vhs_Flowcharts/*.bat)",
+      "Bash(git -C \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\" status --short)",
+      "Bash(git -C \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\" check-ignore -v frage_1.png logo_HQ_neg.png Logo_HQ_pos.png)",
+      "Bash(git -C \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\" ls-files -o --exclude-standard | head -20)",
+      "Bash(git -C \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\" ls-files | grep -E \"\\\\.\\(bat|png|svg\\)$\")",
+      "Bash(git -C \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\" log --oneline -5)",
+      "Bash(git -C \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\" ls-files --stage | grep -E \"\\\\.png$|\\\\.bat$\")",
+      "Bash(ls -lh \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\"/*.md)",
+      "Bash(git -C \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\" log --all --pretty=format: --name-only | sort -u | grep -E \"\\\\.\\(png|bat|md\\)$\" | head -20)",
+      "Bash(git -C \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\" ls-files | grep -i fehler)",
+      "Bash(git -C \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\" ls-files | grep -i \"frage\\\\|optimierung\")",
+      "Bash(git -C \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\" check-ignore -v \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\\\\frage_1.png\" \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\\\\Fehler_1.png\" 2>&1)",
+      "Bash(ls -lh \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\"/*.png 2>/dev/null)",
+      "Bash(git -C \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\" diff-index --quiet HEAD || echo \"uncommitted changes\")",
+      "Bash(git -C \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\" config --get core.ignorecase)"
     ]
   }
 }
