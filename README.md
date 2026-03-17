@@ -7,47 +7,7 @@ Lokal laufendes PWA-Tool (Progressive Web App) zur Erstellung algorithmischer Ab
 - **KI-Diagramm-Generierung**: Erzeugt Diagramme direkt aus einer Prozessbeschreibung per Google Gemini API.
 - **Visueller Editor**: Drag-and-drop-basierter Diagrammeditor mit JointJS.
 - **vhs-Starter-Vorlagen**: Sofort nutzbare Vorlagen fuer typische vhs-Prozesse wie Kursplanung, Dozierenden-Onboarding, Beschwerdebearbeitung oder Raumbuchung.
-- **Prozess-Check und Selbstbewertung**: Automatische Strukturpruefung plus schlanke Reflexion in fuenf OE-Feldern.
-- **Massnahmen-Overlay**: Verbesserungsmassnahmen mit Bezug auf einzelne Prozessschritte direkt am Diagramm pflegen.
-- **Workshop-Modus**: Schrittweise Moderationsansicht fuer Teamgespraeche und Prozessworkshops.
-- **Speicherverwaltung**: Mehrere Diagramme lokal speichern, laden, umbenennen und loeschen.
-- **Offline-faehig**: Editor, Laden, Speichern und Exporte funktionieren auch ohne Internet. Nur die KI-Funktion benoetigt Netzverbindung.
-- **Lokale Datenhaltung**: Diagramme, Projektmetadaten und API-Key bleiben lokal im Browser gespeichert.
-
-## Letzte Erweiterungen
-
-- **Vorlagenbibliothek**: Neue Starter-Vorlagen erleichtern den Einstieg in typische Volkshochschulprozesse.
-- **Qualitaetsleiste**: Rechte Seitenleiste mit Strukturpruefung, EFQM-naher Selbstbewertung und Massnahmenverwaltung.
-- **Workshop-Modus**: Moderationsansicht mit Schritt-Navigation, Fokusmodus und Export einer Workshop-Zusammenfassung.
-- **Erweiterte Exporte**: Projektdatei mit Metadaten, Massnahmenliste als CSV und Workshop-Notizen als TXT.
-- **Manuelle Verbindungen**: Elemente besitzen Ports an den Raendern, von denen aus Verbindungen per Maus gezogen werden koennen.
-- **Dynamisches Text-Sizing**: Elemente skalieren automatisch mit der Textmenge.
-- **Reset-Funktion**: Ein dedizierter Button erlaubt das schnelle Leeren der Arbeitsflaeche.
-
-## Erste Schritte / Installation
-
-1. Stelle sicher, dass [Node.js](https://nodejs.org) installiert ist.
-2. Fuehre die Datei `install.bat` per Doppelklick aus.
-3. Starte das Tool kuenftig mit einem Klick auf `start.bat`.
-4. Oeffne `http://localhost:5173` im Browser. Chrome oder Edge werden empfohlen.
-5. Trage deinen Google-Gemini-API-Key in den Einstellungen ein.
-
-## Lokale Nutzung und PWA
-
-Da das Tool als Progressive Web App entwickelt wurde, kann es wie eine normale Desktop-Anwendung installiert werden:
-
-1. In Chrome oder Edge in der Adresszeile auf "App installieren" klicken.
-2. Die App erscheint danach mit eigenem Icon und ohne Browserleisten.
-3. Alle Daten bleiben weiterhin lokal auf dem jeweiligen Geraet.
-
-## Nutzung im Alltag
-
-- **Elemente verbinden**: Mit der Maus ueber einen Knoten fahren, einen Port anklicken und die Verbindung zum Zielelement ziehen.
-- **Text bearbeiten**: Doppelklick auf ein Element oder eine Verbindung, um den Text direkt anzupassen.
-- **Speichern**: Ueber den Button "Speichern" wird das aktuelle Projekt lokal in IndexedDB gesichert.
-- **Laden**: Ueber "Oeffnen" lassen sich gespeicherte Diagramme wieder aufrufen.
-
-## Neue Funktionen nutzen
+- **Prozess-Check und Selbstbewertung**: AutomatisFol
 
 ### 1. Mit Vorlagen starten
 

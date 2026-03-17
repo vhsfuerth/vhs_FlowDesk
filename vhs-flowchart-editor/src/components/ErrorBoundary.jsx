@@ -29,7 +29,7 @@ class ErrorBoundary extends React.Component {
               Ein unerwarteter Fehler ist aufgetreten
             </h1>
             <p className="text-sm text-gray-600 mb-6">
-              {this.state.error?.message || 'Die Anwendung konnte nicht korrekt geladen werden.'}
+              Die Anwendung konnte nicht korrekt geladen werden.
             </p>
             <button
               onClick={this.handleReload}

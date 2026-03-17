@@ -5,6 +5,14 @@ const API_TIMEOUT_MS = 30000;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const mapApiStatusToMessage = (status) => {
+    if (status === 400) return 'Die Anfrage war ungültig. Bitte überprüfe den API-Key.';
+    if (status === 401 || status === 403) return 'Zugriff verweigert. Bitte überprüfe deinen API-Key.';
+    if (status === 429) return 'Anfrage-Limit erreicht. Bitte warte einen Moment und versuche es erneut.';
+    if (status >= 500) return 'Der KI-Dienst ist momentan nicht erreichbar. Bitte versuche es später.';
+    return 'Bei der KI-Generierung ist ein Fehler aufgetreten. Bitte versuche es erneut.';
+};
+
 async function callGeminiApi(modelName, apiKey, prompt, userText) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
@@ -68,7 +76,8 @@ export const generateFlowchartFromText = async (text) => {
 
             const errorData = await response.json().catch(() => ({}));
             const apiErrorMessage = errorData.error?.message || response.statusText || 'Unknown API Error';
-            throw new Error(`Gemini API Error (${response.status}): ${apiErrorMessage}`);
+            console.error(`Gemini API Error (${response.status}):`, apiErrorMessage);
+            throw new Error(mapApiStatusToMessage(response.status));
 
         } catch (error) {
             lastError = error;
@@ -102,9 +111,10 @@ export const checkApiStatus = async () => {
             const errorData = await response.json().catch(() => ({}));
             const apiErrorMessage = errorData.error?.message || response.statusText || 'Unbekannter Fehler';
 
-            if (response.status === 429) return { status: 'limit', message: `Limit erreicht: ${apiErrorMessage}` };
-            if (response.status === 400 || response.status === 403) return { status: 'invalid', message: `Key ungültig: ${apiErrorMessage}` };
-            return { status: 'error', message: `Fehler: ${apiErrorMessage}` };
+            console.error('API-Status-Check Fehler:', apiErrorMessage);
+            if (response.status === 429) return { status: 'limit', message: 'Anfrage-Limit erreicht. Bitte warte einen Moment.' };
+            if (response.status === 400 || response.status === 403) return { status: 'invalid', message: 'API-Key ungültig oder nicht berechtigt.' };
+            return { status: 'error', message: 'Der KI-Dienst ist momentan nicht erreichbar.' };
         }
     } catch (error) {
         return { status: 'error', message: `Verbindung fehlgeschlagen: ${error.message}` };
