@@ -195,6 +195,51 @@ export const shapes = {
         markup: polygonMarkup
     }),
     
+    Lane: joint.dia.Element.define('vhs.Lane', {
+        attrs: {
+            body: {
+                refWidth: '100%',
+                refHeight: '100%',
+                fill: '#f0f4f8',
+                stroke: COLORS.vhsBlue40,
+                strokeWidth: 1.5,
+                rx: 6,
+                ry: 6,
+            },
+            header: {
+                refWidth: '100%',
+                height: 40,
+                fill: COLORS.vhsBlue20,
+                stroke: COLORS.vhsBlue40,
+                strokeWidth: 1.5,
+                rx: 6,
+                ry: 6,
+            },
+            label: {
+                refX: 16,
+                refY: 20,
+                textVerticalAnchor: 'middle',
+                textAnchor: 'left',
+                fontFamily: FONTS.primary,
+                fill: COLORS.vhsBlue,
+                fontSize: 14,
+                fontWeight: 'bold',
+            }
+        },
+        z: -10
+    }, {
+        markup: [{
+            tagName: 'rect',
+            selector: 'body'
+        }, {
+            tagName: 'rect',
+            selector: 'header'
+        }, {
+            tagName: 'text',
+            selector: 'label'
+        }]
+    }),
+
     Annotation: joint.dia.Element.define('vhs.Annotation', {
         attrs: {
             body: {
@@ -298,6 +343,16 @@ export const createDecisionNode = (x, y, label = 'Entscheidung?') => {
         attrs: { label: { text: label } }
     });
     autoSizeForText(node, label, 'decision');
+    return node;
+};
+
+export const createLaneNode = (x, y, label = 'Verantwortungsbereich') => {
+    const node = new shapes.Lane({
+        position: { x, y },
+        size: { width: 600, height: 200 },
+        attrs: { label: { text: label } }
+    });
+    node.set('z', -10);
     return node;
 };
 

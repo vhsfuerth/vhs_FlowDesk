@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FileDown, Plus, Search, Target } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FileDown, Plus, Search, Target, Sparkles } from 'lucide-react';
 import { REVIEW_SCORE_GUIDES, REVIEW_SCORE_LABELS, getReviewScoreSummary, validateDiagram } from '../analysis/diagram-validation';
 import { exportQualityReport, exportQualityReportPDF } from '../export/file-export';
 import WorkshopPanel from './WorkshopPanel';
+import SimulationPanel from './SimulationPanel';
+import { generateImprovements } from '../ai/gemini-client';
 
 const SCORE_OPTIONS = [
   { value: 0, label: '0', sublabel: 'kritisch' },
@@ -43,6 +45,7 @@ const QualityPanel = ({
   onExportMeasures,
   onGetDiagramImage,
   workshopProps,
+  onSimulationFocus,
   isCollapsed,
   width,
   onToggleCollapsed,
@@ -53,6 +56,8 @@ const QualityPanel = ({
   const [isEvaluationCollapsed, setIsEvaluationCollapsed] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
   const [wizardCompact, setWizardCompact] = useState(false);
+  const [aiAnalysisLoading, setAiAnalysisLoading] = useState(false);
+  const [aiAnalysisError, setAiAnalysisError] = useState('');
 
   const validation = useMemo(() => validateDiagram(diagramData, metadata.improvementItems), [diagramData, metadata.improvementItems]);
   const reviewSummary = useMemo(() => getReviewScoreSummary(metadata.reviewScores), [metadata.reviewScores]);
@@ -116,6 +121,33 @@ const QualityPanel = ({
       nodeLabel,
       metadata.reviewNotes
     );
+  };
+
+  const handleAiAnalysis = async () => {
+    setAiAnalysisLoading(true);
+    setAiAnalysisError('');
+    try {
+      const improvements = await generateImprovements(diagramData, metadata.reviewScores);
+      const newItems = improvements.map((imp) => ({
+        id: `measure-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        nodeId: imp.nodeId || '',
+        title: imp.title || '',
+        owner: imp.owner || '',
+        priority: imp.priority || 'mittel',
+        status: 'offen',
+        dueDate: ''
+      }));
+      onMetadataChange({ ...metadata, improvementItems: [...metadata.improvementItems, ...newItems] });
+      setActiveTab('measures');
+    } catch (e) {
+      setAiAnalysisError(
+        e.message === 'API_KEY_MISSING'
+          ? 'Kein API-Key hinterlegt. Bitte in den Einstellungen eingeben.'
+          : e.message
+      );
+    } finally {
+      setAiAnalysisLoading(false);
+    }
   };
 
   const [pdfExporting, setPdfExporting] = useState(false);
@@ -197,24 +229,30 @@ const QualityPanel = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 p-2 gap-2 border-b border-[var(--color-vhs-blau-10)] bg-gray-50">
+      <div className="grid grid-cols-4 p-2 gap-1.5 border-b border-[var(--color-vhs-blau-10)] bg-gray-50">
         <button
           onClick={() => setActiveTab('check')}
-          className={`px-3 py-2 rounded-md text-sm font-bold transition-colors ${activeTab === 'check' ? 'bg-white text-[var(--color-vhs-blau)] shadow-sm' : 'text-gray-500 hover:bg-white'}`}
+          className={`px-2 py-2 rounded-md text-xs font-bold transition-colors ${activeTab === 'check' ? 'bg-white text-[var(--color-vhs-blau)] shadow-sm' : 'text-gray-500 hover:bg-white'}`}
         >
-          Prozess-Check
+          Prüfung
         </button>
         <button
           onClick={() => setActiveTab('measures')}
-          className={`px-3 py-2 rounded-md text-sm font-bold transition-colors ${activeTab === 'measures' ? 'bg-white text-[var(--color-vhs-blau)] shadow-sm' : 'text-gray-500 hover:bg-white'}`}
+          className={`px-2 py-2 rounded-md text-xs font-bold transition-colors ${activeTab === 'measures' ? 'bg-white text-[var(--color-vhs-blau)] shadow-sm' : 'text-gray-500 hover:bg-white'}`}
         >
           Maßnahmen
         </button>
         <button
           onClick={() => setActiveTab('workshop')}
-          className={`px-3 py-2 rounded-md text-sm font-bold transition-colors ${activeTab === 'workshop' ? 'bg-white text-[var(--color-vhs-blau)] shadow-sm' : 'text-gray-500 hover:bg-white'}`}
+          className={`px-2 py-2 rounded-md text-xs font-bold transition-colors ${activeTab === 'workshop' ? 'bg-white text-[var(--color-vhs-blau)] shadow-sm' : 'text-gray-500 hover:bg-white'}`}
         >
           Workshop
+        </button>
+        <button
+          onClick={() => setActiveTab('simulation')}
+          className={`px-2 py-2 rounded-md text-xs font-bold transition-colors ${activeTab === 'simulation' ? 'bg-white text-[var(--color-vhs-blau)] shadow-sm' : 'text-gray-500 hover:bg-white'}`}
+        >
+          Simulation
         </button>
       </div>
 
@@ -425,7 +463,29 @@ const QualityPanel = ({
                           );
                         })}
                       </div>
-                      <div className="flex justify-between items-center">
+                      {/* KI-Analyse */}
+                      <div className="mt-4 rounded-lg border border-[var(--color-vhs-blau-20)] p-3 bg-[var(--color-vhs-blau-10)]">
+                        <div className="text-xs font-bold text-[var(--color-vhs-blau)] mb-1 flex items-center gap-1">
+                          <Sparkles className="w-3.5 h-3.5" />
+                          KI-Analyse
+                        </div>
+                        <p className="text-xs text-gray-500 mb-2">
+                          KI analysiert Diagramm und Scores und schlägt konkrete Maßnahmen vor.
+                        </p>
+                        {aiAnalysisError && (
+                          <p className="text-xs text-red-600 mb-2">{aiAnalysisError}</p>
+                        )}
+                        <button
+                          onClick={handleAiAnalysis}
+                          disabled={aiAnalysisLoading}
+                          className="inline-flex items-center px-3 py-2 rounded-md bg-[var(--color-vhs-blau)] text-white text-xs font-bold hover:bg-[var(--color-vhs-blau-80)] disabled:opacity-50 w-full justify-center"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 mr-1" />
+                          {aiAnalysisLoading ? 'Analysiere…' : 'KI-Analyse anfordern'}
+                        </button>
+                      </div>
+
+                      <div className="flex justify-between items-center mt-4">
                         <button
                           onClick={() => setWizardStep(5)}
                           className="inline-flex items-center px-3 py-2 rounded-md border border-gray-200 text-gray-600 text-sm font-bold hover:bg-gray-50"
@@ -577,7 +637,7 @@ const QualityPanel = ({
               )}
             </section>
           </>
-        ) : (
+        ) : activeTab === 'workshop' ? (
           <WorkshopPanel
             isActive={workshopProps.isActive}
             steps={workshopProps.steps}
@@ -589,6 +649,13 @@ const QualityPanel = ({
             onFocusStep={workshopProps.onFocusStep}
             onMetadataChange={onMetadataChange}
             onExportSummary={workshopProps.onExportSummary}
+            onExportPDF={workshopProps.onExportPDF}
+          />
+        ) : (
+          <SimulationPanel
+            diagramData={diagramData}
+            onFocusNode={onFocusNode}
+            onSetSimulationFocus={onSimulationFocus}
           />
         )}
       </div>

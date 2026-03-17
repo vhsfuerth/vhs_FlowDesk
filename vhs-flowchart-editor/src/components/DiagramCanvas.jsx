@@ -3,7 +3,7 @@ import * as joint from 'jointjs';
 import { HistoryManager } from '../diagram/history';
 import { JSONConverter } from '../diagram/converter';
 import { DiagramLayout } from '../diagram/layout';
-import { createStartNode, createEndNode, createProcessNode, createDecisionNode, createAnnotationNode, autoSizeForText, linkLabelStyle } from '../diagram/shapes';
+import { createStartNode, createEndNode, createProcessNode, createDecisionNode, createAnnotationNode, createLaneNode, autoSizeForText, linkLabelStyle } from '../diagram/shapes';
 import { exportToPNG, exportToSVG, exportToPDF, exportToJSON, getDiagramPngDataUrl } from '../export/file-export';
 import EditTextModal from './EditTextModal';
 
@@ -420,6 +420,7 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
         case 'end': newNode = createEndNode(x - 70, y - 35, 'Ende'); break;
         case 'decision': newNode = createDecisionNode(x - 90, y - 55, 'Entscheidung?'); break;
         case 'annotation': newNode = createAnnotationNode(x - 100, y - 40, 'Kommentar'); break;
+        case 'lane': newNode = createLaneNode(x - 300, y - 100, 'Swimlane'); break;
         case 'process':
         default: newNode = createProcessNode(x - 80, y - 30, 'Prozess'); break;
       }

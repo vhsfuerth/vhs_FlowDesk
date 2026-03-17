@@ -1,5 +1,5 @@
 import React from 'react';
-import { Share2, Printer, CheckSquare, Trash2, FolderOpen, ZoomIn, ZoomOut, Maximize, Presentation, Undo2, Redo2 } from 'lucide-react';
+import { Share2, Printer, CheckSquare, Trash2, FolderOpen, ZoomIn, ZoomOut, Maximize, Presentation, Undo2, Redo2, Clock } from 'lucide-react';
 
 const ExportBar = ({
   onExportSVG,
@@ -9,6 +9,7 @@ const ExportBar = ({
   onSave,
   onClear,
   onLoadClick,
+  onVersionsClick,
   onToggleWorkshop,
   isWorkshopMode,
   zoomLevel,
@@ -39,6 +40,16 @@ const ExportBar = ({
           <FolderOpen className="w-4 h-4 mr-2" />
           Öffnen
         </button>
+        {onVersionsClick && (
+          <button
+            onClick={onVersionsClick}
+            title="Versionshistorie anzeigen"
+            className="flex items-center bg-white border border-gray-200 text-gray-500 px-3 py-2 rounded-md hover:bg-gray-50 text-sm font-bold transition-all shadow-sm active:scale-95"
+          >
+            <Clock className="w-4 h-4 mr-1.5" />
+            Versionen
+          </button>
+        )}
         <div className="w-px h-8 bg-gray-200 mx-1" />
         <button
           onClick={onClear}

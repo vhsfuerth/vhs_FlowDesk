@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, MessageSquarePlus, Presentation, SquarePen } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MessageSquarePlus, Presentation, SquarePen, FileDown } from 'lucide-react';
 
 const emptyWorkshopNote = (nodeId, title = '') => ({
   id: `workshop-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -19,7 +19,8 @@ const WorkshopPanel = ({
   onNext,
   onFocusStep,
   onMetadataChange,
-  onExportSummary
+  onExportSummary,
+  onExportPDF
 }) => {
   const notes = metadata.workshopNotes || [];
   const currentStep = steps[currentStepIndex] || null;
@@ -111,8 +112,18 @@ const WorkshopPanel = ({
           className="inline-flex items-center px-3 py-2 rounded-md border border-[var(--color-vhs-blau)] text-[var(--color-vhs-blau)] text-sm font-bold hover:bg-[var(--color-vhs-blau-10)] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <SquarePen className="w-4 h-4 mr-1" />
-          Workshop-Export
+          TXT
         </button>
+        {onExportPDF && (
+          <button
+            onClick={onExportPDF}
+            disabled={steps.length === 0}
+            className="inline-flex items-center px-3 py-2 rounded-md bg-[var(--color-vhs-blau)] text-white text-sm font-bold hover:bg-[var(--color-vhs-blau-80)] disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <FileDown className="w-4 h-4 mr-1" />
+            PDF-Bericht
+          </button>
+        )}
       </div>
 
       <div className="mt-4 space-y-3 max-h-[320px] overflow-y-auto">

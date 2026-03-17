@@ -1,5 +1,5 @@
 import * as joint from 'jointjs';
-import { createStartNode, createEndNode, createProcessNode, createDecisionNode, createLink, createAnnotationNode } from './shapes';
+import { createStartNode, createEndNode, createProcessNode, createDecisionNode, createLink, createAnnotationNode, createLaneNode } from './shapes';
 
 export class JSONConverter {
     constructor(graph) {
@@ -35,6 +35,9 @@ export class JSONConverter {
                     break;
                 case 'annotation':
                     jointNode = createAnnotationNode(x, y, label);
+                    break;
+                case 'lane':
+                    jointNode = createLaneNode(x, y, label);
                     break;
                 case 'process':
                 default:

@@ -13,15 +13,17 @@ import { generateUUID } from './utils/uuid';
 import TemplateModal from './components/TemplateModal';
 import GuideModal from './components/GuideModal';
 import QualityPanel from './components/QualityPanel';
+import VersionHistoryModal from './components/VersionHistoryModal';
 import { STARTER_TEMPLATES } from './data/templates';
-import { getDefaultMetadata, normalizeMetadata, validateDiagram } from './analysis/diagram-validation';
-import { exportMeasuresToCSV, exportToJSON, exportWorkshopSummary } from './export/file-export';
+import { getDefaultMetadata, normalizeMetadata, validateDiagram, getReviewScoreSummary } from './analysis/diagram-validation';
+import { exportMeasuresToCSV, exportToJSON, exportWorkshopSummary, exportWorkshopReportPDF } from './export/file-export';
 
 function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
+  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
   const [notification, setNotification] = useState({ isVisible: false, message: '', type: 'info' });
   const [currentDiagram, setCurrentDiagram] = useState(null);
   const [diagramMetadata, setDiagramMetadata] = useState(getDefaultMetadata());
@@ -213,7 +215,17 @@ function App() {
           const saved = await indexeddb.saveDiagram(newDiagram);
           setCurrentDiagram(saved);
           setLastDiagramId(saved.id);
-          
+
+          // Automatisch eine Version anlegen
+          const version = {
+              id: generateUUID(),
+              diagramId: saved.id,
+              savedAt: saved.updatedAt,
+              note: '',
+              snapshot: saved
+          };
+          await indexeddb.saveVersion(version).catch(() => {/* Versionierung ist optional */});
+
           // Falls wir nicht gerade wegen Namensänderung schon benachrichtigt haben
           if (targetId === currentDiagram?.id) {
             showNotification('Diagramm erfolgreich gespeichert', 'success');
@@ -386,6 +398,49 @@ function App() {
     showNotification('Workshop-Zusammenfassung exportiert', 'success');
   };
 
+  const handleVersionRestore = (version) => {
+      const restoredDiagram = {
+          ...(version.snapshot || {}),
+          id: generateUUID(),
+          name: `${version.snapshot?.name || 'Diagramm'} (wiederhergestellt)`,
+          updatedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString()
+      };
+      setCurrentDiagram(restoredDiagram);
+      setDiagramMetadata(normalizeMetadata(restoredDiagram.metadata));
+      setLiveDiagramData(restoredDiagram.diagram || { nodes: [], edges: [] });
+      setIsWorkshopMode(false);
+      setWorkshopStepIndex(0);
+      setLastDiagramId(restoredDiagram.id);
+      if (diagramCanvasRef.current) {
+          diagramCanvasRef.current.loadDiagram(restoredDiagram);
+          setZoomLevel(diagramCanvasRef.current.getZoom());
+      }
+      showNotification('Version wiederhergestellt (ungespeichert)', 'success');
+  };
+
+  const handleSimulationFocus = (nodeId) => {
+      diagramCanvasRef.current?.setPresentationFocus(nodeId || null);
+  };
+
+  const handleWorkshopReportPDF = async () => {
+      if (!currentDiagram) return;
+      const summary = getReviewScoreSummary(diagramMetadata.reviewScores);
+      const diagramImage = await diagramCanvasRef.current?.captureDiagramImage('') ?? null;
+      const cleanName = (currentDiagram.name || 'workshop').toLowerCase().replace(/[^a-z0-9]/g, '_');
+      await exportWorkshopReportPDF(
+          currentDiagram.name,
+          workshopSteps,
+          diagramMetadata.workshopNotes || [],
+          diagramMetadata.improvementItems || [],
+          diagramMetadata.reviewScores,
+          summary,
+          diagramImage,
+          `${cleanName}_workshop_bericht.pdf`
+      );
+      showNotification('Workshop-PDF exportiert', 'success');
+  };
+
   const handleQualityPanelResizeStart = (event) => {
     resizeStateRef.current = {
       isActive: true,
@@ -451,6 +506,7 @@ function App() {
           onFocusNode={handleFocusNode}
           onExportMeasures={handleExportMeasures}
           onGetDiagramImage={() => diagramCanvasRef.current?.captureDiagramImage('')}
+          onSimulationFocus={handleSimulationFocus}
           isCollapsed={isQualityPanelCollapsed}
           width={qualityPanelWidth}
           onToggleCollapsed={handleQualityPanelToggle}
@@ -468,7 +524,8 @@ function App() {
                 focusWorkshopStep(nextIndex);
               }
             },
-            onExportSummary: handleWorkshopExport
+            onExportSummary: handleWorkshopExport,
+            onExportPDF: handleWorkshopReportPDF
           }}
         />
       </div>
@@ -481,6 +538,7 @@ function App() {
          onSave={saveCurrentDiagram}
          onClear={handleClearDiagram}
          onLoadClick={() => setIsLoadModalOpen(true)}
+         onVersionsClick={currentDiagram?.id ? () => setIsVersionHistoryOpen(true) : undefined}
          onToggleWorkshop={handleWorkshopToggle}
          isWorkshopMode={isWorkshopMode}
          zoomLevel={zoomLevel}
@@ -514,6 +572,13 @@ function App() {
       <GuideModal
         isOpen={isGuideModalOpen}
         onClose={() => setIsGuideModalOpen(false)}
+      />
+
+      <VersionHistoryModal
+        isOpen={isVersionHistoryOpen}
+        onClose={() => setIsVersionHistoryOpen(false)}
+        diagramId={currentDiagram?.id}
+        onRestore={handleVersionRestore}
       />
       
       <Notification 

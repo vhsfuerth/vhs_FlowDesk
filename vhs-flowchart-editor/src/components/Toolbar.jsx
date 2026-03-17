@@ -1,4 +1,4 @@
-import { Play, CircleStop, Square, Diamond, MessageSquareDashed, ArrowRight, ChevronLeft, ChevronRight, CheckCircle2, AlertTriangle, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { Play, CircleStop, Square, Diamond, MessageSquareDashed, ArrowRight, ChevronLeft, ChevronRight, CheckCircle2, AlertTriangle, Search, ChevronDown, ChevronUp, Rows3 } from 'lucide-react';
 import { useState } from 'react';
 
 const Toolbar = ({ onDragStart, isCollapsed, onToggleCollapsed, validation, onFocusNode }) => {
@@ -15,7 +15,8 @@ const Toolbar = ({ onDragStart, isCollapsed, onToggleCollapsed, validation, onFo
     { type: 'end', icon: CircleStop, label: 'Ende', color: 'text-[var(--color-vhs-orange)]' },
     { type: 'process', icon: Square, label: 'Prozess', color: 'text-[var(--color-vhs-blau)]' },
     { type: 'decision', icon: Diamond, label: 'Entscheidung', color: 'text-[var(--color-vhs-orange-hell)]' },
-    { type: 'annotation', icon: MessageSquareDashed, label: 'Kommentar', color: 'text-[var(--color-vhs-blau-60)]' }
+    { type: 'annotation', icon: MessageSquareDashed, label: 'Kommentar', color: 'text-[var(--color-vhs-blau-60)]' },
+    { type: 'lane', icon: Rows3, label: 'Swimlane', color: 'text-[var(--color-vhs-blau-40)]' }
   ];
 
   const handleDragStart = (event, tool) => {

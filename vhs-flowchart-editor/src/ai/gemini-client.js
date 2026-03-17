@@ -1,5 +1,5 @@
 import { getApiKey, getCustomPrompt } from '../storage/settings';
-import { SYSTEM_PROMPT } from './prompts';
+import { SYSTEM_PROMPT, IMPROVEMENT_PROMPT } from './prompts';
 
 const API_TIMEOUT_MS = 30000;
 
@@ -87,6 +87,55 @@ export const generateFlowchartFromText = async (text) => {
         }
     }
     
+    throw lastError || new Error('Kein kompatibles KI-Modell gefunden.');
+};
+
+export const generateImprovements = async (diagramData, reviewScores) => {
+    const apiKey = getApiKey();
+    if (!apiKey) throw new Error('API_KEY_MISSING');
+
+    const SCORE_LABELS = {
+        clarity: 'Klarheit',
+        mediaBreaks: 'Medienbruch',
+        risk: 'Risiko',
+        participantFocus: 'Teilnehmendenorientierung',
+        ownership: 'Verantwortlichkeit'
+    };
+    const scoresText = Object.entries(reviewScores)
+        .map(([k, v]) => `${SCORE_LABELS[k] || k}: ${v}/3`)
+        .join(', ');
+    const userText = `Diagramm (JSON):\n${JSON.stringify(diagramData, null, 2)}\n\nQualitätsbewertung:\n${scoresText}`;
+
+    const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-latest'];
+    let lastError = null;
+
+    for (let i = 0; i < modelsToTry.length; i++) {
+        const model = modelsToTry[i];
+        try {
+            if (i > 0) await delay(1500);
+            const response = await callGeminiApi(model, apiKey, IMPROVEMENT_PROMPT, userText);
+
+            if (response.ok) {
+                const data = await response.json();
+                const contentText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!contentText) throw new Error('INVALID_JSON_RESPONSE');
+                const parsed = JSON.parse(contentText);
+                if (!parsed.improvements || !Array.isArray(parsed.improvements)) {
+                    throw new Error('INVALID_JSON_RESPONSE');
+                }
+                return parsed.improvements;
+            }
+            if (response.status === 404) { lastError = new Error('404'); continue; }
+            const errorData = await response.json().catch(() => ({}));
+            console.error(`Gemini API Error (${response.status}):`, errorData.error?.message);
+            throw new Error(mapApiStatusToMessage(response.status));
+        } catch (error) {
+            lastError = error;
+            if (error.message === 'INVALID_JSON_RESPONSE') throw error;
+            if (error.message.includes('404')) continue;
+            throw error;
+        }
+    }
     throw lastError || new Error('Kein kompatibles KI-Modell gefunden.');
 };
 
