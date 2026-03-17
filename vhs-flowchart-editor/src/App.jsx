@@ -110,17 +110,52 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      const isInput = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
+      // Ignore if user is typing in an input or textarea
+      const isInput = ['INPUT', 'TEXTAREA'].includes(e.target.tagName) || e.target.isContentEditable;
       if (isInput) return;
-      if (e.ctrlKey && e.key === 'z') {
+
+      // Undo: Ctrl+Z
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         e.preventDefault();
         diagramCanvasRef.current?.undo();
       }
-      if (e.ctrlKey && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
+      
+      // Redo: Ctrl+Y or Ctrl+Shift+Z
+      if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') || 
+          ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z')) {
         e.preventDefault();
         diagramCanvasRef.current?.redo();
       }
+
+      // Delete: Delete or Backspace
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        // Only delete if no modal is open
+        const modalVisible = document.querySelector('[role="dialog"]') || 
+                           document.querySelector('.fixed.inset-0.z-50');
+        
+        if (!modalVisible) {
+           if (e.key === 'Backspace') {
+             e.preventDefault();
+           }
+           diagramCanvasRef.current?.deleteSelected();
+        }
+      }
+
+      // Zoom: Ctrl + / Ctrl - / Ctrl 0
+      if ((e.ctrlKey || e.metaKey)) {
+        if (e.key === '+' || e.key === '=') {
+          e.preventDefault();
+          handleZoomIn();
+        } else if (e.key === '-') {
+          e.preventDefault();
+          handleZoomOut();
+        } else if (e.key === '0') {
+          e.preventDefault();
+          setZoomLevel(1);
+        }
+      }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
@@ -365,13 +400,11 @@ function App() {
 
   // Zoom handlers
   const handleZoomIn = () => {
-    diagramCanvasRef.current?.zoomIn();
-    setZoomLevel(diagramCanvasRef.current?.getZoom() || 1);
+    setZoomLevel(prev => Math.min(2, Math.round((prev + 0.1) * 10) / 10));
   };
 
   const handleZoomOut = () => {
-    diagramCanvasRef.current?.zoomOut();
-    setZoomLevel(diagramCanvasRef.current?.getZoom() || 1);
+    setZoomLevel(prev => Math.max(0.1, Math.round((prev - 0.1) * 10) / 10));
   };
 
   const handleCenter = () => {
@@ -406,6 +439,9 @@ function App() {
            ref={diagramCanvasRef}
            onGraphChange={handleGraphChange}
            onHistoryChange={(u, r) => { setCanUndo(u); setCanRedo(r); }}
+           zoomLevel={zoomLevel}
+           onZoomIn={handleZoomIn}
+           onZoomOut={handleZoomOut}
         />
         <QualityPanel
           diagramData={liveDiagramData}

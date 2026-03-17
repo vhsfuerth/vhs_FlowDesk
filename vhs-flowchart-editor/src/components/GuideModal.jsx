@@ -25,13 +25,13 @@ const sections = [
   },
   {
     icon: Square,
-    title: 'Elemente per Drag & Drop',
-    text: 'Ziehe Start, Ende, Prozess, Entscheidung oder Kommentar aus der linken Seitenleiste auf die Arbeitsfläche, um dein Diagramm manuell aufzubauen.'
+    title: 'Elemente verwalten',
+    text: 'Ziehe Elemente aus der Seitenleiste auf die Arbeitsfläche. Wähle ein Element aus, um es zu verschieben oder drücke Entf / Backspace zum Löschen.'
   },
   {
     icon: Maximize,
-    title: 'Arbeitsfläche',
-    text: 'Verschiebe die Ansicht per Klick und Ziehen auf den Hintergrund. Nutze die Zoom-Buttons unten zum Vergrößern und Verkleinern. Doppelklick auf ein Element öffnet die Textbearbeitung.'
+    title: 'Ansicht & Zoom',
+    text: 'Verschiebe die Ansicht per Klick und Ziehen auf den Hintergrund. Nutze Strg + Mausrad oder die Zoom-Buttons unten. Strg + 0 setzt den Zoom zurück.'
   },
   {
     icon: ArrowRight,

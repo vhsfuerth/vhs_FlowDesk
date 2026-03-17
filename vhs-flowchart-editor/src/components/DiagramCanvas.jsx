@@ -7,7 +7,7 @@ import { createStartNode, createEndNode, createProcessNode, createDecisionNode, 
 import { exportToPNG, exportToSVG, exportToPDF, exportToJSON, getDiagramPngDataUrl } from '../export/file-export';
 import EditTextModal from './EditTextModal';
 
-const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryChange }, ref) => {
+const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryChange, zoomLevel, onZoomIn, onZoomOut }, ref) => {
   const canvasRef = useRef(null);
   const graphRef = useRef(null);
   const paperRef = useRef(null);
@@ -15,10 +15,17 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
   const converterRef = useRef(null);
   const layoutRef = useRef(null);
   const initializedRef = useRef(false);
+  const selectedCellRef = useRef(null);
+  const onZoomInRef = useRef(onZoomIn);
+  const onZoomOutRef = useRef(onZoomOut);
+
+  useEffect(() => {
+    onZoomInRef.current = onZoomIn;
+    onZoomOutRef.current = onZoomOut;
+  }, [onZoomIn, onZoomOut]);
 
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(1);
   const highlightTimeoutRef = useRef(null);
   const [editModal, setEditModal] = useState({ isOpen: false, title: '', value: '', onSave: null });
 
@@ -96,6 +103,11 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
       setCanUndo(nextCanUndo);
       setCanRedo(nextCanRedo);
       if (onHistoryChange) onHistoryChange(nextCanUndo, nextCanRedo);
+      if (eventName === 'remove') {
+          if (selectedCellRef.current && selectedCellRef.current.id === arguments[1]?.id) {
+              selectedCellRef.current = null;
+          }
+      }
       if (onGraphChange && (eventName === 'add' || eventName === 'remove' || eventName.includes('change:'))) {
           onGraphChange();
       }
@@ -129,8 +141,21 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
     // Contextual Tools (Simple & Clean)
     paper.on('element:pointerclick', (elementView) => {
       paper.removeTools();
+      selectedCellRef.current = elementView.model;
       const tools = new joint.dia.ToolsView({
         tools: [
+          new joint.elementTools.Boundary({
+            padding: 10,
+            useModelGeometry: true,
+            attrs: {
+              rect: {
+                fill: 'none',
+                stroke: '#00285a',
+                'stroke-width': 2,
+                'stroke-dasharray': '5,5'
+              }
+            }
+          }),
           new joint.elementTools.Remove({ offset: { x: 10, y: 10 } })
         ]
       });
@@ -139,8 +164,19 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
 
     paper.on('link:pointerclick', (linkView) => {
       paper.removeTools();
+      selectedCellRef.current = linkView.model;
       const tools = new joint.dia.ToolsView({
         tools: [
+          new joint.linkTools.Boundary({
+            attrs: {
+              rect: {
+                fill: 'none',
+                stroke: '#00285a',
+                'stroke-width': 2,
+                'stroke-dasharray': '5,5'
+              }
+            }
+          }),
           new joint.linkTools.Remove({ distance: '10%' }),
           new joint.linkTools.SourceArrowhead(),
           new joint.linkTools.TargetArrowhead()
@@ -151,6 +187,7 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
 
     paper.on('blank:pointerclick', () => {
       paper.removeTools();
+      selectedCellRef.current = null;
     });
 
     // DOUBLE CLICK TO EDIT TEXT (modal-based)
@@ -210,21 +247,38 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
       });
     });
 
+    // Ctrl + Mouse Wheel Zoom
+    const onWheel = (e) => {
+        if (e.ctrlKey) {
+            e.preventDefault();
+            if (e.deltaY < 0) {
+                if (onZoomInRef.current) onZoomInRef.current();
+            } else {
+                if (onZoomOutRef.current) onZoomOutRef.current();
+            }
+        }
+    };
+
+    const container = canvasRef.current.parentNode;
+    container.addEventListener('wheel', onWheel, { passive: false });
+
     return () => {
         if (highlightTimeoutRef.current) {
             window.clearTimeout(highlightTimeoutRef.current);
         }
         window.removeEventListener('mousemove', onMouseMove);
         window.removeEventListener('mouseup', onMouseUp);
+        container.removeEventListener('wheel', onWheel);
     };
 
   }, []);
 
-  const handleZoom = (delta) => {
-      const newZoom = Math.max(0.1, Math.min(2, zoomLevel + delta));
-      paperRef.current.scale(newZoom, newZoom);
-      setZoomLevel(newZoom);
-  };
+  useEffect(() => {
+      if (paperRef.current) {
+          paperRef.current.scale(zoomLevel, zoomLevel);
+      }
+  }, [zoomLevel]);
+
 
   const centerContent = () => {
       const bbox = paperRef.current.getContentBBox();
@@ -325,8 +379,14 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
     canUndo: () => historyRef.current?.canUndo() || false,
     canRedo: () => historyRef.current?.canRedo() || false,
 
-    zoomIn: () => handleZoom(0.1),
-    zoomOut: () => handleZoom(-0.1),
+    deleteSelected: () => {
+        if (selectedCellRef.current) {
+            selectedCellRef.current.remove();
+            selectedCellRef.current = null;
+            if (onGraphChange) onGraphChange();
+        }
+    },
+
     center: () => centerContent(),
     getZoom: () => zoomLevel,
     focusNode,

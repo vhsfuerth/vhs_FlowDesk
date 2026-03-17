@@ -5,7 +5,11 @@ const TemplateModal = ({ isOpen, onClose, templates, onApply }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div 
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      role="dialog"
+      aria-modal="true"
+    >
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-5xl flex flex-col max-h-[85vh]">
         <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
           <div>
