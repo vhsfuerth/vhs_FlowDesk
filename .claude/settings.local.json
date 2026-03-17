@@ -22,7 +22,8 @@
       "Bash(ls -lh \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\"/*.png 2>/dev/null)",
       "Bash(git -C \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\" diff-index --quiet HEAD || echo \"uncommitted changes\")",
       "Bash(git -C \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\" config --get core.ignorecase)",
-      "WebFetch(domain:202601-vhs-flowcharts.vercel.app)"
+      "WebFetch(domain:202601-vhs-flowcharts.vercel.app)",
+      "Bash(cd \"D:/80_SoftwareProjekte/202601_vhs_Flowcharts\" && npx vercel logs https://202601-vhs-flowcharts.vercel.app 2>&1 | head -50)"
     ]
   }
 }
