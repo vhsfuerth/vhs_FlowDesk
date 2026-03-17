@@ -21,7 +21,8 @@
       "Bash(git -C \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\" check-ignore -v \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\\\\frage_1.png\" \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\\\\Fehler_1.png\" 2>&1)",
       "Bash(ls -lh \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\"/*.png 2>/dev/null)",
       "Bash(git -C \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\" diff-index --quiet HEAD || echo \"uncommitted changes\")",
-      "Bash(git -C \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\" config --get core.ignorecase)"
+      "Bash(git -C \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\" config --get core.ignorecase)",
+      "WebFetch(domain:202601-vhs-flowcharts.vercel.app)"
     ]
   }
 }
