@@ -2,7 +2,7 @@ import React from 'react';
 import {
   X, BookOpen, Sparkles, Square, Maximize, ArrowRight,
   Undo2, CheckSquare, Printer, AlertTriangle, Presentation,
-  LayoutTemplate, Settings, ClipboardList, FileText
+  LayoutTemplate, Settings, ClipboardList, FileText, KeyRound
 } from 'lucide-react';
 
 const sections = [
@@ -10,6 +10,18 @@ const sections = [
     icon: Sparkles,
     title: 'KI-Diagramm-Generierung',
     text: 'Beschreibe deinen Prozess als Freitext in der oberen Leiste. Die KI erstellt daraus automatisch ein Flussdiagramm mit passenden Elementen und Verbindungen.'
+  },
+  {
+    icon: KeyRound,
+    title: 'Google Gemini API-Key einrichten',
+    steps: [
+      'Gehe zu aistudio.google.com und melde dich mit einem Google-Konto an.',
+      'Klicke oben links auf „API-Key erstellen" und wähle „In neuem Projekt erstellen".',
+      'Kopiere den generierten Key (beginnt mit „AIza…").',
+      'Öffne in der App die Einstellungen über das Zahnrad-Symbol im Header.',
+      'Füge den Key in das Feld „Gemini API-Key" ein und klicke „Speichern".',
+    ],
+    note: 'Der kostenlose Free-Tier von Google AI Studio reicht für den normalen Alltagseinsatz aus. Der Key wird nur lokal in deinem Browser gespeichert.'
   },
   {
     icon: Square,
@@ -107,7 +119,19 @@ const GuideModal = ({ isOpen, onClose }) => {
                     </div>
                     <h3 className="text-sm font-bold text-[var(--color-vhs-blau)]">{section.title}</h3>
                   </div>
-                  <p className="text-sm text-gray-600 leading-relaxed">{section.text}</p>
+                  {section.text && (
+                    <p className="text-sm text-gray-600 leading-relaxed">{section.text}</p>
+                  )}
+                  {section.steps && (
+                    <ol className="text-sm text-gray-600 leading-relaxed mt-1 space-y-1 list-decimal list-inside">
+                      {section.steps.map((step, i) => (
+                        <li key={i}>{step}</li>
+                      ))}
+                    </ol>
+                  )}
+                  {section.note && (
+                    <p className="text-xs text-gray-400 mt-2 italic">{section.note}</p>
+                  )}
                 </div>
               );
             })}
