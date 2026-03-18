@@ -139,8 +139,8 @@ export const generateImprovements = async (diagramData, reviewScores) => {
     throw lastError || new Error('Kein kompatibles KI-Modell gefunden.');
 };
 
-export const checkApiStatus = async () => {
-    const apiKey = getApiKey();
+export const checkApiStatus = async (overrideKey) => {
+    const apiKey = overrideKey !== undefined ? overrideKey.trim() : getApiKey();
     if (!apiKey) return { status: 'missing', message: 'Kein API-Key vorhanden.' };
 
     try {
@@ -170,8 +170,8 @@ export const checkApiStatus = async () => {
     }
 };
 
-export const listAvailableModels = async () => {
-    const apiKey = getApiKey();
+export const listAvailableModels = async (overrideKey) => {
+    const apiKey = overrideKey !== undefined ? overrideKey.trim() : getApiKey();
     if (!apiKey) return [];
 
     try {

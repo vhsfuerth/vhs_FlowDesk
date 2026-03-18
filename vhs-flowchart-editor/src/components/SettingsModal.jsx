@@ -31,11 +31,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
     setApiStatus(null);
     setShowDiagnosis(false);
     try {
-        const result = await checkApiStatus();
+        const result = await checkApiStatus(apiKey);
         setApiStatus(result);
-        
+
         if (result.status !== 'ok') {
-            const models = await listAvailableModels();
+            const models = await listAvailableModels(apiKey);
             setAvailableModels(models);
             setShowDiagnosis(true);
         }
