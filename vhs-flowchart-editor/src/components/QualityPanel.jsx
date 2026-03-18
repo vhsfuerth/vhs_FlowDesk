@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FileDown, Plus, Search, Target, Sparkles } from 'lucide-react';
 import { REVIEW_SCORE_GUIDES, REVIEW_SCORE_LABELS, getReviewScoreSummary, validateDiagram } from '../analysis/diagram-validation';
 import { exportQualityReport, exportQualityReportPDF } from '../export/file-export';
-import WorkshopPanel from './WorkshopPanel';
 import SimulationPanel from './SimulationPanel';
 import { generateImprovements } from '../ai/gemini-client';
 
@@ -15,14 +14,25 @@ const SCORE_OPTIONS = [
 
 const WIZARD_FIELDS = ['clarity', 'mediaBreaks', 'risk', 'participantFocus', 'ownership'];
 
-const emptyMeasure = (nodeId = '') => ({
+const MEASURE_COLORS = [
+  { id: 'blue',    hex: '#1e73af', bg: '#e8f4fc' },
+  { id: 'teal',   hex: '#1a8070', bg: '#e8f5f3' },
+  { id: 'green',  hex: '#4ba02d', bg: '#f0f7eb' },
+  { id: 'orange', hex: '#eb640f', bg: '#fef3ea' },
+  { id: 'violet', hex: '#7d5aa5', bg: '#f4f0f9' },
+  { id: 'red',    hex: '#8c0a23', bg: '#fdeef0' },
+  { id: 'navy',   hex: '#00285a', bg: '#eef4f7' },
+];
+
+const emptyMeasure = (nodeId = '', colorIndex = 0) => ({
   id: `measure-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
   nodeId,
   title: '',
   owner: '',
   priority: 'mittel',
   status: 'offen',
-  dueDate: ''
+  dueDate: '',
+  color: MEASURE_COLORS[colorIndex % MEASURE_COLORS.length].id
 });
 
 const severityClasses = {
@@ -44,7 +54,6 @@ const QualityPanel = ({
   onFocusNode,
   onExportMeasures,
   onGetDiagramImage,
-  workshopProps,
   onSimulationFocus,
   isCollapsed,
   width,
@@ -94,9 +103,10 @@ const QualityPanel = ({
   };
 
   const addMeasure = (nodeId = '') => {
+    const colorIndex = metadata.improvementItems.length;
     onMetadataChange({
       ...metadata,
-      improvementItems: [...metadata.improvementItems, emptyMeasure(nodeId)]
+      improvementItems: [...metadata.improvementItems, emptyMeasure(nodeId, colorIndex)]
     });
     setActiveTab('measures');
   };
@@ -128,14 +138,16 @@ const QualityPanel = ({
     setAiAnalysisError('');
     try {
       const improvements = await generateImprovements(diagramData, metadata.reviewScores);
-      const newItems = improvements.map((imp) => ({
+      const baseIndex = metadata.improvementItems.length;
+      const newItems = improvements.map((imp, i) => ({
         id: `measure-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         nodeId: imp.nodeId || '',
         title: imp.title || '',
         owner: imp.owner || '',
         priority: imp.priority || 'mittel',
         status: 'offen',
-        dueDate: ''
+        dueDate: '',
+        color: MEASURE_COLORS[(baseIndex + i) % MEASURE_COLORS.length].id
       }));
       onMetadataChange({ ...metadata, improvementItems: [...metadata.improvementItems, ...newItems] });
       setActiveTab('measures');
@@ -229,7 +241,7 @@ const QualityPanel = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-4 p-2 gap-1.5 border-b border-[var(--color-vhs-blau-10)] bg-gray-50">
+      <div className="grid grid-cols-3 p-2 gap-1.5 border-b border-[var(--color-vhs-blau-10)] bg-gray-50">
         <button
           onClick={() => setActiveTab('check')}
           className={`px-2 py-2 rounded-md text-xs font-bold transition-colors ${activeTab === 'check' ? 'bg-white text-[var(--color-vhs-blau)] shadow-sm' : 'text-gray-500 hover:bg-white'}`}
@@ -241,12 +253,6 @@ const QualityPanel = ({
           className={`px-2 py-2 rounded-md text-xs font-bold transition-colors ${activeTab === 'measures' ? 'bg-white text-[var(--color-vhs-blau)] shadow-sm' : 'text-gray-500 hover:bg-white'}`}
         >
           Maßnahmen
-        </button>
-        <button
-          onClick={() => setActiveTab('workshop')}
-          className={`px-2 py-2 rounded-md text-xs font-bold transition-colors ${activeTab === 'workshop' ? 'bg-white text-[var(--color-vhs-blau)] shadow-sm' : 'text-gray-500 hover:bg-white'}`}
-        >
-          Workshop
         </button>
         <button
           onClick={() => setActiveTab('simulation')}
@@ -555,21 +561,43 @@ const QualityPanel = ({
                   Noch keine Maßnahmen erfasst. Typischer Einsatz: Medienbrüche, unklare Zuständigkeiten oder Schleifen direkt aus dem Diagramm ableiten.
                 </div>
               ) : (
-                metadata.improvementItems.map((item) => (
-                  <div key={item.id} className="rounded-xl border border-[var(--color-vhs-blau-20)] p-4 bg-white">
+                metadata.improvementItems.map((item) => {
+                  const itemColor = MEASURE_COLORS.find(c => c.id === item.color) || MEASURE_COLORS[0];
+                  return (
+                  <div
+                    key={item.id}
+                    className="rounded-xl border p-4 bg-white overflow-hidden"
+                    style={{ borderColor: itemColor.hex, borderLeftWidth: 4 }}
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <button
                         onClick={() => item.nodeId && onFocusNode(item.nodeId)}
                         className="text-left"
                       >
-                        <div className="flex items-center text-xs uppercase tracking-widest font-black text-gray-400">
+                        <div className="flex items-center text-xs uppercase tracking-widest font-black" style={{ color: itemColor.hex }}>
                           <Target className="w-3 h-3 mr-1" />
                           {nodeLabel(item.nodeId)}
                         </div>
                       </button>
-                      <button onClick={() => removeMeasure(item.id)} className="text-xs text-red-500 font-bold">
-                        Entfernen
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1">
+                          {MEASURE_COLORS.map(c => (
+                            <button
+                              key={c.id}
+                              title={c.id}
+                              onClick={() => updateMeasure(item.id, { color: c.id })}
+                              className="w-3.5 h-3.5 rounded-full border-2 transition-transform hover:scale-110"
+                              style={{
+                                backgroundColor: c.hex,
+                                borderColor: item.color === c.id ? '#000' : c.hex
+                              }}
+                            />
+                          ))}
+                        </div>
+                        <button onClick={() => removeMeasure(item.id)} className="text-xs text-red-500 font-bold">
+                          Entfernen
+                        </button>
+                      </div>
                     </div>
                     <div className="mt-3 space-y-3">
                       <input
@@ -633,24 +661,11 @@ const QualityPanel = ({
                       </div>
                     </div>
                   </div>
-                ))
+                  );
+                })
               )}
             </section>
           </>
-        ) : activeTab === 'workshop' ? (
-          <WorkshopPanel
-            isActive={workshopProps.isActive}
-            steps={workshopProps.steps}
-            currentStepIndex={workshopProps.currentStepIndex}
-            metadata={metadata}
-            onToggle={workshopProps.onToggle}
-            onPrev={workshopProps.onPrev}
-            onNext={workshopProps.onNext}
-            onFocusStep={workshopProps.onFocusStep}
-            onMetadataChange={onMetadataChange}
-            onExportSummary={workshopProps.onExportSummary}
-            onExportPDF={workshopProps.onExportPDF}
-          />
         ) : (
           <SimulationPanel
             diagramData={diagramData}

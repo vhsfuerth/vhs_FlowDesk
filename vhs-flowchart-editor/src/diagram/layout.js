@@ -20,7 +20,8 @@ export class DiagramLayout {
         layoutGraph.setDefaultEdgeLabel(() => ({}));
 
         const cells = this.graph.getCells();
-        const nodes = cells.filter(cell => cell.isElement());
+        // Exclude lanes from layout – they are background containers, not flow nodes
+        const nodes = cells.filter(cell => cell.isElement() && cell.get('type') !== 'vhs.Lane');
         const links = cells.filter(cell => cell.isLink());
 
         // Add nodes to Dagre

@@ -80,7 +80,9 @@ export const getReviewScoreSummary = (reviewScores = DEFAULT_REVIEW_SCORES) => {
 };
 
 export const validateDiagram = (diagram, improvementItems = []) => {
-  const nodes = Array.isArray(diagram?.nodes) ? diagram.nodes : [];
+  const allNodes = Array.isArray(diagram?.nodes) ? diagram.nodes : [];
+  // Lanes are background containers – exclude from all structural validation
+  const nodes = allNodes.filter(n => n.type !== 'lane');
   const edges = Array.isArray(diagram?.edges) ? diagram.edges : [];
 
   const findings = [];

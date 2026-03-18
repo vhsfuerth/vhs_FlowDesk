@@ -1,5 +1,25 @@
 import { jsPDF } from 'jspdf';
 
+// Compress an image dataUrl to JPEG and cap resolution for smaller PDF embeds
+const compressForPdf = (dataUrl, maxPx = 1200, quality = 0.78) =>
+  new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = img.naturalWidth > maxPx ? maxPx / img.naturalWidth : 1;
+      const w = Math.max(1, Math.round(img.naturalWidth * scale));
+      const h = Math.max(1, Math.round(img.naturalHeight * scale));
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(c.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(dataUrl); // fallback: original uncompressed
+    img.src = dataUrl;
+  });
+
 // Helper to convert an image URL to Base64
 const getBase64Image = async (url) => {
     try {
@@ -106,28 +126,51 @@ const getSvgString = async (paper, title = '') => {
     };
 };
 
-export const getDiagramPngDataUrl = async (paper, title = '') => {
-    const { svgString, width, height } = await getSvgString(paper, title);
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, width, height);
-    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
-    return new Promise((resolve) => {
+const renderSvgToCanvas = (svgString, canvasW, canvasH) =>
+    new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvasW;
+        canvas.height = canvasH;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(null); return; }
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvasW, canvasH);
+        const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
         const img = new Image();
         img.onload = () => {
-            ctx.drawImage(img, 0, 0);
+            ctx.drawImage(img, 0, 0, canvasW, canvasH);
             URL.revokeObjectURL(url);
-            try { resolve({ dataUrl: canvas.toDataURL('image/png'), width, height }); }
-            catch { resolve(null); }
+            resolve(canvas);
         };
         img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
         img.src = url;
     });
+
+export const getDiagramPngDataUrl = async (paper, title = '') => {
+    const { svgString, width, height } = await getSvgString(paper, title);
+    const canvas = await renderSvgToCanvas(svgString, width, height);
+    if (!canvas) return null;
+    try {
+        return { dataUrl: canvas.toDataURL('image/png'), width, height };
+    } catch {
+        return null;
+    }
+};
+
+// Returns a compact JPEG suitable for PDF embedding (capped resolution, lossy)
+export const getDiagramJpegForPdf = async (paper, maxPx = 1100, quality = 0.75) => {
+    const { svgString, width, height } = await getSvgString(paper, '');
+    const scale = width > maxPx ? maxPx / width : 1;
+    const canvasW = Math.max(1, Math.round(width * scale));
+    const canvasH = Math.max(1, Math.round(height * scale));
+    const canvas = await renderSvgToCanvas(svgString, canvasW, canvasH);
+    if (!canvas) return null;
+    try {
+        return { dataUrl: canvas.toDataURL('image/jpeg', quality), width, height };
+    } catch {
+        return null;
+    }
 };
 
 export const exportToSVG = async (paper, filename = 'vhs-flowchart.svg', title = '') => {
@@ -248,32 +291,6 @@ export const exportMeasuresToCSV = (items, nodeLabelLookup, filename = 'vhs-mass
     downloadBlob(blob, filename);
 };
 
-export const exportWorkshopSummary = (title, steps, notes, filename = 'vhs-workshop.txt') => {
-    const lines = [
-        `Workshop-Zusammenfassung: ${title || 'Unbenanntes Diagramm'}`,
-        '',
-        'Schritte im Fokus:'
-    ];
-
-    steps.forEach((step, index) => {
-        lines.push(`${index + 1}. ${step.label}`);
-    });
-
-    lines.push('');
-    lines.push('Diskussionspunkte:');
-
-    notes.forEach((note, index) => {
-        const stepLabel = steps.find((step) => step.id === note.nodeId)?.label || 'Nicht zugeordnet';
-        lines.push(`${index + 1}. ${note.title || 'Ohne Titel'} [${stepLabel}]`);
-        lines.push(`   Status: ${note.status || 'open'}`);
-        if (note.note) {
-            lines.push(`   Notiz: ${note.note}`);
-        }
-    });
-
-    const blob = new Blob([lines.join('\r\n')], { type: 'text/plain;charset=utf-8;' });
-    downloadBlob(blob, filename);
-};
 
 export const exportQualityReport = (
   title,
@@ -477,11 +494,12 @@ export const exportQualityReportPDF = async (
   doc.setFillColor(...BLUE);
   doc.rect(0, 0, PW, HEADER_H, 'F');
 
-  // Logo proportional
+  // Logo proportional — compress to JPEG to avoid storing raw PNG pixels
   const logo = await loadLogoProportional(48, 20);
   if (logo) {
     const logoY = (HEADER_H - logo.h) / 2;
-    doc.addImage(logo.b64, 'PNG', M, logoY, logo.w, logo.h);
+    const logoJpeg = await compressForPdf(logo.b64, 400, 0.90);
+    doc.addImage(logoJpeg, 'JPEG', M, logoY, logo.w, logo.h);
   } else {
     doc.setTextColor(...WHITE);
     doc.setFont('helvetica', 'bold');
@@ -570,7 +588,7 @@ export const exportQualityReportPDF = async (
     const imgW = naturalW * scale;
     const imgH = naturalH * scale;
     const imgX = M + (CW - imgW) / 2;
-    doc.addImage(diagramImage.dataUrl, 'PNG', imgX, y, imgW, imgH);
+    doc.addImage(diagramImage.dataUrl, 'JPEG', imgX, y, imgW, imgH);
   } else {
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(9);
@@ -695,26 +713,26 @@ export const exportQualityReportPDF = async (
   });
 
   // Summary box
-  y = guard(y, 14);
+  const hasHotspots = reviewSummary.hotspots.length > 0;
+  const summaryBoxH = hasHotspots ? 19 : 11;
+  y = guard(y, summaryBoxH + 4);
   doc.setFillColor(...BLUE_L);
-  doc.rect(M, y, CW, 11, 'F');
+  doc.rect(M, y, CW, summaryBoxH, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(...BLUE);
   doc.text('Durchschnitt:', M + 4, y + 7);
   doc.setTextColor(...scoreRgb(Math.round(avg)));
   doc.text(`${avg.toFixed(1)} / 3`, M + 42, y + 7);
-  if (reviewSummary.hotspots.length > 0) {
+  if (hasHotspots) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(...ORANGE);
     const htText = 'Handlungsbedarf: ' + reviewSummary.hotspots.map((f) => SCORE_LABELS[f]).join(', ');
-    // Measure available space from after the avg value
-    const usedW = textWidthMm(`${avg.toFixed(1)} / 3`, 9) + 42 - M + 4;
-    const htLines = doc.splitTextToSize(safe(htText), CW - usedW - 4);
-    doc.text(htLines[0] || '', M + usedW + 4, y + 7);
+    const htLines = doc.splitTextToSize(safe(htText), CW - 8);
+    doc.text(htLines[0] || '', M + 4, y + 15);
   }
-  y += 16;
+  y += summaryBoxH + 5;
 
   // ── MASSNAHMEN ────────────────────────────────────────────────────────────
   y = guard(y, 20);
@@ -771,342 +789,6 @@ export const exportQualityReportPDF = async (
 
   footer(currentPage);
 
-  doc.save(filename);
-};
-
-export const exportWorkshopReportPDF = async (
-  title,
-  workshopSteps,
-  workshopNotes,
-  improvementItems,
-  reviewScores,
-  reviewSummary,
-  diagramImage = null,
-  filename = 'vhs-workshop-bericht.pdf'
-) => {
-  const safe = (str) => String(str == null ? '' : str)
-    .replace(/\u2192/g, '->').replace(/\u26A0/g, '(!)').replace(/\u25AA/g, '-')
-    .replace(/\u2713/g, 'OK').replace(/\u2714/g, 'OK')
-    .replace(/[\u0100-\uFFFF]/g, '?');
-
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const PW = 210;
-  const PH = 297;
-  const M = 16;
-  const CW = PW - 2 * M;
-
-  const BLUE   = [0, 40, 90];
-  const BLUE_L = [235, 240, 245];
-  const ORANGE = [233, 78, 27];
-  const WHITE  = [255, 255, 255];
-  const GRAY   = [110, 110, 110];
-  const LGRAY  = [210, 210, 210];
-  const GREEN  = [34, 139, 34];
-
-  const SCORE_LABELS = {
-    clarity: 'Klarheit', mediaBreaks: 'Medienbruch', risk: 'Risiko',
-    participantFocus: 'Teilnehmendenorientierung', ownership: 'Verantwortlichkeit'
-  };
-  const WIZARD_FIELDS = ['clarity', 'mediaBreaks', 'risk', 'participantFocus', 'ownership'];
-
-  const scoreRgb = (s) => s >= 3 ? [34, 139, 34] : s === 2 ? [200, 155, 0] : s === 1 ? [220, 120, 0] : [200, 40, 40];
-  const textWidthMm = (str, fontSize) => doc.getStringUnitWidth(safe(str)) * fontSize / doc.internal.scaleFactor;
-  const multiLine = (str, x, y, maxW, fontSize, style = 'normal', color = GRAY) => {
-    doc.setFont('helvetica', style);
-    doc.setFontSize(fontSize);
-    doc.setTextColor(...color);
-    const lineH = fontSize * 0.3528 * 1.3;
-    const lines = doc.splitTextToSize(safe(str), maxW);
-    lines.forEach((line, i) => doc.text(line, x, y + i * lineH));
-    return y + lines.length * lineH;
-  };
-
-  const date = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-
-  let currentPage = 1;
-  const addPageHeader = (isFirst = false) => {
-    doc.setFillColor(...BLUE);
-    doc.rect(0, 0, PW, isFirst ? 36 : 17, 'F');
-    doc.setFillColor(...ORANGE);
-    doc.rect(0, isFirst ? 36 : 17, PW, 2.5, 'F');
-    doc.setTextColor(...WHITE);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(isFirst ? 12 : 9);
-    doc.text('WORKSHOP-ABSCHLUSSBERICHT', isFirst ? M : PW - M, isFirst ? 16 : 8, isFirst ? {} : { align: 'right' });
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(isFirst ? 9 : 7.5);
-    doc.text(safe(title || 'Unbenanntes Diagramm'), isFirst ? M : M, isFirst ? 24 : 13.5);
-    if (!isFirst) doc.text(`Seite ${currentPage}`, PW - M, 9, { align: 'right' });
-  };
-
-  const addFooter = () => {
-    doc.setFillColor(...BLUE);
-    doc.rect(0, PH - 12, PW, 12, 'F');
-    doc.setTextColor(...WHITE);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.text('vhs Flowchart-Editor  -  Workshop-Abschlussbericht', M, PH - 4);
-    doc.text(`Seite ${currentPage}`, PW - M, PH - 4, { align: 'right' });
-  };
-
-  const sectionHeader = (text, y) => {
-    doc.setFillColor(...BLUE);
-    doc.rect(M, y, CW, 8, 'F');
-    doc.setTextColor(...WHITE);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.text(safe(text), M + 4, y + 5.5);
-    return y + 8;
-  };
-
-  const guard = (y, needed = 20) => {
-    if (y + needed > PH - 16) {
-      addFooter();
-      doc.addPage();
-      currentPage++;
-      addPageHeader(false);
-      return 26;
-    }
-    return y;
-  };
-
-  // Load logo
-  const loadLogoProportional = async (maxW, maxH) => {
-    const b64 = await getBase64Image('/Logo_HQ_pos.png');
-    if (!b64) return null;
-    const dims = await new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-      img.onerror = () => resolve({ w: maxW * 4, h: maxH });
-      img.src = b64;
-    });
-    const scale = Math.min(maxW / dims.w, maxH / dims.h);
-    return { b64, w: dims.w * scale, h: dims.h * scale };
-  };
-
-  // ── PAGE 1: COVER ───────────────────────────────────────────────────────
-  addPageHeader(true);
-  const HEADER_H = 38.5;
-
-  const logo = await loadLogoProportional(48, 20);
-  if (logo) {
-    const logoY = (HEADER_H - logo.h) / 2 - 2;
-    doc.addImage(logo.b64, 'PNG', M, logoY, logo.w, logo.h);
-  }
-
-  let y = HEADER_H + 14;
-
-  doc.setTextColor(...BLUE);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(20);
-  const titleLineH = 20 * 0.3528 * 1.3;
-  const titleLines = doc.splitTextToSize(safe(title || 'Unbenanntes Diagramm'), CW);
-  titleLines.forEach((l, i) => doc.text(l, M, y + i * titleLineH));
-  y += titleLines.length * titleLineH + 4;
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(...GRAY);
-  doc.text(`Workshop-Datum: ${date}`, M, y);
-  y += 7;
-
-  // Quick score overview
-  const avg = reviewSummary.average;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(...BLUE);
-  doc.text(`Qualitätsbewertung  Ø: ${avg.toFixed(1)} / 3`, M, y);
-  y += 5;
-  const PBW = 80;
-  doc.setFillColor(...LGRAY);
-  doc.rect(M, y, PBW, 4, 'F');
-  doc.setFillColor(...scoreRgb(Math.round(avg)));
-  doc.rect(M, y, (avg / 3) * PBW, 4, 'F');
-  y += 11;
-
-  doc.setDrawColor(...LGRAY);
-  doc.setLineWidth(0.4);
-  doc.line(M, y, PW - M, y);
-  y += 6;
-
-  // Summary stats
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(...GRAY);
-  doc.text(`Prozessschritte: ${workshopSteps.length}  |  Diskussionspunkte: ${workshopNotes.length}  |  Maßnahmen: ${improvementItems.length}`, M, y);
-  y += 9;
-
-  // Diagram image
-  if (diagramImage?.dataUrl && diagramImage.width > 0 && diagramImage.height > 0) {
-    const maxW = CW;
-    const maxH = PH - y - 16;
-    const pxToMm = 0.2646;
-    const naturalW = diagramImage.width * pxToMm;
-    const naturalH = diagramImage.height * pxToMm;
-    const scale = Math.min(maxW / naturalW, maxH / naturalH, 1);
-    const imgW = naturalW * scale;
-    const imgH = naturalH * scale;
-    const imgX = M + (CW - imgW) / 2;
-    doc.addImage(diagramImage.dataUrl, 'PNG', imgX, y, imgW, imgH);
-  }
-
-  addFooter();
-
-  // ── PAGE 2: QUALITY SCORES ──────────────────────────────────────────────
-  doc.addPage();
-  currentPage++;
-  addPageHeader(false);
-  y = 26;
-
-  y = sectionHeader('QUALITAETSBEWERTUNG', y);
-  y += 5;
-
-  WIZARD_FIELDS.forEach((field) => {
-    y = guard(y, 14);
-    const score = reviewScores[field] ?? 2;
-    const label = SCORE_LABELS[field];
-    const isHotspot = score <= 1;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(...(isHotspot ? ORANGE : BLUE));
-    doc.text(safe(label + (isHotspot ? '  (!)' : '')), M, y);
-    doc.setTextColor(...scoreRgb(score));
-    doc.text(`${score}/3`, PW - M, y, { align: 'right' });
-    const SBW = 40;
-    const SBX = PW - M - SBW - 14;
-    const SBY = y - 3;
-    doc.setFillColor(...LGRAY);
-    doc.rect(SBX, SBY, SBW, 3, 'F');
-    if (score > 0) {
-      doc.setFillColor(...scoreRgb(score));
-      doc.rect(SBX, SBY, (score / 3) * SBW, 3, 'F');
-    }
-    y += 9;
-  });
-
-  // Summary box
-  y = guard(y, 14);
-  doc.setFillColor(...BLUE_L);
-  doc.rect(M, y, CW, 10, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(...BLUE);
-  doc.text('Durchschnitt:', M + 4, y + 7);
-  doc.setTextColor(...scoreRgb(Math.round(avg)));
-  doc.text(`${avg.toFixed(1)} / 3`, M + 40, y + 7);
-  y += 16;
-
-  // ── PROZESSSCHRITTE ─────────────────────────────────────────────────────
-  y = guard(y, 20);
-  y = sectionHeader(`PROZESSSCHRITTE (${workshopSteps.length})`, y);
-  y += 5;
-
-  if (workshopSteps.length === 0) {
-    y = multiLine('Keine Prozessschritte vorhanden.', M, y, CW, 9, 'italic', GRAY) + 4;
-  } else {
-    workshopSteps.forEach((step, i) => {
-      y = guard(y, 10);
-      const typeLabels = { start: 'Start', end: 'Ende', process: 'Prozess', decision: 'Entscheidung', annotation: 'Kommentar' };
-      const typeLabel = typeLabels[step.type] || step.type;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.5);
-      doc.setTextColor(...BLUE);
-      doc.text(`${i + 1}.`, M, y);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(40, 40, 40);
-      const stepLines = doc.splitTextToSize(safe(step.label || '(leer)'), CW - 15);
-      stepLines.forEach((l, li) => doc.text(l, M + 8, y + li * (8.5 * 0.3528 * 1.3)));
-      doc.setFontSize(7.5);
-      doc.setTextColor(...GRAY);
-      doc.text(safe(typeLabel), PW - M, y, { align: 'right' });
-      y += stepLines.length * (8.5 * 0.3528 * 1.3) + 2;
-    });
-  }
-
-  y += 5;
-
-  // ── DISKUSSIONSPUNKTE ───────────────────────────────────────────────────
-  y = guard(y, 20);
-  y = sectionHeader(`DISKUSSIONSPUNKTE (${workshopNotes.length})`, y);
-  y += 5;
-
-  if (workshopNotes.length === 0) {
-    y = multiLine('Keine Diskussionspunkte erfasst.', M, y, CW, 9, 'italic', GRAY) + 4;
-  } else {
-    const STATUS_LABELS = { open: 'offen', decided: 'entschieden', 'follow-up': 'nachverfolgen' };
-    workshopNotes.forEach((note, i) => {
-      const stepLabel = workshopSteps.find((s) => s.id === note.nodeId)?.label || 'Allgemein';
-      const titleLines = doc.splitTextToSize(safe(note.title || '(ohne Titel)'), CW - 10);
-      const noteLines = note.note ? doc.splitTextToSize(safe(note.note), CW - 14) : [];
-      const rowH = titleLines.length * (9 * 0.3528 * 1.3) + (noteLines.length > 0 ? noteLines.length * (8 * 0.3528 * 1.3) + 2 : 0) + 8;
-      y = guard(y, rowH);
-
-      if (i % 2 === 0) {
-        doc.setFillColor(248, 249, 251);
-        doc.rect(M, y - 3, CW, rowH, 'F');
-      }
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(...BLUE);
-      doc.text(`${i + 1}.`, M, y);
-      doc.setTextColor(40, 40, 40);
-      titleLines.forEach((l, li) => doc.text(l, M + 7, y + li * (9 * 0.3528 * 1.3)));
-      y += titleLines.length * (9 * 0.3528 * 1.3) + 1;
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(...GRAY);
-      const metaText = `Bezug: ${safe(stepLabel)}  |  Status: ${STATUS_LABELS[note.status] || note.status}`;
-      doc.text(safe(metaText), M + 7, y);
-      y += 5;
-
-      if (note.note && noteLines.length > 0) {
-        doc.setFontSize(8);
-        doc.setTextColor(60, 60, 60);
-        noteLines.forEach((l, li) => doc.text(l, M + 9, y + li * (8 * 0.3528 * 1.3)));
-        y += noteLines.length * (8 * 0.3528 * 1.3) + 2;
-      }
-      y += 3;
-    });
-  }
-
-  // ── MASSNAHMEN ───────────────────────────────────────────────────────────
-  y = guard(y, 20);
-  y = sectionHeader(`MASSNAHMEN (${improvementItems.length})`, y);
-  y += 5;
-
-  if (improvementItems.length === 0) {
-    y = multiLine('Keine Massnahmen erfasst.', M, y, CW, 9, 'italic', GRAY) + 2;
-  } else {
-    improvementItems.forEach((item, i) => {
-      const tLines = doc.splitTextToSize(safe(item.title || '(ohne Titel)'), CW - 10);
-      const rowH = tLines.length * (9 * 0.3528 * 1.3) + 12;
-      y = guard(y, rowH);
-
-      if (i % 2 === 0) {
-        doc.setFillColor(248, 249, 251);
-        doc.rect(M, y - 3, CW, rowH, 'F');
-      }
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(...BLUE);
-      doc.text(`${i + 1}.`, M, y);
-      doc.setTextColor(40, 40, 40);
-      tLines.forEach((l, li) => doc.text(l, M + 7, y + li * (9 * 0.3528 * 1.3)));
-      y += tLines.length * (9 * 0.3528 * 1.3) + 1;
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(...GRAY);
-      const metaText = `Prio: ${item.priority}  |  Status: ${item.status}  |  Bis: ${item.dueDate || '-'}  |  Wer: ${safe(item.owner || '-')}`;
-      const mLines = doc.splitTextToSize(safe(metaText), CW - 10);
-      mLines.forEach((l, li) => doc.text(l, M + 7, y + li * (7.5 * 0.3528 * 1.3)));
-      y += mLines.length * (7.5 * 0.3528 * 1.3) + 4;
-    });
-  }
-
-  addFooter();
   doc.save(filename);
 };
 

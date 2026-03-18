@@ -15,8 +15,8 @@ import GuideModal from './components/GuideModal';
 import QualityPanel from './components/QualityPanel';
 import VersionHistoryModal from './components/VersionHistoryModal';
 import { STARTER_TEMPLATES } from './data/templates';
-import { getDefaultMetadata, normalizeMetadata, validateDiagram, getReviewScoreSummary } from './analysis/diagram-validation';
-import { exportMeasuresToCSV, exportToJSON, exportWorkshopSummary, exportWorkshopReportPDF } from './export/file-export';
+import { getDefaultMetadata, normalizeMetadata, validateDiagram } from './analysis/diagram-validation';
+import { exportMeasuresToCSV, exportToJSON } from './export/file-export';
 
 function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -28,8 +28,6 @@ function App() {
   const [currentDiagram, setCurrentDiagram] = useState(null);
   const [diagramMetadata, setDiagramMetadata] = useState(getDefaultMetadata());
   const [liveDiagramData, setLiveDiagramData] = useState({ nodes: [], edges: [] });
-  const [isWorkshopMode, setIsWorkshopMode] = useState(false);
-  const [workshopStepIndex, setWorkshopStepIndex] = useState(0);
   const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false);
   const [isQualityPanelCollapsed, setIsQualityPanelCollapsed] = useState(false);
   const [qualityPanelWidth, setQualityPanelWidth] = useState(460);
@@ -39,16 +37,6 @@ function App() {
 
   const diagramCanvasRef = useRef(null);
   const resizeStateRef = useRef({ isActive: false, startX: 0, startWidth: 460 });
-  const workshopSteps = useMemo(() => (
-    (liveDiagramData?.nodes || [])
-      .filter((node) => node.type !== 'annotation')
-      .slice()
-      .sort((a, b) => {
-        const yDiff = (a.position?.y || 0) - (b.position?.y || 0);
-        if (Math.abs(yDiff) > 30) return yDiff;
-        return (a.position?.x || 0) - (b.position?.x || 0);
-      })
-  ), [liveDiagramData]);
 
   const [pendingDiagram, setPendingDiagram] = useState(null);
 
@@ -81,13 +69,6 @@ function App() {
       setPendingDiagram(null);
     }
   }, [pendingDiagram]);
-
-  useEffect(() => {
-    if (!isWorkshopMode) return;
-    const nextIndex = Math.min(workshopStepIndex, Math.max(workshopSteps.length - 1, 0));
-    setWorkshopStepIndex(nextIndex);
-    diagramCanvasRef.current?.setPresentationFocus(workshopSteps[nextIndex]?.id || null);
-  }, [isWorkshopMode, workshopStepIndex, workshopSteps]);
 
   useEffect(() => {
     const handleMouseMove = (event) => {
@@ -239,8 +220,7 @@ function App() {
       setCurrentDiagram(diagram);
       setDiagramMetadata(normalizeMetadata(diagram.metadata));
       setLiveDiagramData(diagram.diagram || { nodes: [], edges: [] });
-      setIsWorkshopMode(false);
-      setWorkshopStepIndex(0);
+
       setLastDiagramId(diagram.id);
       if (diagramCanvasRef.current) {
           diagramCanvasRef.current.loadDiagram(diagram);
@@ -262,8 +242,7 @@ function App() {
       setCurrentDiagram(newD);
       setDiagramMetadata(getDefaultMetadata());
       setLiveDiagramData({ nodes: [], edges: [] });
-      setIsWorkshopMode(false);
-      setWorkshopStepIndex(0);
+
       setLastDiagramId(newId);
       if (diagramCanvasRef.current) {
           diagramCanvasRef.current.clear();
@@ -285,9 +264,8 @@ function App() {
           diagramCanvasRef.current.clear();
       }
       setLiveDiagramData({ nodes: [], edges: [] });
-      setIsWorkshopMode(false);
-      setWorkshopStepIndex(0);
-      setDiagramMetadata((prev) => ({ ...prev, improvementItems: [], workshopNotes: [] }));
+
+      setDiagramMetadata((prev) => ({ ...prev, improvementItems: [] }));
       showNotification('Arbeitsfläche geleert (Rückgängig möglich).', 'info');
   };
 
@@ -295,8 +273,7 @@ function App() {
       if (!diagramCanvasRef.current) return;
       diagramCanvasRef.current.loadGeneratedData(diagramData);
       setLiveDiagramData(diagramData);
-      setIsWorkshopMode(false);
-      setWorkshopStepIndex(0);
+
       showNotification('KI-Diagramm generiert', 'success');
       setTimeout(() => saveCurrentDiagram('KI Generiertes Diagramm'), 500); 
   };
@@ -363,41 +340,6 @@ function App() {
     showNotification('Maßnahmenliste exportiert', 'success');
   };
 
-  const handleWorkshopToggle = () => {
-    const nextActive = !isWorkshopMode;
-    setIsWorkshopMode(nextActive);
-    if (!nextActive) {
-      diagramCanvasRef.current?.setPresentationFocus(null);
-      return;
-    }
-
-    const initialIndex = Math.min(workshopStepIndex, Math.max(workshopSteps.length - 1, 0));
-    setWorkshopStepIndex(initialIndex);
-    diagramCanvasRef.current?.setPresentationFocus(workshopSteps[initialIndex]?.id || null);
-  };
-
-  const focusWorkshopStep = (index) => {
-    if (workshopSteps.length === 0) return;
-    const boundedIndex = Math.max(0, Math.min(index, workshopSteps.length - 1));
-    setWorkshopStepIndex(boundedIndex);
-    const stepId = workshopSteps[boundedIndex]?.id;
-    if (isWorkshopMode) {
-      diagramCanvasRef.current?.setPresentationFocus(stepId || null);
-    } else if (stepId) {
-      diagramCanvasRef.current?.focusNode(stepId);
-    }
-  };
-
-  const handleWorkshopExport = () => {
-    exportWorkshopSummary(
-      currentDiagram?.name,
-      workshopSteps,
-      diagramMetadata.workshopNotes || [],
-      `${getCleanFilename() || 'diagram'}_workshop.txt`
-    );
-    showNotification('Workshop-Zusammenfassung exportiert', 'success');
-  };
-
   const handleVersionRestore = (version) => {
       const restoredDiagram = {
           ...(version.snapshot || {}),
@@ -409,8 +351,7 @@ function App() {
       setCurrentDiagram(restoredDiagram);
       setDiagramMetadata(normalizeMetadata(restoredDiagram.metadata));
       setLiveDiagramData(restoredDiagram.diagram || { nodes: [], edges: [] });
-      setIsWorkshopMode(false);
-      setWorkshopStepIndex(0);
+
       setLastDiagramId(restoredDiagram.id);
       if (diagramCanvasRef.current) {
           diagramCanvasRef.current.loadDiagram(restoredDiagram);
@@ -421,24 +362,6 @@ function App() {
 
   const handleSimulationFocus = (nodeId) => {
       diagramCanvasRef.current?.setPresentationFocus(nodeId || null);
-  };
-
-  const handleWorkshopReportPDF = async () => {
-      if (!currentDiagram) return;
-      const summary = getReviewScoreSummary(diagramMetadata.reviewScores);
-      const diagramImage = await diagramCanvasRef.current?.captureDiagramImage('') ?? null;
-      const cleanName = (currentDiagram.name || 'workshop').toLowerCase().replace(/[^a-z0-9]/g, '_');
-      await exportWorkshopReportPDF(
-          currentDiagram.name,
-          workshopSteps,
-          diagramMetadata.workshopNotes || [],
-          diagramMetadata.improvementItems || [],
-          diagramMetadata.reviewScores,
-          summary,
-          diagramImage,
-          `${cleanName}_workshop_bericht.pdf`
-      );
-      showNotification('Workshop-PDF exportiert', 'success');
   };
 
   const handleQualityPanelResizeStart = (event) => {
@@ -511,22 +434,6 @@ function App() {
           width={qualityPanelWidth}
           onToggleCollapsed={handleQualityPanelToggle}
           onResizeStart={handleQualityPanelResizeStart}
-          workshopProps={{
-            isActive: isWorkshopMode,
-            steps: workshopSteps,
-            currentStepIndex: workshopStepIndex,
-            onToggle: handleWorkshopToggle,
-            onPrev: () => focusWorkshopStep(workshopStepIndex - 1),
-            onNext: () => focusWorkshopStep(workshopStepIndex + 1),
-            onFocusStep: (nodeId) => {
-              const nextIndex = workshopSteps.findIndex((step) => step.id === nodeId);
-              if (nextIndex >= 0) {
-                focusWorkshopStep(nextIndex);
-              }
-            },
-            onExportSummary: handleWorkshopExport,
-            onExportPDF: handleWorkshopReportPDF
-          }}
         />
       </div>
 
@@ -539,8 +446,6 @@ function App() {
          onClear={handleClearDiagram}
          onLoadClick={() => setIsLoadModalOpen(true)}
          onVersionsClick={currentDiagram?.id ? () => setIsVersionHistoryOpen(true) : undefined}
-         onToggleWorkshop={handleWorkshopToggle}
-         isWorkshopMode={isWorkshopMode}
          zoomLevel={zoomLevel}
          onZoomIn={handleZoomIn}
          onZoomOut={handleZoomOut}

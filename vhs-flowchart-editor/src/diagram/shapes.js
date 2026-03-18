@@ -200,20 +200,17 @@ export const shapes = {
             body: {
                 refWidth: '100%',
                 refHeight: '100%',
-                fill: '#f0f4f8',
-                stroke: COLORS.vhsBlue40,
+                fill: '#EEF4F7',
+                stroke: COLORS.vhsBlue,
                 strokeWidth: 1.5,
                 rx: 6,
                 ry: 6,
             },
             header: {
-                refWidth: '100%',
-                height: 40,
-                fill: COLORS.vhsBlue20,
-                stroke: COLORS.vhsBlue40,
-                strokeWidth: 1.5,
-                rx: 6,
-                ry: 6,
+                // Rounded top corners matching body, flat bottom at y=40
+                d: 'M 5 0 L calc(w-5) 0 Q calc(w) 0 calc(w) 5 L calc(w) 40 L 0 40 L 0 5 Q 0 0 5 0 Z',
+                fill: COLORS.vhsBlue,
+                stroke: 'none',
             },
             label: {
                 refX: 16,
@@ -221,9 +218,14 @@ export const shapes = {
                 textVerticalAnchor: 'middle',
                 textAnchor: 'left',
                 fontFamily: FONTS.primary,
-                fill: COLORS.vhsBlue,
+                fill: '#ffffff',
                 fontSize: 14,
                 fontWeight: 'bold',
+                textWrap: {
+                    width: -32,
+                    height: 30,
+                    ellipsis: true
+                }
             }
         },
         z: -10
@@ -232,7 +234,7 @@ export const shapes = {
             tagName: 'rect',
             selector: 'body'
         }, {
-            tagName: 'rect',
+            tagName: 'path',
             selector: 'header'
         }, {
             tagName: 'text',
@@ -346,13 +348,18 @@ export const createDecisionNode = (x, y, label = 'Entscheidung?') => {
     return node;
 };
 
-export const createLaneNode = (x, y, label = 'Verantwortungsbereich') => {
+export const createLaneNode = (x, y, label = 'Swimlane', color = null) => {
     const node = new shapes.Lane({
         position: { x, y },
-        size: { width: 600, height: 200 },
+        size: { width: 700, height: 160 },
         attrs: { label: { text: label } }
     });
     node.set('z', -10);
+    if (color) {
+        node.attr('header/fill', color.header);
+        node.attr('body/fill', color.body);
+        node.attr('body/stroke', color.header);
+    }
     return node;
 };
 

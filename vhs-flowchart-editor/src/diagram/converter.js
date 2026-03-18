@@ -37,7 +37,7 @@ export class JSONConverter {
                     jointNode = createAnnotationNode(x, y, label);
                     break;
                 case 'lane':
-                    jointNode = createLaneNode(x, y, label);
+                    jointNode = createLaneNode(x, y, label, node.laneColor || null);
                     break;
                 case 'process':
                 default:
@@ -98,13 +98,23 @@ export class JSONConverter {
                 const size = cell.size();
                 const labelText = cell.attr('label/text') || '';
 
-                json.nodes.push({
+                const nodeData = {
                     id: cell.id,
                     type: typeName,
                     label: labelText,
                     position: { x: position.x, y: position.y },
                     size: { width: size.width, height: size.height }
-                });
+                };
+
+                if (typeName === 'lane') {
+                    const headerFill = cell.attr('header/fill');
+                    const bodyFill = cell.attr('body/fill');
+                    if (headerFill) {
+                        nodeData.laneColor = { header: headerFill, body: bodyFill };
+                    }
+                }
+
+                json.nodes.push(nodeData);
             } else if (cell.isLink()) {
                 const source = cell.get('source');
                 const target = cell.get('target');

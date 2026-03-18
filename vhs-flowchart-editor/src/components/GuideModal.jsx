@@ -1,8 +1,8 @@
 import React from 'react';
 import {
   X, BookOpen, Sparkles, Square, Maximize, ArrowRight,
-  Undo2, CheckSquare, Printer, AlertTriangle, Presentation,
-  LayoutTemplate, Settings, ClipboardList, FileText, KeyRound
+  Undo2, CheckSquare, Printer, AlertTriangle,
+  LayoutTemplate, Settings, ClipboardList, FileText, KeyRound, Rows3
 } from 'lucide-react';
 
 const sections = [
@@ -69,14 +69,22 @@ const sections = [
     text: 'Im Prozess-Check kannst du einen professionellen Qualitätsbericht als PDF exportieren. Seite 1 enthält Deckblatt, Status, Durchschnittswert und das Flowchart. Seite 2 listet alle Befunde, Selbstbewertungs-Scores mit Notizen und die erfassten Maßnahmen im vhs-Layout.'
   },
   {
-    icon: Presentation,
-    title: 'Workshop-Modus',
-    text: 'Gehe Schritt für Schritt durch das Diagramm und sammle Diskussionspunkte direkt an den einzelnen Prozessschritten. Ideal für Team-Workshops.'
+    icon: Rows3,
+    title: 'Swimlanes (Verantwortungsbereiche)',
+    steps: [
+      'Ziehe „Swimlane" aus der Elementleiste auf die Arbeitsfläche.',
+      'Doppelklick öffnet den Bearbeitungsdialog: Bezeichnung und Farbakzent (7 Farben) frei wählbar.',
+      'Klicke auf eine Lane → blauer Resize-Pfeil (▪) erscheint unten rechts. Ziehen verändert Breite und Höhe.',
+      'Ordne mehrere Lanes untereinander an – jede Lane repräsentiert einen Verantwortungsbereich.',
+      'Lege Prozessschritte innerhalb der zuständigen Lane ab und verbinde sie wie gewohnt.',
+      'Verbindungen, die eine Lanegrenze kreuzen, zeigen Übergaben und Schnittstellen zwischen Rollen.',
+    ],
+    note: 'Swimlanes werden beim Export und im Workshop-Modus wie alle anderen Elemente dargestellt. Zwei fertige Swimlane-Vorlagen findest du unter „Vorlagen" → Kategorie Programm.'
   },
   {
     icon: LayoutTemplate,
     title: 'Vorlagen',
-    text: 'Starte schneller mit vorgefertigten Templates für häufige vhs-Prozesse wie Kursplanung, Anmeldung oder Dozentenverwaltung.'
+    text: 'Starte schneller mit vorgefertigten Templates für häufige vhs-Prozesse wie Kursplanung, Anmeldung oder Dozentenverwaltung. Zwei Vorlagen demonstrieren den Einsatz von Swimlanes.'
   },
   {
     icon: Settings,

@@ -101,6 +101,59 @@ export const STARTER_TEMPLATES = [
     }
   },
   {
+    id: 'swimlane-anmeldung',
+    name: 'Kursanmeldung (Swimlane)',
+    description: 'Anmeldeprozess mit klarer Zuordnung: Interessierte und Service-Team.',
+    category: 'Programm',
+    diagram: {
+      nodes: [
+        { id: 'l1', type: 'lane', label: 'Interessierte', position: { x: 40, y: 40 }, size: { width: 1200, height: 150 }, laneColor: { header: '#1a8070', body: '#e8f5f3' } },
+        { id: 'l2', type: 'lane', label: 'Service-Team', position: { x: 40, y: 200 }, size: { width: 1200, height: 165 }, laneColor: { header: '#4ba02d', body: '#f0f7eb' } },
+        { id: 's1', type: 'start',    label: 'Kursangebot entdeckt',         position: { x: 80,  y: 95  }, size: { width: 180, height: 70  } },
+        { id: 'n1', type: 'process',  label: 'Anmeldeformular ausfüllen',     position: { x: 330, y: 100 }, size: { width: 210, height: 60  } },
+        { id: 'n2', type: 'process',  label: 'Anmeldung entgegennehmen',      position: { x: 600, y: 270 }, size: { width: 210, height: 60  } },
+        { id: 'n3', type: 'decision', label: 'Kursplatz frei?',               position: { x: 840, y: 247 }, size: { width: 185, height: 110 } },
+        { id: 'n4', type: 'process',  label: 'Bestätigung versenden',          position: { x: 840, y: 100 }, size: { width: 190, height: 60  } },
+        { id: 'e1', type: 'end',      label: 'Erfolgreich angemeldet',         position: { x: 1055, y: 95 }, size: { width: 170, height: 70  } },
+        { id: 'e2', type: 'end',      label: 'Wartelistenangebot erhalten',    position: { x: 1055, y: 260 }, size: { width: 180, height: 70 } }
+      ],
+      edges: [
+        { from: 's1', to: 'n1', label: '' },
+        { from: 'n1', to: 'n2', label: '' },
+        { from: 'n2', to: 'n3', label: '' },
+        { from: 'n3', to: 'n4', label: 'Ja' },
+        { from: 'n3', to: 'e2', label: 'Nein' },
+        { from: 'n4', to: 'e1', label: '' }
+      ]
+    }
+  },
+  {
+    id: 'swimlane-kursentwicklung',
+    name: 'Kursentwicklung (Swimlane)',
+    description: 'Entwicklung und Durchführung eines Kurses – Verantwortlichkeiten von Programmplanung, Kursleitung und Marketing.',
+    category: 'Programm',
+    diagram: {
+      nodes: [
+        { id: 'l1', type: 'lane', label: 'Programmplanung', position: { x: 40, y: 40  }, size: { width: 1380, height: 140 }, laneColor: { header: '#00285a', body: '#EEF4F7' } },
+        { id: 'l2', type: 'lane', label: 'Kursleitung',     position: { x: 40, y: 190 }, size: { width: 1380, height: 140 }, laneColor: { header: '#eb640f', body: '#fef3ea' } },
+        { id: 'l3', type: 'lane', label: 'Marketing',       position: { x: 40, y: 340 }, size: { width: 1380, height: 140 }, laneColor: { header: '#8c0a23', body: '#fdeef0' } },
+        { id: 's1', type: 'start',   label: 'Kursbedarf erkannt',                  position: { x: 80,   y: 90  }, size: { width: 175, height: 70 } },
+        { id: 'n1', type: 'process', label: 'Konzept und Lernziele definieren',     position: { x: 320,  y: 95  }, size: { width: 215, height: 60 } },
+        { id: 'n2', type: 'process', label: 'Inhalte und Materialien ausarbeiten',  position: { x: 600,  y: 240 }, size: { width: 225, height: 60 } },
+        { id: 'n3', type: 'process', label: 'Kurs ausschreiben und bewerben',       position: { x: 850,  y: 388 }, size: { width: 225, height: 60 } },
+        { id: 'n4', type: 'process', label: 'Kurs durchführen und begleiten',       position: { x: 1105, y: 240 }, size: { width: 220, height: 60 } },
+        { id: 'e1', type: 'end',     label: 'Kurs ausgewertet',                     position: { x: 1105, y: 90  }, size: { width: 175, height: 70 } }
+      ],
+      edges: [
+        { from: 's1', to: 'n1', label: '' },
+        { from: 'n1', to: 'n2', label: '' },
+        { from: 'n2', to: 'n3', label: '' },
+        { from: 'n3', to: 'n4', label: '' },
+        { from: 'n4', to: 'e1', label: '' }
+      ]
+    }
+  },
+  {
     id: 'cooperation-request',
     name: 'Kooperationsanfrage',
     description: 'Von der Anfrage bis zur Entscheidung über eine Kooperation.',

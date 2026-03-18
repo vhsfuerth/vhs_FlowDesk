@@ -24,7 +24,8 @@
       "Bash(git -C \"D:\\\\80_SoftwareProjekte\\\\202601_vhs_Flowcharts\" config --get core.ignorecase)",
       "WebFetch(domain:202601-vhs-flowcharts.vercel.app)",
       "Bash(cd \"D:/80_SoftwareProjekte/202601_vhs_Flowcharts\" && npx vercel logs https://202601-vhs-flowcharts.vercel.app 2>&1 | head -50)",
-      "Bash(find /d/80_SoftwareProjekte/202601_vhs_Flowcharts/vhs-flowchart-editor/src -type f \\\\\\(-name *.jsx -o -name *.js -o -name *.html \\\\\\))"
+      "Bash(find /d/80_SoftwareProjekte/202601_vhs_Flowcharts/vhs-flowchart-editor/src -type f \\\\\\(-name *.jsx -o -name *.js -o -name *.html \\\\\\))",
+      "Bash(python3:*)"
     ]
   }
 }

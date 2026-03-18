@@ -1,5 +1,5 @@
 import React from 'react';
-import { Share2, Printer, CheckSquare, Trash2, FolderOpen, ZoomIn, ZoomOut, Maximize, Presentation, Undo2, Redo2, Clock } from 'lucide-react';
+import { Share2, Printer, CheckSquare, Trash2, FolderOpen, ZoomIn, ZoomOut, Maximize, Undo2, Redo2, Clock } from 'lucide-react';
 
 const ExportBar = ({
   onExportSVG,
@@ -10,8 +10,6 @@ const ExportBar = ({
   onClear,
   onLoadClick,
   onVersionsClick,
-  onToggleWorkshop,
-  isWorkshopMode,
   zoomLevel,
   onZoomIn,
   onZoomOut,
