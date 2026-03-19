@@ -302,8 +302,6 @@ function App() {
     setCurrentDiagram(nextDiagram);
     setDiagramMetadata(normalizeMetadata(nextDiagram.metadata));
     setLiveDiagramData(template.diagram);
-    setIsWorkshopMode(false);
-    setWorkshopStepIndex(0);
     setLastDiagramId(newId);
     setIsTemplateModalOpen(false);
 
