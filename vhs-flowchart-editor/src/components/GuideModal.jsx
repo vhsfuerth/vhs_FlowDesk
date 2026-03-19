@@ -2,7 +2,7 @@ import React from 'react';
 import {
   X, BookOpen, Sparkles, Square, Maximize, ArrowRight,
   Undo2, CheckSquare, Printer, AlertTriangle,
-  LayoutTemplate, Settings, ClipboardList, FileText, KeyRound, Rows3
+  LayoutTemplate, Settings, ClipboardList, FileText, KeyRound, Rows3, Clock
 } from 'lucide-react';
 
 const sections = [
@@ -49,6 +49,11 @@ const sections = [
     text: 'Diagramme werden lokal im Browser gespeichert. Klicke auf „Speichern" in der unteren Leiste. Über „Öffnen" lädst du gespeicherte Diagramme.'
   },
   {
+    icon: Clock,
+    title: 'Versionsverlauf',
+    text: 'Bei jedem Speichern wird automatisch ein Versions-Snapshot angelegt. Über den Button „Versionen" in der unteren Leiste kannst du frühere Zustände des Diagramms ansehen und wiederherstellen.'
+  },
+  {
     icon: Printer,
     title: 'Export',
     text: 'Exportiere dein Diagramm als PNG, SVG, PDF oder JSON über die Buttons in der unteren Leiste. Den vollständigen Qualitätsbericht kannst du direkt im Prozess-Check als PDF herunterladen.'
@@ -79,7 +84,7 @@ const sections = [
       'Lege Prozessschritte innerhalb der zuständigen Lane ab und verbinde sie wie gewohnt.',
       'Verbindungen, die eine Lanegrenze kreuzen, zeigen Übergaben und Schnittstellen zwischen Rollen.',
     ],
-    note: 'Swimlanes werden beim Export und im Workshop-Modus wie alle anderen Elemente dargestellt. Zwei fertige Swimlane-Vorlagen findest du unter „Vorlagen" → Kategorie Programm.'
+    note: 'Swimlanes werden beim Export wie alle anderen Elemente dargestellt. Zwei fertige Swimlane-Vorlagen findest du unter „Vorlagen".'
   },
   {
     icon: LayoutTemplate,

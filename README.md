@@ -6,8 +6,17 @@ Lokal laufendes PWA-Tool (Progressive Web App) zur Erstellung algorithmischer Ab
 
 - **KI-Diagramm-Generierung**: Erzeugt Diagramme direkt aus einer Prozessbeschreibung per Google Gemini API.
 - **Visueller Editor**: Drag-and-drop-basierter Diagrammeditor mit JointJS.
+- **Swimlanes (Verantwortungsbereiche)**: Visuelle Abgrenzung von Rollen und Zust\u00e4ndigkeiten direkt im Diagramm.
 - **vhs-Starter-Vorlagen**: Sofort nutzbare Vorlagen fuer typische vhs-Prozesse wie Kursplanung, Dozierenden-Onboarding, Beschwerdebearbeitung oder Raumbuchung.
-- **Prozess-Check und Selbstbewertung**: AutomatisFol
+- **Prozess-Check und Selbstbewertung**: Automatische Strukturpr\u00fcfung und geleiteter Bewertungs-Wizard (5 Kriterien, 0\u20133 Punkte).
+- **Ma\u00dfnahmen-Tracking**: Verbesserungsma\u00dfnahmen mit Priorit\u00e4t, Status, Zust\u00e4ndigkeit und Termin.
+- **PDF-Qualit\u00e4tsbericht**: Professioneller 2-seitiger vhs-Bericht mit Deckblatt, Befunden und Scores.
+- **Versionsverlauf**: Automatische Snapshots bei jedem Speichern mit M\u00f6glichkeit zur Wiederherstellung.
+- **Exporte**: PNG, SVG, PDF (mit vhs-Branding), Projekt-JSON und Ma\u00dfnahmen-CSV.
+
+---
+
+## Benutzung
 
 ### 1. Mit Vorlagen starten
 
@@ -20,7 +29,19 @@ Sinnvoll fuer:
 - erste Prozessaufnahme ohne leeres Blatt
 - Standardprozesse mit wenig Vorbereitungszeit
 
-### 2. Prozess-Check verwenden
+### 2. Swimlanes (Verantwortungsbereiche)
+
+Swimlanes gliedern das Diagramm in Zust\u00e4ndigkeitsbereiche verschiedener Rollen oder Abteilungen.
+
+1. Element **„Swimlane"** aus der Seitenleiste auf die Arbeitsfl\u00e4che ziehen.
+2. Doppelklick \u00f6ffnet den Bearbeitungsdialog: Bezeichnung und Farbakzent frei w\u00e4hlbar.
+3. Mehrere Lanes untereinander anordnen \u2013 jede Lane steht f\u00fcr einen Verantwortungsbereich.
+4. Prozessschritte innerhalb der zust\u00e4ndigen Lane ablegen und wie gewohnt verbinden.
+5. Verbindungen, die eine Lanegrenze kreuzen, zeigen \u00dcbergaben zwischen Rollen.
+
+Hinweis: Zwei fertige Swimlane-Vorlagen sind direkt \u00fcber **„Vorlagen"** abrufbar.
+
+### 3. Prozess-Check verwenden
 
 In der rechten Seitenleiste unter **"Prozess-Check"** gibt es zwei Ebenen:
 
@@ -34,10 +55,9 @@ In der rechten Seitenleiste unter **"Prozess-Check"** gibt es zwei Ebenen:
   - Teilnehmendenorientierung
   - Verantwortlichkeit
 
-Hinweis:
-Ein Klick auf eine Meldung mit Knotenzug zeigt die betroffene Stelle direkt im Diagramm an.
+Hinweis: Ein Klick auf eine Meldung mit Knotenzug zeigt die betroffene Stelle direkt im Diagramm an.
 
-### 3. Massnahmen dokumentieren
+### 4. Massnahmen dokumentieren
 
 Unter **"Massnahmen"** in der rechten Seitenleiste lassen sich Verbesserungen strukturiert festhalten:
 
@@ -49,38 +69,47 @@ Unter **"Massnahmen"** in der rechten Seitenleiste lassen sich Verbesserungen st
 
 Die Liste kann anschliessend als **CSV** exportiert werden, zum Beispiel fuer Excel oder andere Nachverfolgungslisten.
 
-### 4. Workshop-Modus fuer Teamgespraeche
+### 5. Versionsverlauf
 
-Der Button **"Workshop"** in der unteren Leiste aktiviert den Moderationsmodus.
+Bei jedem Speichern wird automatisch ein Snapshot des Diagramms angelegt.
 
-Moeglichkeiten:
-- Schrittweise Navigation durch den Prozess
-- Fokus auf den jeweils aktuellen Prozessschritt
-- Diskussionspunkte direkt pro Schritt dokumentieren
-- Export einer kompakten Workshop-Zusammenfassung als `.txt`
+- Button **„Versionen"** in der unteren Leiste \u00f6ffnet die Versionshistorie.
+- Fr\u00fchere Zust\u00e4nde k\u00f6nnen angezeigt und wiederhergestellt werden.
+- Verf\u00fcgbar sobald ein Diagramm gespeichert wurde.
 
-Typischer Ablauf:
-1. Diagramm oder Vorlage laden.
-2. Workshop-Modus starten.
-3. Schritt fuer Schritt durch den Prozess gehen.
-4. Beobachtungen, Entscheidungen oder offene Fragen als Diskussionspunkte notieren.
-5. Ergebnisse speichern oder als Workshop-Datei exportieren.
+### 6. Exporte
 
-### 5. Erweiterte Exporte
+\u00dcber die Buttons in der unteren Leiste stehen folgende Exporte bereit:
 
-Neben PNG, SVG und PDF stehen nun weitere Exporte zur Verfuegung:
+- **PNG / SVG**: Bilddatei des Diagramms mit vhs-Branding.
+- **PDF**: Druckoptimiertes Diagramm als PDF.
+- **JSON (Projektdatei)**: Vollst\u00e4ndiges Diagramm inkl. Metadaten, Bewertungen und Ma\u00dfnahmen.
+- **PDF-Qualit\u00e4tsbericht** (aus dem Prozess-Check): 2-seitiger vhs-Bericht mit Deckblatt, Befunden, Scores und Ma\u00dfnahmen.
+- **Ma\u00dfnahmen-CSV** (aus dem Prozess-Check): F\u00fcr Aufgabenlisten und Nachverfolgung.
 
-- **Projekt-JSON**: Enthaeelt Diagramm plus Metadaten wie Bewertungen, Massnahmen und Workshop-Notizen.
-- **Massnahmen-CSV**: Fuer Aufgabenlisten und Nachverfolgung.
-- **Workshop-TXT**: Fuer Besprechungsdokumentation und Protokolle.
+### 7. Tastenkombinationen
+
+| Tastenkombination | Funktion |
+|---|---|
+| `Strg + Z` | R\u00fckg\u00e4ngig |
+| `Strg + Y` / `Strg + Umschalt + Z` | Wiederholen |
+| `Entf` / `Backspace` | Ausgew\u00e4hltes Element l\u00f6schen |
+| `Strg + Mausrad` | Zoom |
+| `Strg + +` / `Strg + -` | Zoom rein / raus |
+| `Strg + 0` | Zoom zur\u00fccksetzen |
+| Doppelklick | Text bearbeiten |
+
+---
 
 ## Technologien
 
 - Frontend: React 19 + Vite
 - Styling: Tailwind CSS v4
 - Diagramm-Engine: JointJS + Dagre.js
-- Storage: IndexedDB
-- Export: jsPDF, SVG, PNG, JSON, CSV, TXT
+- Storage: IndexedDB (Diagramme + Versionen)
+- Export: jsPDF, SVG, PNG, JSON, CSV
+
+---
 
 ## Weitergabe und Hosting
 
