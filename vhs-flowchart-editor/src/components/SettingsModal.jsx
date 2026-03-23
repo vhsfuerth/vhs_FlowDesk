@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { getApiKey, setApiKey, getCustomPrompt, setCustomPrompt } from '../storage/settings';
 import { SYSTEM_PROMPT } from '../ai/prompts';
-import { Settings, X, Key, Sparkles, RotateCcw, Activity, Loader2, CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import { Settings, X, Key, Sparkles, RotateCcw, Activity, Loader2, CheckCircle2, AlertCircle, Info, Scale } from 'lucide-react';
 import { checkApiStatus, listAvailableModels } from '../ai/gemini-client';
 
 const SettingsModal = ({ isOpen, onClose }) => {
@@ -151,6 +151,19 @@ const SettingsModal = ({ isOpen, onClose }) => {
             />
             <p className="text-xs text-gray-500 mt-1">
               Diese Anweisungen steuern, wie die KI Diagramme generiert. Änderungen können das Ergebnis stark beeinflussen.
+            </p>
+          </div>
+
+          <div className="pt-4 border-t border-gray-100">
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+              <Scale className="w-4 h-4 mr-1" />
+              Lizenz &amp; Urheber
+            </label>
+            <p className="text-xs text-gray-600">
+              MIT License
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              &copy; 2026 Tobias Götz, vhs Fürth gGmbH
             </p>
           </div>
         </div>

@@ -192,5 +192,9 @@ server {
 
 4. Site aktivieren und Nginx neu starten.
 
+## Lizenz
+
+MIT License – siehe [LICENSE](LICENSE).
+
 ---
 Erstellt fuer die vhs im Rahmen der Prozess-Digitalisierung 2026.
