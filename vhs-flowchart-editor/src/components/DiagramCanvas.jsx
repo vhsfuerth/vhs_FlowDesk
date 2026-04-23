@@ -43,15 +43,31 @@ class LaneResizeTool extends joint.dia.ToolView {
             el.appendChild(ln);
         });
 
-        bg.addEventListener('mousedown', (evt) => this._startResize(evt), { once: true });
+        // Only attach drag listener when not already resizing (prevents re-entrant calls)
+        if (!this._resizing) {
+            bg.addEventListener('mousedown', (evt) => this._startResize(evt), { once: true });
+            // Also block pointerdown so JointJS doesn't simultaneously try to drag the lane
+            bg.addEventListener('pointerdown', (evt) => evt.stopPropagation(), { once: true });
+        }
     }
 
     _startResize(evt) {
         evt.stopPropagation();
+        if (this._resizing) return;
+        this._resizing = true;
+
         const paper = this.relatedView.paper;
         const { width, height } = this.relatedView.model.size();
         const lp = paper.clientToLocalPoint(evt.clientX, evt.clientY);
         const startX = lp.x, startY = lp.y, startW = width, startH = height;
+
+        const cleanup = () => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+            window.removeEventListener('blur', onBlur);
+            this._resizing = false;
+            this._draw(); // restore interactive handle at final position
+        };
 
         const onMove = (e) => {
             const p = paper.clientToLocalPoint(e.clientX, e.clientY);
@@ -59,14 +75,16 @@ class LaneResizeTool extends joint.dia.ToolView {
                 Math.max(200, startW + (p.x - startX)),
                 Math.max(60, startH + (p.y - startY))
             );
-            this._draw();
+            // JointJS fires update() -> _draw() automatically via change:size; no manual call needed
         };
-        const onUp = () => {
-            window.removeEventListener('mousemove', onMove);
-            window.removeEventListener('mouseup', onUp);
-        };
+        const onUp = () => cleanup();
+        // If the browser loses focus mid-drag (e.g. Alt-Tab + mouse release outside),
+        // mouseup never fires on window – reset state to prevent a stuck resize.
+        const onBlur = () => cleanup();
+
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
+        window.addEventListener('blur', onBlur);
     }
 }
 
@@ -166,14 +184,14 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
 
     history.isTracking = true;
 
-    graph.on('all', (eventName) => {
+    graph.on('all', (eventName, cell) => {
       const nextCanUndo = history.canUndo();
       const nextCanRedo = history.canRedo();
       setCanUndo(nextCanUndo);
       setCanRedo(nextCanRedo);
       if (onHistoryChange) onHistoryChange(nextCanUndo, nextCanRedo);
       if (eventName === 'remove') {
-          if (selectedCellRef.current && selectedCellRef.current.id === arguments[1]?.id) {
+          if (selectedCellRef.current && selectedCellRef.current.id === cell?.id) {
               selectedCellRef.current = null;
           }
       }
@@ -204,8 +222,16 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
         isPanning = false;
     };
 
+    // If the browser loses focus while the mouse button is held (e.g. Alt-Tab + release
+    // outside the window), mouseup never fires and isPanning stays true permanently,
+    // making the canvas scroll on every subsequent mouse move instead of responding to clicks.
+    const onWindowBlur = () => {
+        isPanning = false;
+    };
+
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('blur', onWindowBlur);
 
     // Contextual Tools (Simple & Clean)
     paper.on('element:pointerclick', (elementView) => {
@@ -359,6 +385,7 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
         }
         window.removeEventListener('mousemove', onMouseMove);
         window.removeEventListener('mouseup', onMouseUp);
+        window.removeEventListener('blur', onWindowBlur);
         container.removeEventListener('wheel', onWheel);
     };
 
