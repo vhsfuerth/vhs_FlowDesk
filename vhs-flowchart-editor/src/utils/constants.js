@@ -45,3 +45,11 @@ export const SHAPE_CONFIG = {
 };
 
 export const GRID_SIZE = 10;
+
+// Markierungen im Versionsvergleich (vhs Grün B, Gelb, Rot)
+export const COMPARE_MARKS = {
+  added: { label: 'Neu', color: '#4BA02D', width: 4 },
+  changed: { label: 'Geändert', color: '#FAB90F', width: 4 },
+  removed: { label: 'Entfernt', color: '#E1000F', width: 3, dash: '6,4', opacity: 0.45 },
+  moved: { label: 'Verschoben', color: '#69829B', width: 0 }
+};

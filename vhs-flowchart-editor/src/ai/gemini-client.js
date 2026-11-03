@@ -1,7 +1,12 @@
 import { getApiKey, getCustomPrompt } from '../storage/settings';
 import { SYSTEM_PROMPT, IMPROVEMENT_PROMPT } from './prompts';
-
-const API_TIMEOUT_MS = 30000;
+import {
+    API_TIMEOUT_MS,
+    GEMINI_API_BASE,
+    GEMINI_HEALTHCHECK_MODEL,
+    GEMINI_MODELS,
+    MODEL_FALLBACK_DELAY_MS
+} from './config';
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -13,16 +18,23 @@ const mapApiStatusToMessage = (status) => {
     return 'Bei der KI-Generierung ist ein Fehler aufgetreten. Bitte versuche es erneut.';
 };
 
+// Der Key wird im Header übertragen, nicht als URL-Parameter –
+// so landet er nicht in Proxy-, Server- oder Browser-Logs.
+const buildHeaders = (apiKey) => ({
+    'Content-Type': 'application/json',
+    'x-goog-api-key': apiKey
+});
+
 async function callGeminiApi(modelName, apiKey, prompt, userText) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const url = `${GEMINI_API_BASE}/models/${modelName}:generateContent`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
     try {
-        const response = await fetch(url, {
+        return await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: buildHeaders(apiKey),
             body: JSON.stringify({
                 systemInstruction: { parts: [{ text: prompt }] },
                 contents: [{ role: 'user', parts: [{ text: userText }] }],
@@ -30,7 +42,6 @@ async function callGeminiApi(modelName, apiKey, prompt, userText) {
             }),
             signal: controller.signal
         });
-        return response;
     } catch (error) {
         if (error.name === 'AbortError') {
             throw new Error(`Zeitüberschreitung: ${modelName} hat nicht innerhalb von ${API_TIMEOUT_MS / 1000}s geantwortet.`);
@@ -41,102 +52,69 @@ async function callGeminiApi(modelName, apiKey, prompt, userText) {
     }
 }
 
-export const generateFlowchartFromText = async (text) => {
+// Probiert die konfigurierten Modelle der Reihe nach durch. Nur ein 404
+// (Modell nicht verfügbar) führt zum nächsten Modell, alle anderen Fehler brechen ab.
+async function generateWithFallback(prompt, userText, parseResult) {
     const apiKey = getApiKey();
     if (!apiKey) throw new Error('API_KEY_MISSING');
-    
-    const activePrompt = getCustomPrompt() || SYSTEM_PROMPT;
-    // Updated based on diagnosis for this specific key
-    const modelsToTry = [
-        'gemini-2.5-flash', 
-        'gemini-2.0-flash', 
-        'gemini-1.5-flash', 
-        'gemini-1.5-flash-latest'
-    ];
-    
-    let lastError = null;
-    for (let i = 0; i < modelsToTry.length; i++) {
-        const model = modelsToTry[i];
-        try {
-            if (i > 0) await delay(1500);
 
-            const response = await callGeminiApi(model, apiKey, activePrompt, text);
+    for (let i = 0; i < GEMINI_MODELS.length; i++) {
+        const model = GEMINI_MODELS[i];
+        if (i > 0) await delay(MODEL_FALLBACK_DELAY_MS);
 
-            if (response.ok) {
-                const data = await response.json();
-                const contentText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (!contentText) throw new Error('INVALID_JSON_RESPONSE');
-                return validateApiResponse(JSON.parse(contentText));
+        const response = await callGeminiApi(model, apiKey, prompt, userText);
+
+        if (response.ok) {
+            const data = await response.json();
+            const contentText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!contentText) throw new Error('INVALID_JSON_RESPONSE');
+            let parsed;
+            try {
+                parsed = JSON.parse(contentText);
+            } catch {
+                throw new Error('INVALID_JSON_RESPONSE');
             }
-
-            if (response.status === 404) {
-                console.warn(`Model ${model} not found, trying next...`);
-                continue;
-            }
-
-            const errorData = await response.json().catch(() => ({}));
-            const apiErrorMessage = errorData.error?.message || response.statusText || 'Unknown API Error';
-            console.error(`Gemini API Error (${response.status}):`, apiErrorMessage);
-            throw new Error(mapApiStatusToMessage(response.status));
-
-        } catch (error) {
-            lastError = error;
-            if (error.message.includes('INVALID_JSON_RESPONSE')) throw error;
-            if (lastError.message.includes('404')) continue;
-            throw error;
+            return parseResult(parsed);
         }
+
+        if (response.status === 404) {
+            console.warn(`Modell ${model} nicht verfügbar, versuche nächstes…`);
+            continue;
+        }
+
+        const errorData = await response.json().catch(() => ({}));
+        console.error(`Gemini API Error (${response.status}):`, errorData.error?.message || response.statusText);
+        throw new Error(mapApiStatusToMessage(response.status));
     }
-    
-    throw lastError || new Error('Kein kompatibles KI-Modell gefunden.');
+
+    throw new Error('Kein kompatibles KI-Modell gefunden. Bitte die Modellliste in src/ai/config.js prüfen.');
+}
+
+export const generateFlowchartFromText = (text) => {
+    const activePrompt = getCustomPrompt() || SYSTEM_PROMPT;
+    return generateWithFallback(activePrompt, text, validateApiResponse);
 };
 
-export const generateImprovements = async (diagramData, reviewScores) => {
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error('API_KEY_MISSING');
+const SCORE_LABELS = {
+    clarity: 'Klarheit',
+    mediaBreaks: 'Medienbruch',
+    risk: 'Risiko',
+    participantFocus: 'Teilnehmendenorientierung',
+    ownership: 'Verantwortlichkeit'
+};
 
-    const SCORE_LABELS = {
-        clarity: 'Klarheit',
-        mediaBreaks: 'Medienbruch',
-        risk: 'Risiko',
-        participantFocus: 'Teilnehmendenorientierung',
-        ownership: 'Verantwortlichkeit'
-    };
+export const generateImprovements = (diagramData, reviewScores) => {
     const scoresText = Object.entries(reviewScores)
         .map(([k, v]) => `${SCORE_LABELS[k] || k}: ${v}/3`)
         .join(', ');
     const userText = `Diagramm (JSON):\n${JSON.stringify(diagramData, null, 2)}\n\nQualitätsbewertung:\n${scoresText}`;
 
-    const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-latest'];
-    let lastError = null;
-
-    for (let i = 0; i < modelsToTry.length; i++) {
-        const model = modelsToTry[i];
-        try {
-            if (i > 0) await delay(1500);
-            const response = await callGeminiApi(model, apiKey, IMPROVEMENT_PROMPT, userText);
-
-            if (response.ok) {
-                const data = await response.json();
-                const contentText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (!contentText) throw new Error('INVALID_JSON_RESPONSE');
-                const parsed = JSON.parse(contentText);
-                if (!parsed.improvements || !Array.isArray(parsed.improvements)) {
-                    throw new Error('INVALID_JSON_RESPONSE');
-                }
-                return parsed.improvements;
-            }
-            if (response.status === 404) { lastError = new Error('404'); continue; }
-            const errorData = await response.json().catch(() => ({}));
-            console.error(`Gemini API Error (${response.status}):`, errorData.error?.message);
-            throw new Error(mapApiStatusToMessage(response.status));
-        } catch (error) {
-            lastError = error;
-            if (error.message === 'INVALID_JSON_RESPONSE') throw error;
-            if (error.message.includes('404')) continue;
-            throw error;
+    return generateWithFallback(IMPROVEMENT_PROMPT, userText, (parsed) => {
+        if (!parsed.improvements || !Array.isArray(parsed.improvements)) {
+            throw new Error('INVALID_JSON_RESPONSE');
         }
-    }
-    throw lastError || new Error('Kein kompatibles KI-Modell gefunden.');
+        return parsed.improvements;
+    });
 };
 
 export const checkApiStatus = async (overrideKey) => {
@@ -144,10 +122,9 @@ export const checkApiStatus = async (overrideKey) => {
     if (!apiKey) return { status: 'missing', message: 'Kein API-Key vorhanden.' };
 
     try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-        const response = await fetch(url, {
+        const response = await fetch(`${GEMINI_API_BASE}/models/${GEMINI_HEALTHCHECK_MODEL}:generateContent`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: buildHeaders(apiKey),
             body: JSON.stringify({
                 contents: [{ parts: [{ text: "Respond with only 'OK'" }] }],
                 generationConfig: { maxOutputTokens: 5 }
@@ -156,15 +133,14 @@ export const checkApiStatus = async (overrideKey) => {
 
         if (response.ok) {
             return { status: 'ok', message: 'API-Key ist aktiv und bereit.' };
-        } else {
-            const errorData = await response.json().catch(() => ({}));
-            const apiErrorMessage = errorData.error?.message || response.statusText || 'Unbekannter Fehler';
-
-            console.error('API-Status-Check Fehler:', apiErrorMessage);
-            if (response.status === 429) return { status: 'limit', message: 'Anfrage-Limit erreicht. Bitte warte einen Moment.' };
-            if (response.status === 400 || response.status === 403) return { status: 'invalid', message: 'API-Key ungültig oder nicht berechtigt.' };
-            return { status: 'error', message: 'Der KI-Dienst ist momentan nicht erreichbar.' };
         }
+
+        const errorData = await response.json().catch(() => ({}));
+        console.error('API-Status-Check Fehler:', errorData.error?.message || response.statusText);
+        if (response.status === 429) return { status: 'limit', message: 'Anfrage-Limit erreicht. Bitte warte einen Moment.' };
+        if (response.status === 400 || response.status === 403) return { status: 'invalid', message: 'API-Key ungültig oder nicht berechtigt.' };
+        if (response.status === 404) return { status: 'error', message: `Modell ${GEMINI_HEALTHCHECK_MODEL} ist nicht verfügbar.` };
+        return { status: 'error', message: 'Der KI-Dienst ist momentan nicht erreichbar.' };
     } catch (error) {
         return { status: 'error', message: `Verbindung fehlgeschlagen: ${error.message}` };
     }
@@ -175,20 +151,20 @@ export const listAvailableModels = async (overrideKey) => {
     if (!apiKey) return [];
 
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
+        const response = await fetch(`${GEMINI_API_BASE}/models`, { headers: buildHeaders(apiKey) });
         if (!response.ok) return [];
         const data = await response.json();
         return data.models || [];
-    } catch (e) {
+    } catch {
         return [];
     }
 };
 
-const validateApiResponse = (json) => {
-    if (!json.nodes || !Array.isArray(json.nodes)) {
-         throw new Error('JSON validation failed: missing nodes array');
+export const validateApiResponse = (json) => {
+    if (!json || !Array.isArray(json.nodes)) {
+        throw new Error('INVALID_JSON_RESPONSE');
     }
-    
+
     // Ensure minimal viable graph
     const hasStart = json.nodes.some(n => n.type === 'start');
     if (!hasStart && json.nodes.length > 0) {
@@ -196,12 +172,14 @@ const validateApiResponse = (json) => {
     }
 
     // Filter out bad edges
-    if (json.edges && Array.isArray(json.edges)) {
+    if (Array.isArray(json.edges)) {
         json.edges = json.edges.filter(edge => {
             const hasSource = json.nodes.some(n => n.id === edge.from);
             const hasTarget = json.nodes.some(n => n.id === edge.to);
             return hasSource && hasTarget;
         });
+    } else {
+        json.edges = [];
     }
 
     return json;

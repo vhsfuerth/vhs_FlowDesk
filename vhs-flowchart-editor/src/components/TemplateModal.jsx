@@ -1,25 +1,31 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { X, Sparkles, LayoutTemplate } from 'lucide-react';
+import { STARTER_TEMPLATES } from '../data/templates';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
-const TemplateModal = ({ isOpen, onClose, templates, onApply }) => {
-  if (!isOpen) return null;
+// Wird nur gerendert, solange der Dialog offen ist
+const TemplateModal = ({ onClose, onApply, templates = STARTER_TEMPLATES }) => {
+  const dialogRef = useDialogA11y(true, onClose);
+  const titleId = useId();
 
   return (
-    <div 
+    <div
+      ref={dialogRef}
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
       role="dialog"
       aria-modal="true"
+      aria-labelledby={titleId}
     >
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-5xl flex flex-col max-h-[85vh]">
         <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
           <div>
-            <h2 className="text-xl font-bold flex items-center text-[var(--color-vhs-blau)]">
-              <LayoutTemplate className="w-5 h-5 mr-2" />
+            <h2 id={titleId} className="text-xl font-bold flex items-center text-[var(--color-vhs-blau)]">
+              <LayoutTemplate className="w-5 h-5 mr-2" aria-hidden="true" />
               vhs-Starter-Vorlagen
             </h2>
             <p className="text-sm text-gray-500 mt-1">Schneller Einstieg für häufige Prozesse in Volkshochschulen.</p>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 p-1 hover:bg-gray-200 rounded-full transition-colors">
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 p-1 hover:bg-gray-200 rounded-full transition-colors" aria-label="Vorlagen schließen">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -33,14 +39,14 @@ const TemplateModal = ({ isOpen, onClose, templates, onApply }) => {
                 className="text-left border border-[var(--color-vhs-blau-20)] rounded-xl p-4 bg-white hover:border-[var(--color-vhs-blau)] hover:shadow-md transition-all"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-vhs-orange)]">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-vhs-orange-b)]">
                     {template.category}
                   </span>
-                  <Sparkles className="w-4 h-4 text-[var(--color-vhs-gelb)]" />
+                  <Sparkles className="w-4 h-4 text-[var(--color-vhs-gelb)]" aria-hidden="true" />
                 </div>
                 <h3 className="mt-3 text-lg font-bold text-[var(--color-vhs-blau)]">{template.name}</h3>
                 <p className="mt-2 text-sm text-gray-600 leading-relaxed">{template.description}</p>
-                <div className="mt-4 text-xs text-gray-400">
+                <div className="mt-4 text-xs text-gray-500">
                   {template.diagram.nodes.length} Knoten, {template.diagram.edges.length} Verbindungen
                 </div>
               </button>

@@ -30,7 +30,10 @@ export class HistoryManager {
         if (targetEvents.some(te => eventName.includes(te))) {
             // Debounce state saving
             if (this.saveTimeout) clearTimeout(this.saveTimeout);
-            this.saveTimeout = setTimeout(() => this.saveState(), 300);
+            this.saveTimeout = setTimeout(() => {
+                this.saveTimeout = null;
+                this.saveState();
+            }, 300);
         }
     }
 
@@ -48,7 +51,18 @@ export class HistoryManager {
         }
     }
 
+    // Noch nicht gesicherte (entprellte) Änderung sofort übernehmen,
+    // damit Rückgängig/Wiederholen direkt nach einer Änderung greift
+    flushPending() {
+        if (this.saveTimeout) {
+            clearTimeout(this.saveTimeout);
+            this.saveTimeout = null;
+            this.saveState();
+        }
+    }
+
     undo() {
+        this.flushPending();
         if (this.undoStack.length > 1) {
             this.isTracking = false;
             
@@ -65,6 +79,7 @@ export class HistoryManager {
     }
 
     redo() {
+        this.flushPending();
         if (this.redoStack.length > 0) {
             this.isTracking = false;
             
@@ -79,7 +94,7 @@ export class HistoryManager {
     }
 
     canUndo() {
-        return this.undoStack.length > 1;
+        return this.undoStack.length > 1 || Boolean(this.saveTimeout);
     }
 
     canRedo() {
@@ -87,6 +102,8 @@ export class HistoryManager {
     }
 
     clear() {
+        if (this.saveTimeout) clearTimeout(this.saveTimeout);
+        this.saveTimeout = null;
         this.undoStack = [];
         this.redoStack = [];
         this.saveState();

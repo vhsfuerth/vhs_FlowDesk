@@ -1,18 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useId, useState } from 'react';
 import { X } from 'lucide-react';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
-const EditTextModal = ({ isOpen, title, initialValue, onSave, onCancel }) => {
-  const [value, setValue] = useState('');
-  const inputRef = useRef(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      setValue(initialValue || '');
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
-  }, [isOpen, initialValue]);
-
-  if (!isOpen) return null;
+// Wird nur gerendert, solange der Dialog offen ist
+const EditTextModal = ({ title, initialValue, onSave, onCancel }) => {
+  const [value, setValue] = useState(initialValue || '');
+  const dialogRef = useDialogA11y(true, onCancel);
+  const titleId = useId();
 
   const handleSave = () => {
     onSave(value);
@@ -23,25 +17,23 @@ const EditTextModal = ({ isOpen, title, initialValue, onSave, onCancel }) => {
       e.preventDefault();
       handleSave();
     }
-    if (e.key === 'Escape') {
-      onCancel();
-    }
   };
 
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       onClick={onCancel}
       role="dialog"
       aria-modal="true"
-      aria-label={title}
+      aria-labelledby={titleId}
     >
       <div
         className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
-          <h3 className="text-sm font-bold text-[var(--color-vhs-blau)]">{title}</h3>
+          <h3 id={titleId} className="text-sm font-bold text-[var(--color-vhs-blau)]">{title}</h3>
           <button
             onClick={onCancel}
             className="p-1 hover:bg-gray-200 rounded-full transition-colors"
@@ -52,14 +44,15 @@ const EditTextModal = ({ isOpen, title, initialValue, onSave, onCancel }) => {
         </div>
         <div className="p-4">
           <textarea
-            ref={inputRef}
+            data-autofocus
+            aria-labelledby={titleId}
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={handleKeyDown}
             className="w-full text-sm py-2 px-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-[var(--color-vhs-orange-hell)] focus:border-transparent min-h-[60px] max-h-[200px] resize-y"
             rows={2}
           />
-          <p className="text-xs text-gray-400 mt-1">Enter = Speichern, Esc = Abbrechen</p>
+          <p className="text-xs text-gray-500 mt-1">Enter = Speichern, Esc = Abbrechen</p>
         </div>
         <div className="flex justify-end gap-2 px-4 py-3 border-t border-gray-200 bg-gray-50">
           <button

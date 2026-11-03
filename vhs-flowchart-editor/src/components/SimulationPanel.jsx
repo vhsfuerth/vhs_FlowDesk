@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { ChevronRight, Play, RotateCcw, Download, CheckCircle2, Footprints } from 'lucide-react';
 
 const SimulationPanel = ({ diagramData, onFocusNode, onSetSimulationFocus }) => {
@@ -6,8 +6,8 @@ const SimulationPanel = ({ diagramData, onFocusNode, onSetSimulationFocus }) => 
   const [currentNodeId, setCurrentNodeId] = useState(null);
   const [path, setPath] = useState([]); // [{nodeId, label, choiceLabel}]
 
-  const nodes = diagramData?.nodes || [];
-  const edges = diagramData?.edges || [];
+  const nodes = useMemo(() => diagramData?.nodes || [], [diagramData]);
+  const edges = useMemo(() => diagramData?.edges || [], [diagramData]);
 
   const getNode = (nodeId) => nodes.find((n) => n.id === nodeId);
   const getOutgoing = (nodeId) => edges.filter((e) => e.from === nodeId);
@@ -36,13 +36,13 @@ const SimulationPanel = ({ diagramData, onFocusNode, onSetSimulationFocus }) => 
   }, [onSetSimulationFocus]);
 
   const advanceTo = useCallback((edge) => {
-    const nextNode = getNode(edge.to);
+    const nextNode = nodes.find((n) => n.id === edge.to);
     if (!nextNode) return;
     setCurrentNodeId(nextNode.id);
     setPath((prev) => [...prev, { nodeId: nextNode.id, label: nextNode.label, choiceLabel: edge.label || '' }]);
     onFocusNode(nextNode.id);
     if (onSetSimulationFocus) onSetSimulationFocus(nextNode.id);
-  }, [nodes, edges, onFocusNode, onSetSimulationFocus]);
+  }, [nodes, onFocusNode, onSetSimulationFocus]);
 
   const exportPath = () => {
     const lines = [

@@ -1,18 +1,23 @@
 # vhs Workflow-Algorithm Editor
 
-Lokal laufendes PWA-Tool (Progressive Web App) zur Erstellung algorithmischer Ablaufplaene, Flowcharts und Entscheidungsbaeume im vhs Corporate Design.
+Browserbasiertes PWA-Tool (Progressive Web App) zur Erstellung algorithmischer Ablaufpläne, Flowcharts und Entscheidungsbäume im vhs Corporate Design. Alle Diagramme bleiben lokal im Browser; nur für die KI-Funktionen werden Daten an die Google Gemini API übertragen.
+
+Aktuelle Version und Änderungen: siehe [CHANGELOG.md](CHANGELOG.md).
 
 ## Hauptfunktionen
 
 - **KI-Diagramm-Generierung**: Erzeugt Diagramme direkt aus einer Prozessbeschreibung per Google Gemini API.
-- **Visueller Editor**: Drag-and-drop-basierter Diagrammeditor mit JointJS.
-- **Swimlanes (Verantwortungsbereiche)**: Visuelle Abgrenzung von Rollen und Zust\u00e4ndigkeiten direkt im Diagramm.
-- **vhs-Starter-Vorlagen**: Sofort nutzbare Vorlagen fuer typische vhs-Prozesse wie Kursplanung, Dozierenden-Onboarding, Beschwerdebearbeitung oder Raumbuchung.
-- **Prozess-Check und Selbstbewertung**: Automatische Strukturpr\u00fcfung und geleiteter Bewertungs-Wizard (5 Kriterien, 0\u20133 Punkte).
-- **Ma\u00dfnahmen-Tracking**: Verbesserungsma\u00dfnahmen mit Priorit\u00e4t, Status, Zust\u00e4ndigkeit und Termin.
-- **PDF-Qualit\u00e4tsbericht**: Professioneller 2-seitiger vhs-Bericht mit Deckblatt, Befunden und Scores.
-- **Versionsverlauf**: Automatische Snapshots bei jedem Speichern mit M\u00f6glichkeit zur Wiederherstellung.
-- **Exporte**: PNG, SVG, PDF (mit vhs-Branding), Projekt-JSON und Ma\u00dfnahmen-CSV.
+- **Visueller Editor**: Diagrammeditor mit JointJS – Elemente per Drag & Drop oder Klick hinzufügen, Mehrfachauswahl, Kopieren/Einfügen, automatisches Anordnen, Ausrichten und Verteilen.
+- **Swimlanes (Verantwortungsbereiche)**: Visuelle Abgrenzung von Rollen und Zuständigkeiten direkt im Diagramm.
+- **vhs-Starter-Vorlagen**: Sofort nutzbare Vorlagen für typische vhs-Prozesse wie Kursplanung, Dozierenden-Onboarding, Beschwerdebearbeitung oder Raumbuchung.
+- **Prozess-Check und Selbstbewertung**: Automatische Strukturprüfung und geleiteter Bewertungs-Wizard (5 Kriterien, 0–3 Punkte).
+- **Maßnahmen-Tracking**: Verbesserungsmaßnahmen mit Priorität, Status, Zuständigkeit und Termin.
+- **PDF-Qualitätsbericht**: 2-seitiger vhs-Bericht mit Deckblatt, Befunden und Scores.
+- **Autosave**: Ungespeicherte Änderungen werden automatisch als Entwurf gesichert und nach einem Absturz oder Neuladen zur Wiederherstellung angeboten.
+- **Versionsverlauf und -vergleich**: Automatische Snapshots bei jedem Speichern, Notizen je Version, farbig markierter Vergleich zweier Fassungen und Wiederherstellung.
+- **Prozessbeschreibung**: Automatisch erzeugte Verfahrensanweisung als Word-Dokument oder Markdown.
+- **Import & Backup**: Projektdateien importieren, alle Diagramme in einer Sicherungsdatei sichern und wieder einspielen.
+- **Exporte**: PNG, SVG, PDF (mit vhs-Branding), Projekt-JSON und Maßnahmen-CSV.
 
 ---
 
@@ -20,84 +25,111 @@ Lokal laufendes PWA-Tool (Progressive Web App) zur Erstellung algorithmischer Ab
 
 ### 1. Mit Vorlagen starten
 
-1. Im Header auf **"Vorlagen"** klicken.
-2. Eine passende vhs-Starter-Vorlage auswaehlen.
+1. Im Header auf **„Vorlagen“** klicken.
+2. Eine passende vhs-Starter-Vorlage auswählen.
 3. Das Diagramm wird geladen und kann direkt angepasst oder mit KI weiterentwickelt werden.
 
-Sinnvoll fuer:
+Sinnvoll für:
+
 - schnelle Einstiege in Workshops
 - erste Prozessaufnahme ohne leeres Blatt
 - Standardprozesse mit wenig Vorbereitungszeit
 
-### 2. Swimlanes (Verantwortungsbereiche)
+### 2. KI-Generierung und Datenschutz
 
-Swimlanes gliedern das Diagramm in Zust\u00e4ndigkeitsbereiche verschiedener Rollen oder Abteilungen.
+1. Google-Gemini-API-Key in den **Einstellungen** (Zahnrad im Header) hinterlegen.
+2. Prozess im Feld „KI-Assistent“ beschreiben und **„Diagramm generieren“** klicken.
+3. Vor der ersten Nutzung erscheint ein **Datenschutzhinweis**, der bestätigt werden muss.
 
-1. Element **„Swimlane"** aus der Seitenleiste auf die Arbeitsfl\u00e4che ziehen.
-2. Doppelklick \u00f6ffnet den Bearbeitungsdialog: Bezeichnung und Farbakzent frei w\u00e4hlbar.
-3. Mehrere Lanes untereinander anordnen \u2013 jede Lane steht f\u00fcr einen Verantwortungsbereich.
-4. Prozessschritte innerhalb der zust\u00e4ndigen Lane ablegen und wie gewohnt verbinden.
-5. Verbindungen, die eine Lanegrenze kreuzen, zeigen \u00dcbergaben zwischen Rollen.
+> **Wichtig:** Im kostenlosen Kontingent von Google AI Studio darf Google Eingaben und Antworten zur Verbesserung seiner Dienste verwenden. Keine personenbezogenen Daten (z. B. Namen von Teilnehmenden) und keine vertraulichen Informationen eingeben. Für vertrauliche Inhalte ein kostenpflichtiges Kontingent nutzen und vorher mit der bzw. dem Datenschutzbeauftragten abstimmen.
 
-Hinweis: Zwei fertige Swimlane-Vorlagen sind direkt \u00fcber **„Vorlagen"** abrufbar.
+Der API-Key wird nur lokal im Browser gespeichert und ausschließlich im Request-Header an die Gemini API übertragen. Die verwendeten Modelle sind zentral in `vhs-flowchart-editor/src/ai/config.js` konfiguriert.
 
-### 3. Prozess-Check verwenden
+### 3. Bearbeiten, Anordnen und Ausrichten
 
-In der rechten Seitenleiste unter **"Prozess-Check"** gibt es zwei Ebenen:
+- **Mehrere Elemente auswählen**: `Strg` oder `Umschalt` gedrückt halten und Elemente anklicken – oder auf freier Fläche mit gedrückter `Umschalt`-Taste einen Rahmen ziehen. Ausgewählte Elemente werden gemeinsam verschoben, kopiert oder gelöscht.
+- **Kopieren & Einfügen**: `Strg + C` / `Strg + V` (funktioniert auch zwischen zwei Diagrammen), `Strg + D` dupliziert die Auswahl. Verbindungen zwischen den ausgewählten Elementen werden mitkopiert.
+- **Menü „Anordnen“** in der unteren Leiste:
+  - *Automatisch anordnen* räumt das ganze Diagramm auf (von oben nach unten oder von links nach rechts). Bei Swimlanes bleibt jeder Schritt in seiner Lane.
+  - *Ausrichten* (links, mittig, rechts, oben, unten) ab zwei ausgewählten Elementen.
+  - *Gleichmäßig verteilen* ab drei ausgewählten Elementen.
 
-- **Automatische Pruefung**:
-  Erkennt typische Probleme wie fehlenden Start- oder Endknoten, isolierte Elemente, Sackgassen und unvollstaendige Entscheidungen.
-- **Selbstbewertung**:
-  Bewertet den Prozess mit `0` bis `3` Punkten in diesen fuenf Feldern:
-  - Klarheit
-  - Medienbruch
-  - Risiko
-  - Teilnehmendenorientierung
-  - Verantwortlichkeit
+Alle Aktionen lassen sich mit `Strg + Z` rückgängig machen.
 
-Hinweis: Ein Klick auf eine Meldung mit Knotenzug zeigt die betroffene Stelle direkt im Diagramm an.
+### 4. Swimlanes (Verantwortungsbereiche)
 
-### 4. Massnahmen dokumentieren
+Swimlanes gliedern das Diagramm in Zuständigkeitsbereiche verschiedener Rollen oder Abteilungen.
 
-Unter **"Massnahmen"** in der rechten Seitenleiste lassen sich Verbesserungen strukturiert festhalten:
+1. Element **„Swimlane“** aus der Seitenleiste auf die Arbeitsfläche ziehen.
+2. Doppelklick öffnet den Bearbeitungsdialog: Bezeichnung und Farbakzent frei wählbar.
+3. Mehrere Lanes untereinander anordnen – jede Lane steht für einen Verantwortungsbereich.
+4. Prozessschritte innerhalb der zuständigen Lane ablegen und wie gewohnt verbinden.
+5. Verbindungen, die eine Lanegrenze kreuzen, zeigen Übergaben zwischen Rollen.
 
-- Massnahme benennen
-- Bezugsknoten auswaehlen
-- Verantwortliche Person erfassen
-- Prioritaet und Status pflegen
-- Zieltermin setzen
+Hinweis: Zwei fertige Swimlane-Vorlagen sind direkt über **„Vorlagen“** abrufbar.
 
-Die Liste kann anschliessend als **CSV** exportiert werden, zum Beispiel fuer Excel oder andere Nachverfolgungslisten.
+### 5. Prozess-Check verwenden
 
-### 5. Versionsverlauf
+In der rechten Seitenleiste unter **„Prozess-Check“** gibt es zwei Ebenen:
 
-Bei jedem Speichern wird automatisch ein Snapshot des Diagramms angelegt.
+- **Automatische Prüfung**: Erkennt typische Probleme wie fehlenden Start- oder Endknoten, isolierte Elemente, Sackgassen und unvollständige Entscheidungen.
+- **Selbstbewertung**: Bewertet den Prozess mit `0` bis `3` Punkten in den Feldern Klarheit, Medienbruch, Risiko, Teilnehmendenorientierung und Verantwortlichkeit.
 
-- Button **„Versionen"** in der unteren Leiste \u00f6ffnet die Versionshistorie.
-- Fr\u00fchere Zust\u00e4nde k\u00f6nnen angezeigt und wiederhergestellt werden.
-- Verf\u00fcgbar sobald ein Diagramm gespeichert wurde.
+Ein Klick auf eine Meldung mit Knotenbezug zeigt die betroffene Stelle direkt im Diagramm an.
 
-### 6. Exporte
+### 6. Maßnahmen dokumentieren
 
-\u00dcber die Buttons in der unteren Leiste stehen folgende Exporte bereit:
+Unter **„Maßnahmen“** in der rechten Seitenleiste lassen sich Verbesserungen strukturiert festhalten (Bezugsknoten, Verantwortliche, Priorität, Status, Zieltermin). Die Liste kann als **CSV** exportiert werden, z. B. für Excel.
+
+### 7. Speichern, Autosave und Versionen
+
+- **Speichern** über den Button in der unteren Leiste oder mit `Strg + S`.
+- Neben dem Button zeigt ein **Status** an, ob alle Änderungen gespeichert sind oder nur als Entwurf gesichert wurden.
+- Ungespeicherte Änderungen werden nach kurzer Zeit automatisch als **Entwurf** gesichert. Beim nächsten Öffnen bietet die App an, den Entwurf wiederherzustellen.
+- Bei jedem Speichern entsteht automatisch eine **Version** (max. 10 pro Diagramm), abrufbar über **„Versionen“**. Zu jeder Version lässt sich eine Notiz hinterlegen.
+- **Versionen vergleichen**: In der Versionshistorie eine Version mit dem aktuellen Stand vergleichen (Vergleichssymbol) oder zwei Versionen ankreuzen und „Auswahl vergleichen“ wählen. Neue Elemente sind grün, geänderte gelb und entfernte rot gestrichelt markiert; rechts steht die Liste der Änderungen.
+
+### 8. Import & Backup
+
+Alle Diagramme liegen nur im Browser. **Werden die Browserdaten gelöscht, sind auch die Diagramme weg.** Deshalb:
+
+- **„Öffnen“ → „Backup erstellen“** sichert alle Diagramme samt Versionen in eine JSON-Datei.
+- **„Öffnen“ → „Importieren“** liest eine Projektdatei (einzelnes Diagramm) oder ein Backup ein. Dateien werden vor dem Import geprüft; fehlerhafte Dateien werden mit einer verständlichen Meldung abgelehnt.
+
+### 9. Exporte
+
+Über die Buttons in der unteren Leiste:
 
 - **PNG / SVG**: Bilddatei des Diagramms mit vhs-Branding.
 - **PDF**: Druckoptimiertes Diagramm als PDF.
-- **JSON (Projektdatei)**: Vollst\u00e4ndiges Diagramm inkl. Metadaten, Bewertungen und Ma\u00dfnahmen.
-- **PDF-Qualit\u00e4tsbericht** (aus dem Prozess-Check): 2-seitiger vhs-Bericht mit Deckblatt, Befunden, Scores und Ma\u00dfnahmen.
-- **Ma\u00dfnahmen-CSV** (aus dem Prozess-Check): F\u00fcr Aufgabenlisten und Nachverfolgung.
+- **JSON (Projektdatei)**: Vollständiges Diagramm inkl. Metadaten, Bewertungen und Maßnahmen.
+- **Beschreibung (Word / Markdown)**: Verfahrensanweisung mit nummerierten Schritten, Entscheidungszweigen, Zuständigkeiten aus den Swimlanes, Hinweisen aus Kommentaren und Rollenübersicht – für Handbuch, Einarbeitung oder Intranet.
+- **PDF-Qualitätsbericht** (aus dem Prozess-Check): 2-seitiger vhs-Bericht.
+- **Maßnahmen-CSV** (aus dem Prozess-Check): Für Aufgabenlisten und Nachverfolgung.
 
-### 7. Tastenkombinationen
+### 10. Tastenkombinationen
 
 | Tastenkombination | Funktion |
 |---|---|
-| `Strg + Z` | R\u00fckg\u00e4ngig |
+| `Strg + S` | Speichern |
+| `Strg + Z` | Rückgängig |
 | `Strg + Y` / `Strg + Umschalt + Z` | Wiederholen |
-| `Entf` / `Backspace` | Ausgew\u00e4hltes Element l\u00f6schen |
+| `Entf` / `Rücktaste` | Auswahl löschen |
+| `Strg` / `Umschalt` + Klick | Element zur Auswahl hinzufügen oder entfernen |
+| `Umschalt` + Ziehen (freie Fläche) | Rahmenauswahl |
+| `Strg + A` | Alles auswählen |
+| `Strg + C` / `Strg + V` | Kopieren / Einfügen |
+| `Strg + D` | Duplizieren |
+| Pfeiltasten | Auswahl verschieben (mit `Umschalt` in kleinen Schritten) |
 | `Strg + Mausrad` | Zoom |
 | `Strg + +` / `Strg + -` | Zoom rein / raus |
-| `Strg + 0` | Zoom zur\u00fccksetzen |
+| `Strg + 0` | Zoom zurücksetzen |
+| `Esc` | Dialog schließen bzw. Auswahl aufheben |
 | Doppelklick | Text bearbeiten |
+
+### Barrierefreiheit
+
+Dialoge, Menüs und die Elementleiste sind per Tastatur bedienbar (Fokusführung, `Esc`, `Tab`), Icon-Buttons haben Beschriftungen für Screenreader, und Statusmeldungen werden angesagt. Elemente lassen sich per Tastatur einfügen, auswählen (`Strg + A`), verschieben (Pfeiltasten), kopieren und anordnen. Das Verbinden von Elementen erfordert weiterhin eine Maus – das ist bei grafischen Diagrammeditoren technisch bedingt.
 
 ---
 
@@ -106,40 +138,58 @@ Bei jedem Speichern wird automatisch ein Snapshot des Diagramms angelegt.
 - Frontend: React 19 + Vite
 - Styling: Tailwind CSS v4
 - Diagramm-Engine: JointJS + Dagre.js
-- Storage: IndexedDB (Diagramme + Versionen)
-- Export: jsPDF, SVG, PNG, JSON, CSV
+- Storage: IndexedDB (Diagramme, Versionen, Autosave-Entwürfe)
+- Export: jsPDF und docx (bei Bedarf nachgeladen), SVG, PNG, JSON, CSV, Markdown
+- Qualitätssicherung: Vitest, ESLint, TypeScript-Prüfung (JSDoc), GitHub Actions
+
+## Entwicklung
+
+Alle Befehle im Ordner `vhs-flowchart-editor/` (Node.js ≥ 20):
+
+```bash
+npm install        # Abhängigkeiten installieren
+npm run dev        # Entwicklungsserver
+npm run check      # Lint + Typprüfung + Tests
+npm run build      # Produktions-Build nach dist/
+npm run preview    # Build lokal testen (mit denselben Sicherheits-Headern wie auf Vercel)
+```
+
+Details zu Architektur und Datenformat: [docs/Technische_Spezifikationen.md](docs/Technische_Spezifikationen.md).
+
+**Versionierung:** Die Versionsnummer folgt [Semantic Versioning](https://semver.org/lang/de/) und steht in `vhs-flowchart-editor/package.json`. Sie wird in den Einstellungen und in der Anleitung angezeigt. Jede Änderung wird in [CHANGELOG.md](CHANGELOG.md) dokumentiert.
+
+**Continuous Integration:** Bei jedem Push und Pull Request auf GitHub laufen Lint, Typprüfung, Tests und Build (`.github/workflows/ci.yml`). Der Vercel-Build führt dieselben Prüfungen aus (`npm run check`) – schlägt ein Test fehl, wird nicht deployt.
 
 ---
 
 ## Weitergabe und Hosting
 
-Wenn du die Software an Kolleginnen und Kollegen weitergeben moechtest, gibt es drei praktikable Wege:
-
 ### 1. Als Web-App
 
-1. Die Datei `build.bat` im Hauptverzeichnis ausfuehren.
+1. Die Datei `build.bat` im Hauptverzeichnis ausführen.
 2. Warten, bis der Build abgeschlossen ist.
 3. Den Inhalt von `vhs-flowchart-editor/dist/` auf einen statischen Webserver hochladen.
 
-Geeignet fuer Intranet, GitHub Pages oder allgemeinen Webspace.
+Geeignet für Intranet, GitHub Pages oder allgemeinen Webspace.
 
 ### 2. Intranet-Hosting
 
-1. `npm run build` ausfuehren.
+1. `npm run build` ausführen.
 2. Den Inhalt von `dist/` auf den internen Webserver kopieren.
 3. Eine interne URL wie `workflow.vhs.local` auf diesen Server zeigen lassen.
 
 ### 3. Hosting auf Vercel (öffentlich, kostenlos)
 
-Vercel ist ein kostenloser Hosting-Dienst, der sich für dieses Projekt besonders eignet, weil es keine Server-Komponente gibt. Der Build läuft automatisch bei jedem Git-Push.
+Vercel eignet sich besonders, weil es keine Server-Komponente gibt. Der Build läuft automatisch bei jedem Git-Push.
 
 **Voraussetzungen:**
+
 - Projekt liegt auf GitHub (oder GitLab / Bitbucket)
 - Kostenloses Vercel-Konto unter [vercel.com](https://vercel.com)
 
 **Einmalige Einrichtung:**
 
-1. Auf [vercel.com/new](https://vercel.com/new) einloggen und „Import Git Repository" wählen.
+1. Auf [vercel.com/new](https://vercel.com/new) einloggen und „Import Git Repository“ wählen.
 2. Das GitHub-Repo auswählen und auf **Deploy** klicken.
 3. Vercel erkennt `vercel.json` automatisch – kein manuelles Konfigurieren nötig.
 4. Nach wenigen Sekunden ist die App unter einer `*.vercel.app`-URL erreichbar.
@@ -150,33 +200,31 @@ Vercel ist ein kostenloser Hosting-Dienst, der sich für dieses Projekt besonder
 npx vercel --prod
 ```
 
-**Automatische Updates:**
-
-Ab sofort löst jeder `git push` auf den `master`-Branch automatisch einen neuen Build und Deploy auf Vercel aus.
+Jeder `git push` auf den `master`-Branch löst einen neuen Build aus. Der Build bricht ab, wenn Lint, Typprüfung oder Tests fehlschlagen.
 
 **Enthaltene Sicherheits-Header (via `vercel.json`):**
 
 | Header | Schutz gegen |
 |---|---|
-| Content-Security-Policy | XSS, unerlaubte externe Ressourcen |
+| Content-Security-Policy | XSS, unerlaubte externe Ressourcen (Skripte nur von der eigenen Domain, kein `eval`) |
 | X-Frame-Options: DENY | Clickjacking |
 | X-Content-Type-Options: nosniff | MIME-Sniffing |
 | Referrer-Policy | Datenlecks über Referer-Header |
 | Permissions-Policy | Kamera, Mikrofon, Geolocation gesperrt |
 
-> **Hinweis zum API-Key:** Der Google-Gemini-API-Key wird weiterhin lokal im Browser gespeichert und nicht an Vercel oder andere Server übertragen.
+> **Hinweis zum API-Key:** Der Google-Gemini-API-Key wird lokal im Browser gespeichert und nur an die Gemini API übertragen, nicht an Vercel oder andere Server.
 
 ### 4. Als ZIP-Archiv
 
 - Den gesamten Projektordner als `.zip` weitergeben.
 - Voraussetzung: Node.js ist auf dem Zielrechner installiert.
-- Start ueber `start.bat`.
+- Einmalig `install.bat`, danach Start über `start.bat` (im Ordner `vhs-flowchart-editor`).
 
-### Beispiel fuer Ubuntu/Nginx
+### Beispiel für Ubuntu/Nginx
 
 1. Build lokal erstellen.
 2. Inhalt von `dist/` nach `/var/www/workflow-editor` kopieren.
-3. Nginx fuer den Ordner konfigurieren:
+3. Nginx für den Ordner konfigurieren:
 
 ```nginx
 server {
@@ -192,9 +240,11 @@ server {
 
 4. Site aktivieren und Nginx neu starten.
 
+Bei eigenem Hosting die Sicherheits-Header aus `vercel.json` (insbesondere die Content-Security-Policy) ebenfalls im Webserver setzen.
+
 ## Lizenz
 
 MIT License – siehe [LICENSE](LICENSE).
 
 ---
-Erstellt fuer die vhs im Rahmen der Prozess-Digitalisierung 2026.
+Erstellt für die vhs im Rahmen der Prozess-Digitalisierung 2026.
