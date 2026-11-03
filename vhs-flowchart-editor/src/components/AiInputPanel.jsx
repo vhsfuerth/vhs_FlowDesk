@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { generateFlowchartFromText } from '../ai/gemini-client';
+import { describeAiError, generateFlowchartFromText } from '../ai/gemini-client';
 import { getApiKey } from '../storage/settings';
 import { useAiConsent } from '../hooks/useAiConsent';
-import { Sparkles, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sparkles, Loader2, ChevronDown, ChevronUp, Wand2 } from 'lucide-react';
 
-const AiInputPanel = ({ onBeforeGenerate, onDiagramGenerated, onError }) => {
+const AiInputPanel = ({ onOpenCopilot, onBeforeGenerate, onDiagramGenerated, onError }) => {
   const [text, setText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -35,16 +35,7 @@ const AiInputPanel = ({ onBeforeGenerate, onDiagramGenerated, onError }) => {
       }
     } catch (error) {
        console.error(error);
-       const msg = error.message || '';
-       const ERROR_MAP = {
-         API_KEY_INVALID: 'Der API-Key ist ungültig oder abgelaufen.',
-         API_KEY_MISSING: 'API-Key fehlt. Bitte in den Einstellungen hinterlegen.',
-         RATE_LIMIT: 'Anfragelimit bei Google Gemini erreicht. Bitte kurz warten.',
-         INVALID_JSON_RESPONSE: 'Die KI-Antwort konnte nicht als Diagramm interpretiert werden.'
-       };
-
-       const matchedKey = Object.keys(ERROR_MAP).find((key) => msg.includes(key));
-       onError(matchedKey ? ERROR_MAP[matchedKey] : msg);
+       onError(describeAiError(error));
     } finally {
       setIsGenerating(false);
     }
@@ -94,21 +85,31 @@ const AiInputPanel = ({ onBeforeGenerate, onDiagramGenerated, onError }) => {
               disabled={isGenerating}
             />
           </div>
-          <div className="flex items-center shrink-0 self-end md:self-center pt-4 md:pt-0">
+          <div className="flex flex-col sm:flex-row items-stretch gap-2 shrink-0 self-end md:self-center pt-4 md:pt-0">
+            <button
+              onClick={() => onOpenCopilot?.(text)}
+              disabled={isGenerating}
+              title="Geführt: Die KI analysiert die Beschreibung, stellt bei Lücken Rückfragen und zeigt das Ergebnis vor der Übernahme."
+              className="bg-[var(--color-vhs-blau)] text-white px-5 py-2 rounded-md font-bold hover:bg-[var(--color-vhs-blau-80)] transition-colors flex items-center justify-center min-w-[200px] shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed group text-sm"
+            >
+              <Sparkles className="w-4 h-4 mr-2 text-[var(--color-vhs-gelb)] group-hover:scale-110 transition-transform" aria-hidden="true" />
+              Mit KI-Copilot erstellen
+            </button>
             <button
               onClick={handleGenerate}
               disabled={isGenerating || text.trim().length < 10}
-              className="bg-[var(--color-vhs-blau)] text-white px-5 py-2 rounded-md font-bold hover:bg-[var(--color-vhs-blau-80)] transition-colors flex items-center justify-center min-w-[200px] shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed group text-sm"
+              title="Ohne Rückfragen und Vorschau direkt ein Diagramm erzeugen"
+              className="bg-white text-[var(--color-vhs-blau)] border border-[var(--color-vhs-blau)] px-4 py-2 rounded-md font-medium hover:bg-[var(--color-vhs-blau-10)] transition-colors flex items-center justify-center shadow-sm disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               {isGenerating ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />
                   Generiere...
                 </>
               ) : (
                 <>
-                   <Sparkles className="w-4 h-4 mr-2 text-[var(--color-vhs-gelb)] group-hover:scale-110 transition-transform" />
-                   Diagramm generieren
+                  <Wand2 className="w-4 h-4 mr-2" aria-hidden="true" />
+                  Direkt erzeugen
                 </>
               )}
             </button>

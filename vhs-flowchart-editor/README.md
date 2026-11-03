@@ -21,7 +21,7 @@ npm run preview      # Build lokal testen – mit den Sicherheits-Headern aus ..
 
 ```
 src/
-├── ai/            Gemini-Client, Modellkonfiguration (config.js), Prompts
+├── ai/            Gemini-Client, Modellkonfiguration (config.js), Prompts, copilot/ (KI-Copilot)
 ├── analysis/      Strukturprüfung, Selbstbewertung, Versionsvergleich
 ├── components/    React-Komponenten (Canvas, Leisten, Dialoge)
 ├── data/          Starter-Vorlagen

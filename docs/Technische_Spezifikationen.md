@@ -14,7 +14,7 @@ Die Anwendung ist **kein BPMN-Tool**. Nicht enthalten sind Workflow-Automatisier
 
 ### Aktueller Status
 
-Version 1.1.0 (siehe [CHANGELOG.md](../CHANGELOG.md)). Editor mit Mehrfachauswahl und automatischem Anordnen, KI-Integration via Google Gemini, lokale Speicherung mit Autosave, Versionen und Versionsvergleich, Import/Backup sowie Exporte inkl. Prozessbeschreibung sind umgesetzt und durch automatisierte Tests abgesichert.
+Version 1.2.0 (siehe [CHANGELOG.md](../CHANGELOG.md)). Editor mit Mehrfachauswahl und automatischem Anordnen, KI-Copilot via Google Gemini (Analyse, Rückfragen, Prüfansicht), lokale Speicherung mit Autosave, Versionen und Versionsvergleich, Import/Backup sowie Exporte inkl. Prozessbeschreibung sind umgesetzt und durch automatisierte Tests abgesichert.
 
 ---
 
@@ -23,7 +23,7 @@ Version 1.1.0 (siehe [CHANGELOG.md](../CHANGELOG.md)). Editor mit Mehrfachauswah
 | Funktion | Technische Umsetzung |
 |----------|----------------------|
 | **Visueller Editor** | JointJS mit vhs-spezifischen Shapes (`vhs.Start`, `vhs.End`, `vhs.Process`, `vhs.Decision`, `vhs.Annotation`, `vhs.Lane`). |
-| **KI-Generierung** | Freitext → Google Gemini API → strukturiertes JSON → Dagre-Layout → JointJS-Diagramm. |
+| **KI-Copilot** | Freitext → Gemini-Analyse → Prozessmodell (Schritte, Entscheidungen, Rollen, Rückfragen) → optionale Rückfragen → Prüfansicht → lokale Umwandlung inkl. Swimlanes und Layout → JointJS-Diagramm. „Direkt erzeugen“: Freitext → Gemini → `{ nodes, edges }`. |
 | **Manueller Modus** | Drag & Drop oder Klick in der Elementleiste, Verbindung via Ports (sichtbar bei Hover). |
 | **Bearbeiten** | Mehrfachauswahl (Strg/Umschalt + Klick, Rahmen), gemeinsames Verschieben, Kopieren/Einfügen/Duplizieren, Pfeiltasten, automatisches Anordnen (Swimlane-bewusst), Ausrichten und Verteilen. |
 | **Text-Bearbeitung** | Doppelklick auf Elemente oder Linien; automatische Größenanpassung. |
@@ -90,10 +90,11 @@ Kanonisches Diagrammformat (Typen in `src/diagram/types.js`):
 
 ### 3.5 KI-Integration (Gemini)
 
-- **Modelle**: zentral in `src/ai/config.js`. Bei HTTP 404 (Modell nicht verfügbar) wird das nächste Modell probiert, andere Fehler brechen mit deutscher Meldung ab.
+- **Modelle**: zentral in `src/ai/config.js`. Bei HTTP 404 (Modell nicht verfügbar) und 503 (Modell überlastet) wird das nächste Modell probiert, andere Fehler brechen mit deutscher Meldung ab.
 - **API-Key**: lokal im Browser gespeichert; Übertragung ausschließlich im Header `x-goog-api-key`.
 - **Datenschutz**: Vor der ersten KI-Nutzung muss ein Hinweis bestätigt werden (`AiPrivacyNotice.jsx`). Im kostenlosen Kontingent darf Google Ein- und Ausgaben zur Verbesserung seiner Dienste nutzen; personenbezogene und vertrauliche Daten dürfen daher nicht eingegeben werden.
-- **Robustheit**: Zeitlimit 30 s pro Anfrage; KI-Antworten werden geprüft (fehlender Start wird ergänzt, ungültige Verbindungen entfernt).
+- **Robustheit**: Zeitlimit 30 s pro Anfrage (Copilot 60 s), abbrechbar; KI-Antworten werden geprüft (fehlender Start wird ergänzt, ungültige Verbindungen entfernt).
+- **KI-Copilot** (`src/ai/copilot/`): Die KI liefert kein Diagramm, sondern ein Prozessmodell nach festem Antwortschema (`responseSchema`; bei HTTP 400 einmal ohne Schema wiederholt). Jeder Schritt muss seine Übergänge (`transitions: [{ label, to }]`) angeben; der Prompt enthält ein Beispiel. `process-model.js` normalisiert jede Antwort tolerant (Typ-Aliasse, eindeutige IDs, explizite Nachfolger, Fragen als Entscheidungen, fehlender Zweig zum sonst unverbundenen Schritt, Begrenzung auf 40 Schritte/5 Rückfragen) und meldet Korrekturen für Nutzende (`warnings`) sowie strukturelle Mängel (`issues`). Bei `issues` bittet `copilot-client.js` die KI einmalig mit der Fehlerliste um Korrektur und übernimmt das Ergebnis nur, wenn es weniger Mängel hat. `model-to-diagram.js` erzeugt daraus lokal Start, Ende, Verbindungen, Swimlanes je Rolle und das Layout; Hinweise werden als Randkommentare neben den Ablauf gesetzt. Varianten (`variants.js`) steuern nur die Formulierung. Der Dialogzustand ist ein Reducer (`state/copilotState.js`).
 
 ### 3.6 Bearbeiten und automatisches Anordnen
 
@@ -152,7 +153,7 @@ Orientierung an WCAG 2.1 AA, soweit mit einem grafischen Editor sinnvoll: Dialog
 
 ## 5. Qualitätssicherung
 
-- **Tests** (`npm test`): Konverter (verlustfreie Hin- und Rückumwandlung, alle Vorlagen), automatisches Anordnen (inkl. Swimlanes), Zwischenablage, Ausrichten/Verteilen, Undo/Redo, Prozessbeschreibung (Reihenfolge, Verzweigungen, Schleifen, Lanes, Word-Datei), Versionsvergleich, Prüfregeln, Datenformat und Migration, Import/Backup, Autosave-Logik, KI-Client (Header statt URL-Parameter, Modell-Fallback, Fehlermeldungen), IndexedDB-Zugriff (gegen `fake-indexeddb`: Versionsgrenze, Löschen samt Versionen/Entwürfen, Migration beim Lesen).
+- **Tests** (`npm test`): Konverter (verlustfreie Hin- und Rückumwandlung, alle Vorlagen), automatisches Anordnen (inkl. Swimlanes), Zwischenablage, Ausrichten/Verteilen, Undo/Redo, Prozessbeschreibung (Reihenfolge, Verzweigungen, Schleifen, Lanes, Word-Datei), Versionsvergleich, Prüfregeln, Datenformat und Migration, Import/Backup, Autosave-Logik, KI-Client (Header statt URL-Parameter, Modell-Fallback, Fehlermeldungen, Antwortschema, Abbruch), KI-Copilot (Normalisierung fehlerhafter Antworten, Umwandlung inkl. Lanes und überschneidungsfreier Kommentare, Bearbeitung, Reducer, kompletter Dialogablauf), IndexedDB-Zugriff (gegen `fake-indexeddb`: Versionsgrenze, Löschen samt Versionen/Entwürfen, Migration beim Lesen).
 - **Komponententests** (Testing Library, im selben `npm test`): Bestätigungsdialog (Ergebnis, Escape, Fokusführung), Diagrammliste (Öffnen, Löschen, Import von Projektdatei/Diagramm/Backup, Fehlermeldungen, Backup erstellen), Versionshistorie (Wiederherstellen, Notizen, Löschen, Vergleichsauswahl) und Autosave-Hook. Gemeinsame Hilfen liegen in `src/test/`.
 - **Typprüfung** (`npm run typecheck`): JSDoc-typisierte Module, schrittweise erweiterbar über `jsconfig.json`.
 - **CI**: GitHub Actions bei jedem Push und Pull Request; der Vercel-Build führt `npm run check` aus und bricht bei Fehlern ab.

@@ -6,7 +6,7 @@ Aktuelle Version und Änderungen: siehe [CHANGELOG.md](CHANGELOG.md).
 
 ## Hauptfunktionen
 
-- **KI-Diagramm-Generierung**: Erzeugt Diagramme direkt aus einer Prozessbeschreibung per Google Gemini API.
+- **KI-Copilot**: Analysiert eine Prozessbeschreibung per Google Gemini API, stellt bei Lücken Rückfragen und zeigt das Ergebnis mit Vorschau zur Prüfung, bevor das Diagramm (auf Wunsch mit Swimlanes) entsteht. Alternativ „Direkt erzeugen“ ohne Rückfragen.
 - **Visueller Editor**: Diagrammeditor mit JointJS – Elemente per Drag & Drop oder Klick hinzufügen, Mehrfachauswahl, Kopieren/Einfügen, automatisches Anordnen, Ausrichten und Verteilen.
 - **Swimlanes (Verantwortungsbereiche)**: Visuelle Abgrenzung von Rollen und Zuständigkeiten direkt im Diagramm.
 - **vhs-Starter-Vorlagen**: Sofort nutzbare Vorlagen für typische vhs-Prozesse wie Kursplanung, Dozierenden-Onboarding, Beschwerdebearbeitung oder Raumbuchung.
@@ -38,8 +38,13 @@ Sinnvoll für:
 ### 2. KI-Generierung und Datenschutz
 
 1. Google-Gemini-API-Key in den **Einstellungen** (Zahnrad im Header) hinterlegen.
-2. Prozess im Feld „KI-Assistent“ beschreiben und **„Diagramm generieren“** klicken.
-3. Vor der ersten Nutzung erscheint ein **Datenschutzhinweis**, der bestätigt werden muss.
+2. Prozess im Feld „KI-Assistent“ beschreiben und **„Mit KI-Copilot erstellen“** klicken.
+3. Formulierung wählen (kompakt, fachlich präzise, bürgernah, Schulung) und **„Prozess analysieren“**.
+4. Rückfragen beantworten oder überspringen, dann die erkannten Schritte prüfen und bei Bedarf korrigieren.
+5. **„Diagramm übernehmen“** öffnet das Ergebnis als neues Diagramm, das anschließend gespeichert wird.
+6. Vor der ersten Nutzung erscheint ein **Datenschutzhinweis**, der bestätigt werden muss.
+
+**„Direkt erzeugen“** erstellt wie bisher ohne Rückfragen sofort ein Diagramm.
 
 > **Wichtig:** Im kostenlosen Kontingent von Google AI Studio darf Google Eingaben und Antworten zur Verbesserung seiner Dienste verwenden. Keine personenbezogenen Daten (z. B. Namen von Teilnehmenden) und keine vertraulichen Informationen eingeben. Für vertrauliche Inhalte ein kostenpflichtiges Kontingent nutzen und vorher mit der bzw. dem Datenschutzbeauftragten abstimmen.
 

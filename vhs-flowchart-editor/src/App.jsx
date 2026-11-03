@@ -23,6 +23,7 @@ const DiagramListModal = lazy(() => import('./components/DiagramListModal'));
 const TemplateModal = lazy(() => import('./components/TemplateModal'));
 const GuideModal = lazy(() => import('./components/GuideModal'));
 const VersionHistoryModal = lazy(() => import('./components/VersionHistoryModal'));
+const CopilotDialog = lazy(() => import('./components/copilot/CopilotDialog'));
 
 const EMPTY_DIAGRAM = { nodes: [], edges: [] };
 
@@ -41,6 +42,7 @@ function App() {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
   const [selectionCount, setSelectionCount] = useState(0);
+  const [copilotText, setCopilotText] = useState('');
 
   const diagramCanvasRef = useRef(null);
   const resizeStateRef = useRef({ isActive: false, startX: 0, startWidth: initialUiState.qualityPanelWidth });
@@ -451,6 +453,28 @@ function App() {
     showNotification(`Vorlage "${template.name}" geladen`, 'success');
   };
 
+  const handleOpenCopilot = (text = '') => {
+    setCopilotText(text);
+    openModal(MODALS.COPILOT);
+  };
+
+  // Ergebnis des KI-Copilots als neues, ungespeichertes Diagramm öffnen
+  const handleCopilotApply = async ({ diagram, title }) => {
+    if (!(await confirmLeave())) return;
+    const now = new Date().toISOString();
+    openRecord({
+      id: generateUUID(),
+      name: title || 'KI-Prozess',
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      createdAt: now,
+      updatedAt: now,
+      diagram,
+      metadata: getDefaultMetadata()
+    }, { unsaved: true });
+    closeModal();
+    showNotification(`„${title}“ erstellt – bitte prüfen und speichern.`, 'success');
+  };
+
   const handleFocusNode = (nodeId) => {
     diagramCanvasRef.current?.focusNode(nodeId);
   };
@@ -562,6 +586,7 @@ function App() {
       />
 
       <AiInputPanel
+        onOpenCopilot={handleOpenCopilot}
         onBeforeGenerate={confirmLeave}
         onDiagramGenerated={handleAIGenerated}
         onError={(msg) => showNotification(msg, 'error')}
@@ -648,6 +673,13 @@ function App() {
             diagramId={currentDiagram.id}
             onRestore={handleVersionRestore}
             currentDiagram={liveDiagramData}
+          />
+        )}
+        {ui.openModal === MODALS.COPILOT && (
+          <CopilotDialog
+            initialText={copilotText}
+            onClose={closeModal}
+            onApply={handleCopilotApply}
           />
         )}
       </Suspense>

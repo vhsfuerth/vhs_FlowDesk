@@ -23,6 +23,12 @@
     "src/diagram/converter.js",
     "src/storage/indexeddb.js",
     "src/analysis/diagram-validation.js",
+    "src/diagram/node-size.js",
+    "src/ai/copilot/variants.js",
+    "src/ai/copilot/process-model.js",
+    "src/ai/copilot/model-to-diagram.js",
+    "src/ai/copilot/prompts.js",
+    "src/state/copilotState.js",
     "src/vite-env.d.ts"
   ]
 }

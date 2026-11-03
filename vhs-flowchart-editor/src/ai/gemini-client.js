@@ -25,11 +25,28 @@ const buildHeaders = (apiKey) => ({
     'x-goog-api-key': apiKey
 });
 
-async function callGeminiApi(modelName, apiKey, prompt, userText) {
+/**
+ * Fehler, wenn der Nutzer eine laufende KI-Anfrage abbricht.
+ */
+export const AI_ABORTED = 'AI_ABORTED';
+
+async function callGeminiApi(modelName, apiKey, prompt, userText, options = {}) {
     const url = `${GEMINI_API_BASE}/models/${modelName}:generateContent`;
+    const timeoutMs = options.timeoutMs || API_TIMEOUT_MS;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+    }, timeoutMs);
+    // Abbruch durch den Nutzer an die Anfrage weiterreichen
+    const abortFromOutside = () => controller.abort();
+    if (options.signal?.aborted) controller.abort();
+    options.signal?.addEventListener('abort', abortFromOutside);
+
+    const generationConfig = { responseMimeType: 'application/json', temperature: options.temperature ?? 0.2 };
+    if (options.responseSchema) generationConfig.responseSchema = options.responseSchema;
 
     try {
         return await fetch(url, {
@@ -38,31 +55,40 @@ async function callGeminiApi(modelName, apiKey, prompt, userText) {
             body: JSON.stringify({
                 systemInstruction: { parts: [{ text: prompt }] },
                 contents: [{ role: 'user', parts: [{ text: userText }] }],
-                generationConfig: { responseMimeType: 'application/json', temperature: 0.2 }
+                generationConfig
             }),
             signal: controller.signal
         });
     } catch (error) {
         if (error.name === 'AbortError') {
-            throw new Error(`Zeitüberschreitung: ${modelName} hat nicht innerhalb von ${API_TIMEOUT_MS / 1000}s geantwortet.`);
+            if (!timedOut) throw new Error(AI_ABORTED);
+            throw new Error(`Zeitüberschreitung: ${modelName} hat nicht innerhalb von ${timeoutMs / 1000}s geantwortet.`);
         }
         throw error;
     } finally {
         clearTimeout(timeoutId);
+        options.signal?.removeEventListener('abort', abortFromOutside);
     }
 }
 
-// Probiert die konfigurierten Modelle der Reihe nach durch. Nur ein 404
-// (Modell nicht verfügbar) führt zum nächsten Modell, alle anderen Fehler brechen ab.
-async function generateWithFallback(prompt, userText, parseResult) {
+// Probiert die konfigurierten Modelle der Reihe nach durch. 404 (Modell nicht verfügbar)
+// und 503 (Modell überlastet) führen zum nächsten Modell, alle anderen Fehler brechen ab.
+// Optionen: { responseSchema, timeoutMs, signal, temperature }. Lehnt die API das
+// Antwortschema ab (400), wird dieselbe Anfrage einmal ohne Schema wiederholt.
+export async function generateWithFallback(prompt, userText, parseResult, options = {}) {
     const apiKey = getApiKey();
     if (!apiKey) throw new Error('API_KEY_MISSING');
+    let overloaded = false;
 
     for (let i = 0; i < GEMINI_MODELS.length; i++) {
         const model = GEMINI_MODELS[i];
         if (i > 0) await delay(MODEL_FALLBACK_DELAY_MS);
 
-        const response = await callGeminiApi(model, apiKey, prompt, userText);
+        let response = await callGeminiApi(model, apiKey, prompt, userText, options);
+        if (response.status === 400 && options.responseSchema) {
+            console.warn(`Modell ${model} lehnt das Antwortschema ab, versuche ohne Schema…`);
+            response = await callGeminiApi(model, apiKey, prompt, userText, { ...options, responseSchema: undefined });
+        }
 
         if (response.ok) {
             const data = await response.json();
@@ -81,14 +107,37 @@ async function generateWithFallback(prompt, userText, parseResult) {
             console.warn(`Modell ${model} nicht verfügbar, versuche nächstes…`);
             continue;
         }
+        if (response.status === 503) {
+            console.warn(`Modell ${model} ist überlastet, versuche nächstes…`);
+            overloaded = true;
+            continue;
+        }
 
         const errorData = await response.json().catch(() => ({}));
         console.error(`Gemini API Error (${response.status}):`, errorData.error?.message || response.statusText);
         throw new Error(mapApiStatusToMessage(response.status));
     }
 
+    if (overloaded) {
+        throw new Error('Die KI-Modelle von Google sind gerade stark ausgelastet. Bitte in ein bis zwei Minuten erneut versuchen.');
+    }
     throw new Error('Kein kompatibles KI-Modell gefunden. Bitte die Modellliste in src/ai/config.js prüfen.');
 }
+
+const ERROR_MESSAGES = {
+    API_KEY_INVALID: 'Der API-Key ist ungültig oder abgelaufen.',
+    API_KEY_MISSING: 'API-Key fehlt. Bitte in den Einstellungen hinterlegen.',
+    RATE_LIMIT: 'Anfragelimit bei Google Gemini erreicht. Bitte kurz warten.',
+    INVALID_JSON_RESPONSE: 'Die KI-Antwort konnte nicht verarbeitet werden. Bitte versuchen Sie es erneut.',
+    [AI_ABORTED]: 'Die Anfrage wurde abgebrochen.'
+};
+
+/** Nutzerverständliche (deutsche) Meldung zu einem Fehler der KI-Anbindung. */
+export const describeAiError = (error) => {
+    const message = error?.message || '';
+    const key = Object.keys(ERROR_MESSAGES).find((code) => message.includes(code));
+    return key ? ERROR_MESSAGES[key] : (message || 'Bei der KI-Anfrage ist ein Fehler aufgetreten.');
+};
 
 export const generateFlowchartFromText = (text) => {
     const activePrompt = getCustomPrompt() || SYSTEM_PROMPT;

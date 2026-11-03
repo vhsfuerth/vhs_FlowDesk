@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, renderHook } from '@testing-library/react';
+import { act, cleanup, renderHook } from '@testing-library/react';
 import { useAutosave } from './useAutosave';
 import { indexeddb } from '../storage/indexeddb';
 import { SAVE_STATUS } from '../storage/autosave';
@@ -34,6 +34,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Erst aushängen: Beim Aushängen schreibt der Hook ausstehende Entwürfe – das muss
+  // noch die Attrappe treffen, nicht die echte IndexedDB nach Ende der Testumgebung.
+  cleanup();
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
