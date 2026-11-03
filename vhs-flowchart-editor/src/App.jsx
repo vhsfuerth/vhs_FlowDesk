@@ -1,81 +1,186 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import Header from './components/Header';
 import AiInputPanel from './components/AiInputPanel';
 import Toolbar from './components/Toolbar';
 import DiagramCanvas from './components/DiagramCanvas';
 import ExportBar from './components/ExportBar';
-import SettingsModal from './components/SettingsModal';
-import DiagramListModal from './components/DiagramListModal';
 import Notification from './components/Notification';
+import QualityPanel from './components/QualityPanel';
 import { indexeddb } from './storage/indexeddb';
 import { getLastDiagramId, setLastDiagramId } from './storage/settings';
+import { CURRENT_SCHEMA_VERSION } from './storage/schema';
+import { isDraftNewer } from './storage/autosave';
 import { generateUUID } from './utils/uuid';
-import TemplateModal from './components/TemplateModal';
-import GuideModal from './components/GuideModal';
-import QualityPanel from './components/QualityPanel';
-import VersionHistoryModal from './components/VersionHistoryModal';
-import { STARTER_TEMPLATES } from './data/templates';
 import { getDefaultMetadata, normalizeMetadata, validateDiagram } from './analysis/diagram-validation';
 import { exportMeasuresToCSV, exportToJSON } from './export/file-export';
+import { useConfirm } from './hooks/useConfirm';
+import { useAutosave } from './hooks/useAutosave';
+import { MODALS, initialUiState, uiReducer } from './state/uiState';
+
+// Dialoge werden erst beim ersten Öffnen nachgeladen
+const SettingsModal = lazy(() => import('./components/SettingsModal'));
+const DiagramListModal = lazy(() => import('./components/DiagramListModal'));
+const TemplateModal = lazy(() => import('./components/TemplateModal'));
+const GuideModal = lazy(() => import('./components/GuideModal'));
+const VersionHistoryModal = lazy(() => import('./components/VersionHistoryModal'));
+
+const EMPTY_DIAGRAM = { nodes: [], edges: [] };
+
+const countLabel = (count) => `${count} ${count === 1 ? 'Element' : 'Elemente'}`;
+
+const formatDateTime = (iso) => new Date(iso).toLocaleString('de-DE', {
+  day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+});
 
 function App() {
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
-  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
-  const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
-  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+  const [ui, dispatch] = useReducer(uiReducer, initialUiState);
   const [notification, setNotification] = useState({ isVisible: false, message: '', type: 'info' });
   const [currentDiagram, setCurrentDiagram] = useState(null);
-  const [diagramMetadata, setDiagramMetadata] = useState(getDefaultMetadata());
-  const [liveDiagramData, setLiveDiagramData] = useState({ nodes: [], edges: [] });
-  const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false);
-  const [isQualityPanelCollapsed, setIsQualityPanelCollapsed] = useState(false);
-  const [qualityPanelWidth, setQualityPanelWidth] = useState(460);
+  const [diagramMetadata, setDiagramMetadata] = useState(getDefaultMetadata);
+  const [liveDiagramData, setLiveDiagramData] = useState(EMPTY_DIAGRAM);
   const [zoomLevel, setZoomLevel] = useState(1);
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
+  const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
+  const [selectionCount, setSelectionCount] = useState(0);
 
   const diagramCanvasRef = useRef(null);
-  const resizeStateRef = useRef({ isActive: false, startX: 0, startWidth: 460 });
+  const resizeStateRef = useRef({ isActive: false, startX: 0, startWidth: initialUiState.qualityPanelWidth });
+  const notificationTimerRef = useRef(null);
+  const saveDiagramRef = useRef(null);
+  const graphChangeFrameRef = useRef(null);
 
-  const [pendingDiagram, setPendingDiagram] = useState(null);
+  const confirm = useConfirm();
+  const { status: saveStatus, isDirty, markClean, markUnsaved, cancelPendingDraft } = useAutosave({
+    record: currentDiagram,
+    diagram: liveDiagramData,
+    metadata: diagramMetadata
+  });
+
+  const showNotification = useCallback((message, type = 'info') => {
+    if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
+    setNotification({ isVisible: true, message, type });
+    const duration = Math.max(4000, Math.min(10000, message.length * 60));
+    notificationTimerRef.current = setTimeout(() => {
+      setNotification((prev) => ({ ...prev, isVisible: false }));
+    }, duration);
+  }, []);
+
+  const closeModal = useCallback(() => dispatch({ type: 'closeModal' }), []);
+  const openModal = (modal) => dispatch({ type: 'openModal', modal });
+
+  // Lädt einen Datensatz in Editor und App-Zustand. `unsaved`: Inhalt ist noch nicht gespeichert.
+  const openRecord = useCallback((record, { unsaved = false } = {}) => {
+    const canvas = diagramCanvasRef.current;
+    const metadata = normalizeMetadata(record.metadata);
+    let data = record.diagram || EMPTY_DIAGRAM;
+    if (canvas) {
+      canvas.loadDiagram(record);
+      data = canvas.getCurrentData() || EMPTY_DIAGRAM;
+      setZoomLevel(canvas.getZoom());
+    }
+    setCurrentDiagram(record);
+    setDiagramMetadata(metadata);
+    setLiveDiagramData(data);
+    setLastDiagramId(record.id);
+    if (unsaved) {
+      markUnsaved();
+    } else {
+      markClean({ name: record.name, diagram: data, metadata });
+    }
+  }, [markClean, markUnsaved]);
+
+  const startNewDiagram = useCallback(() => {
+    const now = new Date().toISOString();
+    openRecord({
+      id: generateUUID(),
+      name: 'Neues Diagramm',
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      createdAt: now,
+      updatedAt: now,
+      diagram: null,
+      metadata: getDefaultMetadata()
+    });
+    setZoomLevel(1);
+  }, [openRecord]);
+
+  // Bietet einen Autosave-Entwurf zur Wiederherstellung an, falls er neuer als der gespeicherte Stand ist.
+  // Liefert den wiederherzustellenden Datensatz oder null.
+  const offerDraftRecovery = useCallback(async (diagramId, savedRecord) => {
+    const draft = await indexeddb.getDraft(diagramId).catch(() => null);
+    if (!draft) return null;
+    if (!isDraftNewer(draft, savedRecord)) {
+      await indexeddb.deleteDraft(diagramId).catch(() => {});
+      return null;
+    }
+    const restore = await confirm({
+      title: 'Ungespeicherte Änderungen gefunden',
+      message: `Für „${draft.record.name}“ gibt es einen automatisch gesicherten Entwurf vom ${formatDateTime(draft.savedAt)}`
+        + (savedRecord ? ', der neuer ist als die zuletzt gespeicherte Version.' : '. Das Diagramm wurde noch nie gespeichert.')
+        + '\n\nMöchten Sie den Entwurf wiederherstellen?',
+      confirmLabel: 'Entwurf wiederherstellen',
+      cancelLabel: 'Entwurf verwerfen'
+    });
+    if (!restore) {
+      await indexeddb.deleteDraft(diagramId).catch(() => {});
+      return null;
+    }
+    return draft.record;
+  }, [confirm]);
+
+  // Fragt nach, bevor ungespeicherte Änderungen durch ein anderes Diagramm ersetzt werden.
+  const confirmLeave = useCallback(async () => {
+    if (!isDirty) return true;
+    const discard = await confirm({
+      title: 'Ungespeicherte Änderungen',
+      message: `„${currentDiagram?.name || 'Unbenanntes Diagramm'}“ enthält ungespeicherte Änderungen. Wenn Sie fortfahren, gehen diese verloren.`,
+      confirmLabel: 'Änderungen verwerfen',
+      cancelLabel: 'Abbrechen',
+      tone: 'danger'
+    });
+    if (discard && currentDiagram?.id) {
+      cancelPendingDraft();
+      await indexeddb.deleteDraft(currentDiagram.id).catch(() => {});
+    }
+    return discard;
+  }, [isDirty, confirm, currentDiagram, cancelPendingDraft]);
 
   useEffect(() => {
+    let cancelled = false;
     const loadInitialDiagram = async () => {
-       const lastId = getLastDiagramId();
-       let diagram = null;
+      const lastId = getLastDiagramId();
+      const saved = lastId ? await indexeddb.getDiagram(lastId).catch(() => null) : null;
+      const draftRecord = lastId ? await offerDraftRecovery(lastId, saved) : null;
+      if (cancelled) return;
 
-       if (lastId) {
-           diagram = await indexeddb.getDiagram(lastId);
-       }
-
-       if (diagram) {
-           setCurrentDiagram(diagram);
-           setDiagramMetadata(normalizeMetadata(diagram.metadata));
-           setPendingDiagram(diagram);
-       } else {
-           handleNewDiagram();
-       }
+      if (draftRecord) {
+        openRecord(draftRecord, { unsaved: true });
+        showNotification('Entwurf wiederhergestellt – bitte speichern, um ihn zu übernehmen.', 'info');
+      } else if (saved) {
+        openRecord(saved);
+      } else {
+        startNewDiagram();
+      }
     };
 
     loadInitialDiagram();
-  }, []);
+    return () => { cancelled = true; };
+  }, [offerDraftRecovery, openRecord, showNotification, startNewDiagram]);
 
+  // Warnung beim Schließen des Tabs mit ungespeicherten Änderungen
   useEffect(() => {
-    if (pendingDiagram && diagramCanvasRef.current) {
-      diagramCanvasRef.current.loadDiagram(pendingDiagram);
-      setLiveDiagramData(pendingDiagram.diagram || { nodes: [], edges: [] });
-      setZoomLevel(diagramCanvasRef.current.getZoom());
-      setPendingDiagram(null);
-    }
-  }, [pendingDiagram]);
+    if (!isDirty) return undefined;
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
 
   useEffect(() => {
     const handleMouseMove = (event) => {
       if (!resizeStateRef.current.isActive) return;
       const delta = resizeStateRef.current.startX - event.clientX;
-      const nextWidth = Math.max(380, Math.min(760, resizeStateRef.current.startWidth + delta));
-      setQualityPanelWidth(nextWidth);
+      dispatch({ type: 'setQualityPanelWidth', width: resizeStateRef.current.startWidth + delta });
     };
 
     const handleMouseUp = () => {
@@ -91,41 +196,101 @@ function App() {
     };
   }, []);
 
+  const handleZoomIn = useCallback(() => {
+    setZoomLevel(prev => Math.min(2, Math.round((prev + 0.1) * 10) / 10));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoomLevel(prev => Math.max(0.1, Math.round((prev - 0.1) * 10) / 10));
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
+      const isModifier = e.ctrlKey || e.metaKey;
+
+      // Save: Ctrl+S (auch in Eingabefeldern, damit der Browser-Dialog nicht erscheint)
+      if (isModifier && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        saveDiagramRef.current?.();
+        return;
+      }
+
       // Ignore if user is typing in an input or textarea
-      const isInput = ['INPUT', 'TEXTAREA'].includes(e.target.tagName) || e.target.isContentEditable;
+      const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || e.target.isContentEditable;
       if (isInput) return;
 
+      // Kein Bearbeiten im Hintergrund, solange ein Dialog offen ist
+      const modalVisible = document.querySelector('[aria-modal="true"]');
+      if (modalVisible) return;
+
       // Undo: Ctrl+Z
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+      if (isModifier && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         e.preventDefault();
         diagramCanvasRef.current?.undo();
       }
-      
+
       // Redo: Ctrl+Y or Ctrl+Shift+Z
-      if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') || 
-          ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z')) {
+      if ((isModifier && e.key.toLowerCase() === 'y') ||
+          (isModifier && e.shiftKey && e.key.toLowerCase() === 'z')) {
         e.preventDefault();
         diagramCanvasRef.current?.redo();
       }
 
       // Delete: Delete or Backspace
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        // Only delete if no modal is open
-        const modalVisible = document.querySelector('[role="dialog"]') || 
-                           document.querySelector('.fixed.inset-0.z-50');
-        
-        if (!modalVisible) {
-           if (e.key === 'Backspace') {
-             e.preventDefault();
-           }
-           diagramCanvasRef.current?.deleteSelected();
+        if (e.key === 'Backspace') {
+          e.preventDefault();
+        }
+        diagramCanvasRef.current?.deleteSelected();
+      }
+
+      const canvas = diagramCanvasRef.current;
+      const key = e.key.toLowerCase();
+
+      // Kopieren / Einfügen / Duplizieren / Alles auswählen
+      if (isModifier && !e.shiftKey && canvas) {
+        if (key === 'c') {
+          const count = canvas.copySelection();
+          if (count) {
+            e.preventDefault();
+            showNotification(`${countLabel(count)} kopiert`, 'info');
+          }
+          return;
+        }
+        if (key === 'v') {
+          const count = canvas.paste();
+          if (count) {
+            e.preventDefault();
+            showNotification(`${countLabel(count)} eingefügt`, 'info');
+          }
+          return;
+        }
+        if (key === 'd') {
+          e.preventDefault();
+          canvas.duplicateSelection();
+          return;
+        }
+        if (key === 'a') {
+          e.preventDefault();
+          canvas.selectAll();
+          return;
         }
       }
 
+      if (e.key === 'Escape') {
+        canvas?.clearSelection();
+      }
+
+      // Auswahl mit Pfeiltasten verschieben (Umschalt = in 1-Pixel-Schritten)
+      const arrowDirections = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+      if (arrowDirections[e.key] && !isModifier) {
+        const step = e.shiftKey ? 1 : 10;
+        const [dx, dy] = arrowDirections[e.key];
+        if (canvas?.moveSelection(dx * step, dy * step)) e.preventDefault();
+      }
+
       // Zoom: Ctrl + / Ctrl - / Ctrl 0
-      if ((e.ctrlKey || e.metaKey)) {
+      if (isModifier) {
         if (e.key === '+' || e.key === '=') {
           e.preventDefault();
           handleZoomIn();
@@ -141,18 +306,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  const notificationTimerRef = useRef(null);
-
-  const showNotification = useCallback((message, type = 'info') => {
-    if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
-    setNotification({ isVisible: true, message, type });
-    const duration = Math.max(4000, Math.min(10000, message.length * 60));
-    notificationTimerRef.current = setTimeout(() => {
-      setNotification((prev) => ({ ...prev, isVisible: false }));
-    }, duration);
-  }, []);
+  }, [handleZoomIn, handleZoomOut, showNotification]);
 
   const getCleanFilename = () => {
       const name = currentDiagram?.name || 'diagram';
@@ -160,42 +314,47 @@ function App() {
   };
 
   const saveCurrentDiagram = async (nameOrEvent = null) => {
-      if (!diagramCanvasRef.current) return;
-      
-      const pwaData = diagramCanvasRef.current.getCurrentData();
-      
-      let customName = null;
-      if (typeof nameOrEvent === 'string') {
-          customName = nameOrEvent;
-      } else {
-          customName = currentDiagram?.name || 'Unbenanntes Diagramm';
-      }
-      
-      let targetId = currentDiagram?.id;
-      
+      const canvas = diagramCanvasRef.current;
+      if (!canvas) return;
+
+      const pwaData = canvas.getCurrentData();
+      const customName = typeof nameOrEvent === 'string'
+          ? nameOrEvent
+          : (currentDiagram?.name || 'Unbenanntes Diagramm');
+
+      const previousId = currentDiagram?.id;
+      let targetId = previousId;
+      let isNewRecord = false;
+
       // Prüfen, ob wir einen neuen Speicherstand anlegen müssen (Namensänderung)
       if (targetId) {
-          const existingInDb = await indexeddb.getDiagram(targetId);
+          const existingInDb = await indexeddb.getDiagram(targetId).catch(() => null);
           if (existingInDb && existingInDb.name !== customName) {
-              // Name hat sich geändert -> Neuer Speicherstand (ID neu generieren)
               targetId = generateUUID();
-              showNotification(`Neuer Speicherstand "${customName}" erstellt`, 'success');
+              isNewRecord = true;
           }
       }
-      
+
+      const metadata = normalizeMetadata(diagramMetadata);
       const newDiagram = {
           ...(currentDiagram || {}),
           id: targetId || generateUUID(),
           name: customName,
-          updatedAt: new Date().toISOString(),
           diagram: pwaData,
-          metadata: normalizeMetadata(diagramMetadata)
+          metadata
       };
-      
+
       try {
+          cancelPendingDraft();
           const saved = await indexeddb.saveDiagram(newDiagram);
           setCurrentDiagram(saved);
           setLastDiagramId(saved.id);
+          markClean({ name: saved.name, diagram: pwaData, metadata });
+
+          // Entwürfe sind mit dem Speichern übernommen
+          await Promise.all(
+            [...new Set([previousId, saved.id].filter(Boolean))].map((id) => indexeddb.deleteDraft(id))
+          ).catch(() => {});
 
           // Automatisch eine Version anlegen
           const version = {
@@ -207,54 +366,35 @@ function App() {
           };
           await indexeddb.saveVersion(version).catch(() => {/* Versionierung ist optional */});
 
-          // Falls wir nicht gerade wegen Namensänderung schon benachrichtigt haben
-          if (targetId === currentDiagram?.id) {
-            showNotification('Diagramm erfolgreich gespeichert', 'success');
-          }
-      } catch(e) {
-          showNotification('Fehler beim Speichern', 'error');
+          showNotification(isNewRecord ? `Neuer Speicherstand "${customName}" erstellt` : 'Diagramm erfolgreich gespeichert', 'success');
+      } catch (error) {
+          console.error('Speichern fehlgeschlagen:', error);
+          showNotification(error?.message?.startsWith('Speicherplatz') ? error.message : 'Fehler beim Speichern', 'error');
       }
   };
 
-  const handleDiagramSelect = (diagram) => {
-      setCurrentDiagram(diagram);
-      setDiagramMetadata(normalizeMetadata(diagram.metadata));
-      setLiveDiagramData(diagram.diagram || { nodes: [], edges: [] });
+  useEffect(() => {
+    saveDiagramRef.current = saveCurrentDiagram;
+  });
 
-      setLastDiagramId(diagram.id);
-      if (diagramCanvasRef.current) {
-          diagramCanvasRef.current.loadDiagram(diagram);
-          setZoomLevel(diagramCanvasRef.current.getZoom());
-      }
-      showNotification(`Diagramm "${diagram.name}" geladen`, 'info');
+  const handleDiagramSelect = async (record) => {
+      if (!(await confirmLeave())) return;
+      const draftRecord = await offerDraftRecovery(record.id, record);
+      openRecord(draftRecord || record, { unsaved: Boolean(draftRecord) });
+      showNotification(
+        draftRecord ? `Entwurf von "${record.name}" wiederhergestellt` : `Diagramm "${record.name}" geladen`,
+        'info'
+      );
   };
 
-  const handleNewDiagram = () => {
-      const newId = generateUUID();
-      const newD = {
-          id: newId,
-          name: 'Neues Diagramm',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          diagram: null,
-          metadata: getDefaultMetadata()
-      };
-      setCurrentDiagram(newD);
-      setDiagramMetadata(getDefaultMetadata());
-      setLiveDiagramData({ nodes: [], edges: [] });
-
-      setLastDiagramId(newId);
-      if (diagramCanvasRef.current) {
-          diagramCanvasRef.current.clear();
-          diagramCanvasRef.current.resetHistory();
-          setZoomLevel(1);
-      }
+  const handleNewDiagram = async () => {
+      if (!(await confirmLeave())) return;
+      startNewDiagram();
   };
 
   const handleRenameDiagram = (newName) => {
       if (!currentDiagram) return;
-      const updated = { ...currentDiagram, name: newName };
-      setCurrentDiagram(updated);
+      setCurrentDiagram({ ...currentDiagram, name: newName });
       showNotification('Name geändert (Speichern zum Sichern)', 'info');
   };
 
@@ -263,53 +403,51 @@ function App() {
           diagramCanvasRef.current.setPresentationFocus(null);
           diagramCanvasRef.current.clear();
       }
-      setLiveDiagramData({ nodes: [], edges: [] });
+      setLiveDiagramData(EMPTY_DIAGRAM);
 
       setDiagramMetadata((prev) => ({ ...prev, improvementItems: [] }));
       showNotification('Arbeitsfläche geleert (Rückgängig möglich).', 'info');
   };
 
   const handleAIGenerated = (diagramData) => {
-      if (!diagramCanvasRef.current) return;
-      diagramCanvasRef.current.loadGeneratedData(diagramData);
-      setLiveDiagramData(diagramData);
+      const canvas = diagramCanvasRef.current;
+      if (!canvas) return;
+      canvas.loadGeneratedData(diagramData);
+      setLiveDiagramData(canvas.getCurrentData() || diagramData);
 
       showNotification('KI-Diagramm generiert', 'success');
-      setTimeout(() => saveCurrentDiagram('KI Generiertes Diagramm'), 500); 
+      setTimeout(() => saveDiagramRef.current?.('KI Generiertes Diagramm'), 500);
   };
 
+  // Viele Einzeländerungen (z. B. beim Ziehen mehrerer Elemente) zu einer
+  // Aktualisierung pro Bildschirmbild zusammenfassen
   const handleGraphChange = () => {
-    const latestData = diagramCanvasRef.current?.getCurrentData();
-    if (latestData) {
-      setLiveDiagramData(latestData);
-    }
+    if (graphChangeFrameRef.current) return;
+    graphChangeFrameRef.current = requestAnimationFrame(() => {
+      graphChangeFrameRef.current = null;
+      const latestData = diagramCanvasRef.current?.getCurrentData();
+      if (latestData) {
+        setLiveDiagramData(latestData);
+      }
+    });
   };
 
-  const handleTemplateApply = (template) => {
-    const newId = generateUUID();
-    const nextDiagram = {
-      id: newId,
+  const handleTemplateApply = async (template) => {
+    if (!(await confirmLeave())) return;
+    const now = new Date().toISOString();
+    openRecord({
+      id: generateUUID(),
       name: template.name,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      createdAt: now,
+      updatedAt: now,
       diagram: template.diagram,
       metadata: {
         ...getDefaultMetadata(),
         templateId: template.id
       }
-    };
-
-    setCurrentDiagram(nextDiagram);
-    setDiagramMetadata(normalizeMetadata(nextDiagram.metadata));
-    setLiveDiagramData(template.diagram);
-    setLastDiagramId(newId);
-    setIsTemplateModalOpen(false);
-
-    setTimeout(() => {
-      diagramCanvasRef.current?.loadJson(template.diagram);
-      setZoomLevel(diagramCanvasRef.current?.getZoom() || 1);
-    }, 50);
-
+    }, { unsaved: true });
+    closeModal();
     showNotification(`Vorlage "${template.name}" geladen`, 'success');
   };
 
@@ -321,7 +459,8 @@ function App() {
     if (!currentDiagram) return;
     const project = {
       ...currentDiagram,
-      diagram: diagramCanvasRef.current?.getCurrentData() || currentDiagram.diagram || { nodes: [], edges: [] },
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      diagram: diagramCanvasRef.current?.getCurrentData() || currentDiagram.diagram || EMPTY_DIAGRAM,
       metadata: normalizeMetadata(diagramMetadata)
     };
     exportToJSON(project, `${getCleanFilename() || 'diagram'}_projekt.json`);
@@ -338,23 +477,16 @@ function App() {
     showNotification('Maßnahmenliste exportiert', 'success');
   };
 
-  const handleVersionRestore = (version) => {
-      const restoredDiagram = {
+  const handleVersionRestore = async (version) => {
+      if (!(await confirmLeave())) return;
+      const now = new Date().toISOString();
+      openRecord({
           ...(version.snapshot || {}),
           id: generateUUID(),
           name: `${version.snapshot?.name || 'Diagramm'} (wiederhergestellt)`,
-          updatedAt: new Date().toISOString(),
-          createdAt: new Date().toISOString()
-      };
-      setCurrentDiagram(restoredDiagram);
-      setDiagramMetadata(normalizeMetadata(restoredDiagram.metadata));
-      setLiveDiagramData(restoredDiagram.diagram || { nodes: [], edges: [] });
-
-      setLastDiagramId(restoredDiagram.id);
-      if (diagramCanvasRef.current) {
-          diagramCanvasRef.current.loadDiagram(restoredDiagram);
-          setZoomLevel(diagramCanvasRef.current.getZoom());
-      }
+          updatedAt: now,
+          createdAt: now
+      }, { unsaved: true });
       showNotification('Version wiederhergestellt (ungespeichert)', 'success');
   };
 
@@ -366,55 +498,88 @@ function App() {
     resizeStateRef.current = {
       isActive: true,
       startX: event.clientX,
-      startWidth: qualityPanelWidth
+      startWidth: ui.qualityPanelWidth
     };
   };
 
-  const handleQualityPanelToggle = () => {
-    setIsQualityPanelCollapsed((prev) => !prev);
+  const handleAutoLayout = (direction) => {
+    const usedDirection = diagramCanvasRef.current?.autoLayout(direction);
+    if (!usedDirection) {
+      showNotification('Das Diagramm ist noch leer.', 'info');
+    } else if (usedDirection !== direction) {
+      showNotification('Swimlane-Diagramme werden von links nach rechts angeordnet; jeder Schritt bleibt in seiner Lane. Rückgängig mit Strg+Z.', 'info');
+    } else {
+      showNotification('Diagramm angeordnet. Rückgängig mit Strg+Z.', 'success');
+    }
   };
 
-  // Zoom handlers
-  const handleZoomIn = () => {
-    setZoomLevel(prev => Math.min(2, Math.round((prev + 0.1) * 10) / 10));
-  };
-
-  const handleZoomOut = () => {
-    setZoomLevel(prev => Math.max(0.1, Math.round((prev - 0.1) * 10) / 10));
+  const handleExportDescription = async (format) => {
+    const canvas = diagramCanvasRef.current;
+    const data = canvas?.getCurrentData();
+    if (!data?.nodes?.some((node) => node.type !== 'lane' && node.type !== 'annotation')) {
+      showNotification('Das Diagramm enthält noch keine Schritte.', 'info');
+      return;
+    }
+    const title = currentDiagram?.name || 'Prozessbeschreibung';
+    const baseName = `${getCleanFilename() || 'diagram'}_beschreibung`;
+    try {
+      const { exportProcessDescriptionDocx, exportProcessDescriptionMarkdown } = await import('./export/process-export');
+      if (format === 'md') {
+        exportProcessDescriptionMarkdown(data, title, `${baseName}.md`);
+      } else {
+        const image = await canvas.captureDiagramImage().catch(() => null);
+        await exportProcessDescriptionDocx(data, title, image, `${baseName}.docx`);
+      }
+      showNotification('Prozessbeschreibung exportiert', 'success');
+    } catch (error) {
+      console.error('Export der Prozessbeschreibung fehlgeschlagen:', error);
+      showNotification('Die Prozessbeschreibung konnte nicht erstellt werden.', 'error');
+    }
   };
 
   const handleCenter = () => {
     diagramCanvasRef.current?.center();
   };
 
+  const validation = useMemo(
+    () => validateDiagram(liveDiagramData, diagramMetadata.improvementItems),
+    [liveDiagramData, diagramMetadata.improvementItems]
+  );
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[var(--color-vhs-blau-10)]">
-        <Header 
-        onSettingsClick={() => setIsSettingsOpen(true)} 
+      <a href="#vhs-jointjs-paper" className="sr-only focus:not-sr-only focus:absolute focus:z-[70] focus:top-2 focus:left-2 focus:bg-white focus:text-[var(--color-vhs-blau)] focus:px-3 focus:py-2 focus:rounded focus:shadow">
+        Zur Arbeitsfläche springen
+      </a>
+      <Header
+        onSettingsClick={() => openModal(MODALS.SETTINGS)}
         currentDiagram={currentDiagram}
         onNewDiagram={handleNewDiagram}
         onDiagramSelect={handleDiagramSelect}
         onRename={handleRenameDiagram}
-        onTemplateOpen={() => setIsTemplateModalOpen(true)}
-        onGuideOpen={() => setIsGuideModalOpen(true)}
+        onTemplateOpen={() => openModal(MODALS.TEMPLATES)}
+        onGuideOpen={() => openModal(MODALS.GUIDE)}
       />
-      
-      <AiInputPanel 
+
+      <AiInputPanel
+        onBeforeGenerate={confirmLeave}
         onDiagramGenerated={handleAIGenerated}
         onError={(msg) => showNotification(msg, 'error')}
       />
 
-      <div className="flex flex-1 overflow-hidden relative">
+      <main className="flex flex-1 overflow-hidden relative">
         <Toolbar
-          isCollapsed={isToolbarCollapsed}
-          onToggleCollapsed={() => setIsToolbarCollapsed((prev) => !prev)}
-          validation={useMemo(() => validateDiagram(liveDiagramData, diagramMetadata.improvementItems), [liveDiagramData, diagramMetadata.improvementItems])}
+          isCollapsed={ui.isToolbarCollapsed}
+          onToggleCollapsed={() => dispatch({ type: 'toggleToolbar' })}
+          validation={validation}
           onFocusNode={handleFocusNode}
+          onAddNode={(type) => diagramCanvasRef.current?.addNodeAtCenter(type)}
         />
         <DiagramCanvas
            ref={diagramCanvasRef}
            onGraphChange={handleGraphChange}
-           onHistoryChange={(u, r) => { setCanUndo(u); setCanRedo(r); }}
+           onHistoryChange={(canUndo, canRedo) => setHistoryState({ canUndo, canRedo })}
+           onSelectionChange={setSelectionCount}
            zoomLevel={zoomLevel}
            onZoomIn={handleZoomIn}
            onZoomOut={handleZoomOut}
@@ -428,67 +593,70 @@ function App() {
           onExportMeasures={handleExportMeasures}
           onGetDiagramImage={() => diagramCanvasRef.current?.captureDiagramImage('')}
           onSimulationFocus={handleSimulationFocus}
-          isCollapsed={isQualityPanelCollapsed}
-          width={qualityPanelWidth}
-          onToggleCollapsed={handleQualityPanelToggle}
+          isCollapsed={ui.isQualityPanelCollapsed}
+          width={ui.qualityPanelWidth}
+          onToggleCollapsed={() => dispatch({ type: 'toggleQualityPanel' })}
           onResizeStart={handleQualityPanelResizeStart}
         />
-      </div>
+      </main>
 
       <ExportBar
-         onExportSVG={() => diagramCanvasRef.current?.exportAsSVG(`${getCleanFilename()}.svg`, currentDiagram?.name)}
+         onExportSVG={() => diagramCanvasRef.current?.exportAsSVG(`${getCleanFilename()}.svg`, currentDiagram?.name)?.catch((err) => showNotification(err.message, 'error'))}
          onExportPNG={() => diagramCanvasRef.current?.exportAsPNG(`${getCleanFilename()}.png`, currentDiagram?.name)?.catch((err) => showNotification(err.message, 'error'))}
          onExportPDF={() => diagramCanvasRef.current?.exportAsPDF(`${getCleanFilename()}.pdf`, currentDiagram?.name)?.catch((err) => showNotification(err.message, 'error'))}
          onExportJSON={handleExportProjectJSON}
          onSave={saveCurrentDiagram}
+         saveStatus={saveStatus}
          onClear={handleClearDiagram}
-         onLoadClick={() => setIsLoadModalOpen(true)}
-         onVersionsClick={currentDiagram?.id ? () => setIsVersionHistoryOpen(true) : undefined}
+         onLoadClick={() => openModal(MODALS.DIAGRAM_LIST)}
+         onVersionsClick={currentDiagram?.id ? () => openModal(MODALS.VERSIONS) : undefined}
          zoomLevel={zoomLevel}
          onZoomIn={handleZoomIn}
          onZoomOut={handleZoomOut}
          onCenterContent={handleCenter}
          onUndo={() => diagramCanvasRef.current?.undo()}
          onRedo={() => diagramCanvasRef.current?.redo()}
-         canUndo={canUndo}
-         canRedo={canRedo}
+         canUndo={historyState.canUndo}
+         canRedo={historyState.canRedo}
+         onAutoLayout={handleAutoLayout}
+         onAlign={(mode) => diagramCanvasRef.current?.alignSelection(mode)}
+         onDistribute={(axis) => diagramCanvasRef.current?.distributeSelection(axis)}
+         selectionCount={selectionCount}
+         onExportDescription={handleExportDescription}
       />
 
-      <SettingsModal 
-        isOpen={isSettingsOpen} 
-        onClose={() => setIsSettingsOpen(false)} 
-      />
+      <Suspense fallback={null}>
+        {ui.openModal === MODALS.SETTINGS && (
+          <SettingsModal onClose={closeModal} />
+        )}
+        {ui.openModal === MODALS.DIAGRAM_LIST && (
+          <DiagramListModal
+            onClose={closeModal}
+            onSelect={handleDiagramSelect}
+            onNotify={showNotification}
+          />
+        )}
+        {ui.openModal === MODALS.TEMPLATES && (
+          <TemplateModal onClose={closeModal} onApply={handleTemplateApply} />
+        )}
+        {ui.openModal === MODALS.GUIDE && (
+          <GuideModal onClose={closeModal} />
+        )}
+        {ui.openModal === MODALS.VERSIONS && currentDiagram?.id && (
+          <VersionHistoryModal
+            onClose={closeModal}
+            diagramId={currentDiagram.id}
+            onRestore={handleVersionRestore}
+            currentDiagram={liveDiagramData}
+          />
+        )}
+      </Suspense>
 
-      <DiagramListModal
-        isOpen={isLoadModalOpen}
-        onClose={() => setIsLoadModalOpen(false)}
-        onSelect={handleDiagramSelect}
-      />
-
-      <TemplateModal
-        isOpen={isTemplateModalOpen}
-        onClose={() => setIsTemplateModalOpen(false)}
-        templates={STARTER_TEMPLATES}
-        onApply={handleTemplateApply}
-      />
-
-      <GuideModal
-        isOpen={isGuideModalOpen}
-        onClose={() => setIsGuideModalOpen(false)}
-      />
-
-      <VersionHistoryModal
-        isOpen={isVersionHistoryOpen}
-        onClose={() => setIsVersionHistoryOpen(false)}
-        diagramId={currentDiagram?.id}
-        onRestore={handleVersionRestore}
-      />
-      
-      <Notification 
+      <Notification
         isVisible={notification.isVisible}
         message={notification.message}
         type={notification.type}
-        onClose={() => setNotification({ ...notification, isVisible: false })}
+        onClose={() => setNotification((prev) => ({ ...prev, isVisible: false }))}
       />
     </div>
   );

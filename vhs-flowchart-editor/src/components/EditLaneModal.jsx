@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useId, useState } from 'react';
 import { X } from 'lucide-react';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
-export const LANE_COLORS = [
+const LANE_COLORS = [
     { id: 'blue',      label: 'Blau',     header: '#00285a', body: '#EEF4F7' },
     { id: 'green',     label: 'Grün',     header: '#4ba02d', body: '#f0f7eb' },
     { id: 'orange',    label: 'Orange',   header: '#eb640f', body: '#fef3ea' },
@@ -11,21 +12,15 @@ export const LANE_COLORS = [
     { id: 'teal',      label: 'Türkis',   header: '#1a8070', body: '#e8f5f3' },
 ];
 
-const EditLaneModal = ({ isOpen, initialLabel, initialHeaderColor, onSave, onCancel }) => {
-    const [label, setLabel] = useState('');
-    const [colorId, setColorId] = useState('blue');
-    const inputRef = useRef(null);
-
-    useEffect(() => {
-        if (isOpen) {
-            setLabel(initialLabel || '');
-            const found = LANE_COLORS.find(c => c.header === initialHeaderColor);
-            setColorId(found ? found.id : 'blue');
-            setTimeout(() => inputRef.current?.focus(), 50);
-        }
-    }, [isOpen, initialLabel, initialHeaderColor]);
-
-    if (!isOpen) return null;
+// Wird nur gerendert, solange der Dialog offen ist
+const EditLaneModal = ({ initialLabel, initialHeaderColor, onSave, onCancel }) => {
+    const [label, setLabel] = useState(initialLabel || '');
+    const [colorId, setColorId] = useState(
+        () => LANE_COLORS.find(c => c.header === initialHeaderColor)?.id || 'blue'
+    );
+    const dialogRef = useDialogA11y(true, onCancel);
+    const titleId = useId();
+    const labelId = useId();
 
     const selectedColor = LANE_COLORS.find(c => c.id === colorId) || LANE_COLORS[0];
 
@@ -33,23 +28,23 @@ const EditLaneModal = ({ isOpen, initialLabel, initialHeaderColor, onSave, onCan
 
     const handleKeyDown = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSave(); }
-        if (e.key === 'Escape') onCancel();
     };
 
     return (
         <div
+            ref={dialogRef}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
             onClick={onCancel}
             role="dialog"
             aria-modal="true"
-            aria-label="Swimlane bearbeiten"
+            aria-labelledby={titleId}
         >
             <div
                 className="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
-                    <h3 className="text-sm font-bold text-[var(--color-vhs-blau)]">Swimlane bearbeiten</h3>
+                    <h3 id={titleId} className="text-sm font-bold text-[var(--color-vhs-blau)]">Swimlane bearbeiten</h3>
                     <button onClick={onCancel} className="p-1 hover:bg-gray-200 rounded-full transition-colors" aria-label="Schließen">
                         <X className="w-4 h-4 text-gray-500" />
                     </button>
@@ -57,11 +52,12 @@ const EditLaneModal = ({ isOpen, initialLabel, initialHeaderColor, onSave, onCan
 
                 <div className="p-4 space-y-4">
                     <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
+                        <label htmlFor={labelId} className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
                             Bezeichnung
                         </label>
                         <input
-                            ref={inputRef}
+                            id={labelId}
+                            data-autofocus
                             type="text"
                             value={label}
                             onChange={(e) => setLabel(e.target.value)}

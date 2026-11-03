@@ -1,7 +1,7 @@
 import { Play, CircleStop, Square, Diamond, MessageSquareDashed, ArrowRight, ChevronLeft, ChevronRight, CheckCircle2, AlertTriangle, Search, ChevronDown, ChevronUp, Rows3 } from 'lucide-react';
 import { useState } from 'react';
 
-const Toolbar = ({ onDragStart, isCollapsed, onToggleCollapsed, validation, onFocusNode }) => {
+const Toolbar = ({ onDragStart, onAddNode, isCollapsed, onToggleCollapsed, validation, onFocusNode }) => {
   const [isCheckCollapsed, setIsCheckCollapsed] = useState(false);
 
   const severityClasses = {
@@ -56,7 +56,7 @@ const Toolbar = ({ onDragStart, isCollapsed, onToggleCollapsed, validation, onFo
               Elemente
             </h3>
             <p className="text-xs text-gray-500 mt-1">
-              Ziehe Elemente auf die Arbeitsfläche
+              Ziehe Elemente auf die Arbeitsfläche oder klicke sie an
             </p>
           </div>
           <button
@@ -75,20 +75,22 @@ const Toolbar = ({ onDragStart, isCollapsed, onToggleCollapsed, validation, onFo
           {tools.map((tool) => {
             const Icon = tool.icon;
             return (
-              <div
+              <button
+                type="button"
                 key={tool.type}
                 draggable
                 onDragStart={(event) => handleDragStart(event, tool)}
-                className="flex items-center p-3 rounded-md border border-[var(--color-vhs-blau-20)] bg-white hover:bg-[var(--color-vhs-blau-10)] cursor-grab active:cursor-grabbing transition-colors group shadow-sm"
-                title={`${tool.label} hinzufügen`}
+                onClick={() => onAddNode?.(tool.type)}
+                className="w-full text-left flex items-center p-3 rounded-md border border-[var(--color-vhs-blau-20)] bg-white hover:bg-[var(--color-vhs-blau-10)] cursor-grab active:cursor-grabbing transition-colors group shadow-sm"
+                title={`${tool.label} hinzufügen (ziehen oder klicken)`}
               >
-                <div className="mr-3 p-2 rounded bg-gray-50 group-hover:bg-white transition-colors">
+                <div className="mr-3 p-2 rounded bg-gray-50 group-hover:bg-white transition-colors" aria-hidden="true">
                   <Icon className={`w-5 h-5 ${tool.color}`} />
                 </div>
                 <span className="text-sm font-medium text-gray-700 select-none">
                   {tool.label}
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -98,6 +100,7 @@ const Toolbar = ({ onDragStart, isCollapsed, onToggleCollapsed, validation, onFo
             <section className="rounded-xl border border-[var(--color-vhs-blau-20)] overflow-hidden bg-white">
               <button
                 onClick={() => setIsCheckCollapsed(!isCheckCollapsed)}
+                aria-expanded={!isCheckCollapsed}
                 className="w-full text-left p-3 hover:bg-gray-50 transition-colors flex items-center justify-between group"
               >
                 <div className="flex items-center gap-2">
@@ -126,13 +129,13 @@ const Toolbar = ({ onDragStart, isCollapsed, onToggleCollapsed, validation, onFo
                 <div className="px-3 pb-3 pt-2 space-y-3 border-t border-gray-50">
                   <div className="grid grid-cols-3 gap-1.5 text-center text-[9px] font-black uppercase tracking-wider">
                     <div className="rounded bg-red-50 text-red-700 p-1.5 border border-red-100">
-                      {validation.counts.error} Err
+                      {validation.counts.error} Fehler
                     </div>
                     <div className="rounded bg-amber-50 text-amber-700 p-1.5 border border-amber-100">
-                      {validation.counts.warning} Warn
+                      {validation.counts.warning} Warn.
                     </div>
                     <div className="rounded bg-blue-50 text-blue-700 p-1.5 border border-blue-100">
-                      {validation.counts.info} Hinw
+                      {validation.counts.info} Hinw.
                     </div>
                   </div>
 

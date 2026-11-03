@@ -61,3 +61,12 @@
     user-select: none;
     pointer-events: none;
 }
+
+/* Rahmenauswahl (Umschalt + Ziehen auf freier Fläche) */
+.vhs-rubberband {
+    position: absolute;
+    border: 1px dashed #00285A;
+    background: rgba(0, 40, 90, 0.08);
+    pointer-events: none;
+    z-index: 10;
+}

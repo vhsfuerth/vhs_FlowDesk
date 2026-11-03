@@ -1,9 +1,30 @@
-import React from 'react';
+import React, { useId } from 'react';
 import {
   X, BookOpen, Sparkles, Square, Maximize, ArrowRight,
   Undo2, CheckSquare, Printer, AlertTriangle,
-  LayoutTemplate, Settings, ClipboardList, FileText, KeyRound, Rows3, Clock
+  LayoutTemplate, Settings, ClipboardList, FileText, KeyRound, Rows3, Clock,
+  ShieldCheck, Keyboard, HardDriveDownload, LayoutGrid, GitCompare
 } from 'lucide-react';
+import { useDialogA11y } from '../hooks/useDialogA11y';
+
+const SHORTCUTS = [
+  ['Strg + S', 'Speichern'],
+  ['Strg + Z', 'Rückgängig'],
+  ['Strg + Y / Strg + Umschalt + Z', 'Wiederholen'],
+  ['Entf / Rücktaste', 'Auswahl löschen'],
+  ['Strg + Klick / Umschalt + Klick', 'Element zur Auswahl hinzufügen oder entfernen'],
+  ['Umschalt + Ziehen (freie Fläche)', 'Mehrere Elemente mit einem Rahmen auswählen'],
+  ['Strg + A', 'Alle Elemente auswählen'],
+  ['Strg + C / Strg + V', 'Auswahl kopieren / einfügen (auch in ein anderes Diagramm)'],
+  ['Strg + D', 'Auswahl duplizieren'],
+  ['Pfeiltasten', 'Auswahl verschieben (mit Umschalt: in kleinen Schritten)'],
+  ['Strg + Mausrad', 'Zoom'],
+  ['Strg + + / Strg + -', 'Zoom rein / raus'],
+  ['Strg + 0', 'Zoom zurücksetzen'],
+  ['Doppelklick', 'Text bearbeiten'],
+  ['Esc', 'Dialog schließen bzw. Auswahl aufheben'],
+  ['Tab / Umschalt + Tab', 'Zwischen Bedienelementen wechseln']
+];
 
 const sections = [
   {
@@ -24,9 +45,21 @@ const sections = [
     note: 'Der kostenlose Free-Tier von Google AI Studio reicht für den normalen Alltagseinsatz aus. Der Key wird nur lokal in deinem Browser gespeichert.'
   },
   {
+    icon: ShieldCheck,
+    title: 'Datenschutz bei KI-Nutzung',
+    text: 'Für die KI-Funktionen werden Prozessbeschreibung bzw. Diagramm an Google übertragen. Im kostenlosen Kontingent darf Google diese Inhalte zur Verbesserung seiner Dienste nutzen. Gib deshalb keine personenbezogenen Daten (z. B. Namen von Teilnehmenden) und keine vertraulichen Informationen ein.',
+    note: 'Vor der ersten KI-Nutzung erscheint ein Hinweis, den du bestätigen musst. Die Bestätigung kannst du in den Einstellungen zurücknehmen.'
+  },
+  {
     icon: Square,
     title: 'Elemente verwalten',
-    text: 'Ziehe Elemente aus der Seitenleiste auf die Arbeitsfläche. Wähle ein Element aus, um es zu verschieben oder drücke Entf / Backspace zum Löschen.'
+    text: 'Ziehe Elemente aus der Seitenleiste auf die Arbeitsfläche oder klicke sie an – dann erscheinen sie in der Mitte der Ansicht. Mit Strg + Klick oder einem Rahmen (Umschalt + Ziehen auf freier Fläche) wählst du mehrere Elemente aus und verschiebst, kopierst oder löschst sie gemeinsam.'
+  },
+  {
+    icon: LayoutGrid,
+    title: 'Anordnen & Ausrichten',
+    text: 'Über „Anordnen" in der unteren Leiste räumst du das ganze Diagramm automatisch auf – von oben nach unten oder von links nach rechts. Bei Swimlanes bleibt jeder Schritt in seiner Lane, die Lanes werden passend vergrößert. Für mehrere ausgewählte Elemente gibt es dort außerdem Ausrichten und gleichmäßiges Verteilen.',
+    note: 'Alle Aktionen lassen sich mit Strg + Z rückgängig machen.'
   },
   {
     icon: Maximize,
@@ -46,17 +79,40 @@ const sections = [
   {
     icon: CheckSquare,
     title: 'Speichern & Laden',
-    text: 'Diagramme werden lokal im Browser gespeichert. Klicke auf „Speichern" in der unteren Leiste. Über „Öffnen" lädst du gespeicherte Diagramme.'
+    text: 'Diagramme werden lokal im Browser gespeichert. Klicke auf „Speichern" in der unteren Leiste oder drücke Strg + S. Über „Öffnen" lädst du gespeicherte Diagramme.',
+    note: 'Ungespeicherte Änderungen werden automatisch als Entwurf gesichert. Nach einem Absturz oder Neuladen bietet die App an, den Entwurf wiederherzustellen. Der Status steht neben dem Speichern-Button.'
+  },
+  {
+    icon: HardDriveDownload,
+    title: 'Import & Backup',
+    text: 'Im Dialog „Öffnen" kannst du Projektdateien (.json) importieren und mit „Backup erstellen" alle Diagramme samt Versionen in eine Datei sichern. Über „Importieren" spielst du ein Backup wieder ein.',
+    note: 'Wichtig: Werden die Browserdaten gelöscht, sind auch alle Diagramme weg. Erstelle daher regelmäßig ein Backup.'
   },
   {
     icon: Clock,
     title: 'Versionsverlauf',
-    text: 'Bei jedem Speichern wird automatisch ein Versions-Snapshot angelegt. Über den Button „Versionen" in der unteren Leiste kannst du frühere Zustände des Diagramms ansehen und wiederherstellen.'
+    text: 'Bei jedem Speichern wird automatisch ein Versions-Snapshot angelegt. Über den Button „Versionen" in der unteren Leiste kannst du frühere Zustände wiederherstellen und zu jeder Version eine Notiz hinterlegen („Was wurde geändert?").'
+  },
+  {
+    icon: GitCompare,
+    title: 'Versionen vergleichen',
+    steps: [
+      'Öffne „Versionen" in der unteren Leiste.',
+      'Klicke bei einer Version auf das Vergleichssymbol, um sie mit dem aktuellen Stand zu vergleichen – oder kreuze zwei Versionen an und wähle „Auswahl vergleichen".',
+      'Im Diagramm sind Änderungen farbig markiert: grün = neu, gelb = geändert, rot gestrichelt = entfernt. Rechts steht die Liste aller Änderungen.'
+    ],
+    note: 'Der Vergleich ist rein lesend und verändert nichts.'
   },
   {
     icon: Printer,
     title: 'Export',
     text: 'Exportiere dein Diagramm als PNG, SVG, PDF oder JSON über die Buttons in der unteren Leiste. Den vollständigen Qualitätsbericht kannst du direkt im Prozess-Check als PDF herunterladen.'
+  },
+  {
+    icon: FileText,
+    title: 'Prozessbeschreibung (Verfahrensanweisung)',
+    text: 'Über „Beschreibung" in der unteren Leiste wird aus dem Diagramm automatisch eine Textfassung als Word-Dokument oder Markdown erstellt: nummerierte Schritte in Ablaufreihenfolge, Entscheidungen mit ihren Zweigen („Wenn Ja … / Wenn Nein …"), Zuständigkeiten aus den Swimlanes und angebundene Kommentare als Hinweise.',
+    note: 'Ideal für Handbuch, Einarbeitung oder Intranet. Das Word-Dokument enthält zusätzlich ein Bild des Diagramms.'
   },
   {
     icon: AlertTriangle,
@@ -98,21 +154,29 @@ const sections = [
   }
 ];
 
-const GuideModal = ({ isOpen, onClose }) => {
-  if (!isOpen) return null;
+// Wird nur gerendert, solange der Dialog offen ist
+const GuideModal = ({ onClose }) => {
+  const dialogRef = useDialogA11y(true, onClose);
+  const titleId = useId();
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div
+      ref={dialogRef}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+    >
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-4xl flex flex-col max-h-[85vh]">
         <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
           <div>
-            <h2 className="text-xl font-bold flex items-center text-[var(--color-vhs-blau)]">
-              <BookOpen className="w-5 h-5 mr-2" />
+            <h2 id={titleId} className="text-xl font-bold flex items-center text-[var(--color-vhs-blau)]">
+              <BookOpen className="w-5 h-5 mr-2" aria-hidden="true" />
               Anleitung
             </h2>
             <p className="text-sm text-gray-500 mt-1">So funktioniert der vhs Workflow Editor.</p>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 p-1 hover:bg-gray-200 rounded-full transition-colors">
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 p-1 hover:bg-gray-200 rounded-full transition-colors" aria-label="Anleitung schließen">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -127,7 +191,7 @@ const GuideModal = ({ isOpen, onClose }) => {
                   className="border border-[var(--color-vhs-blau-20)] rounded-xl p-4 bg-white"
                 >
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 rounded-lg bg-[var(--color-vhs-blau-10)]">
+                    <div className="p-2 rounded-lg bg-[var(--color-vhs-blau-10)]" aria-hidden="true">
                       <Icon className="w-5 h-5 text-[var(--color-vhs-blau)]" />
                     </div>
                     <h3 className="text-sm font-bold text-[var(--color-vhs-blau)]">{section.title}</h3>
@@ -143,15 +207,44 @@ const GuideModal = ({ isOpen, onClose }) => {
                     </ol>
                   )}
                   {section.note && (
-                    <p className="text-xs text-gray-400 mt-2 italic">{section.note}</p>
+                    <p className="text-xs text-gray-500 mt-2 italic">{section.note}</p>
                   )}
                 </div>
               );
             })}
+            <div className="border border-[var(--color-vhs-blau-20)] rounded-xl p-4 bg-white md:col-span-2">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-lg bg-[var(--color-vhs-blau-10)]" aria-hidden="true">
+                  <Keyboard className="w-5 h-5 text-[var(--color-vhs-blau)]" />
+                </div>
+                <h3 className="text-sm font-bold text-[var(--color-vhs-blau)]">Tastenkürzel</h3>
+              </div>
+              <table className="w-full text-sm text-gray-600">
+                <caption className="sr-only">Tastenkürzel und ihre Funktion</caption>
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-wider text-gray-500">
+                    <th scope="col" className="py-1 pr-4 font-bold">Taste</th>
+                    <th scope="col" className="py-1 font-bold">Funktion</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {SHORTCUTS.map(([keys, action]) => (
+                    <tr key={keys} className="border-t border-gray-100">
+                      <td className="py-1 pr-4"><kbd className="font-mono text-xs bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5">{keys}</kbd></td>
+                      <td className="py-1">{action}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="text-xs text-gray-500 mt-2 italic">
+                Hinweis: Das Verbinden von Elementen auf der Arbeitsfläche ist nur mit der Maus möglich.
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
+        <div className="p-4 border-t bg-gray-50 rounded-b-lg flex justify-between items-center">
+          <span className="text-xs text-gray-500">vhs Workflow Editor · Version {__APP_VERSION__}</span>
           <button
             onClick={onClose}
             className="px-6 py-2 bg-gray-200 text-gray-700 rounded-md font-medium hover:bg-gray-300 transition-colors"

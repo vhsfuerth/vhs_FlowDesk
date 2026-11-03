@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { generateFlowchartFromText } from '../ai/gemini-client';
 import { getApiKey } from '../storage/settings';
+import { useAiConsent } from '../hooks/useAiConsent';
 import { Sparkles, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 
-const AiInputPanel = ({ onDiagramGenerated, onError }) => {
+const AiInputPanel = ({ onBeforeGenerate, onDiagramGenerated, onError }) => {
   const [text, setText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const ensureAiConsent = useAiConsent();
 
   const handleGenerate = async () => {
     if (!text || text.trim().length < 20) {
@@ -18,6 +20,9 @@ const AiInputPanel = ({ onDiagramGenerated, onError }) => {
         onError("API-Key fehlt. Bitte in den Einstellungen hinterlegen.");
         return;
     }
+
+    if (!(await ensureAiConsent())) return;
+    if (onBeforeGenerate && !(await onBeforeGenerate())) return;
 
     setIsGenerating(true);
     try {
@@ -47,9 +52,12 @@ const AiInputPanel = ({ onDiagramGenerated, onError }) => {
 
   return (
     <div className="bg-white border-b border-[var(--color-vhs-blau-20)] shadow-sm">
-      <div 
-        className="flex items-center justify-between px-4 py-1.5 cursor-pointer hover:bg-gray-50 transition-colors"
+      <button
+        type="button"
+        className="w-full flex items-center justify-between px-4 py-1.5 cursor-pointer hover:bg-gray-50 transition-colors text-left"
         onClick={() => setIsCollapsed(!isCollapsed)}
+        aria-expanded={!isCollapsed}
+        aria-controls="ai-input-panel"
       >
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-[var(--color-vhs-orange)]" />
@@ -69,10 +77,10 @@ const AiInputPanel = ({ onDiagramGenerated, onError }) => {
             <ChevronUp className="w-4 h-4 text-gray-400" />
           )}
         </div>
-      </div>
+      </button>
 
       {!isCollapsed && (
-        <div className="px-4 pb-3 pt-1 flex flex-col md:flex-row md:items-center gap-3 border-t border-gray-50">
+        <div id="ai-input-panel" className="px-4 pb-3 pt-1 flex flex-col md:flex-row md:items-center gap-3 border-t border-gray-50">
           <div className="flex-grow">
             <label htmlFor="ai-input" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
               Prozessbeschreibung

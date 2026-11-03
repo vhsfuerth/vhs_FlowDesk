@@ -38,3 +38,25 @@ export const saveSettings = (newSettings) => {
     const current = getSettings();
     setLocalStorageItem(SETTINGS_KEY, { ...current, ...newSettings });
 };
+
+// Bestätigung des KI-Datenschutzhinweises. Wird der Hinweistext inhaltlich
+// geändert, AI_PRIVACY_NOTICE_VERSION erhöhen – dann wird erneut gefragt.
+const AI_CONSENT_KEY = 'vhs-ai-privacy-consent';
+export const AI_PRIVACY_NOTICE_VERSION = 1;
+
+export const getAiConsent = () => {
+    const consent = getLocalStorageItem(AI_CONSENT_KEY, null);
+    return consent?.version === AI_PRIVACY_NOTICE_VERSION ? consent : null;
+};
+export const hasAiConsent = () => getAiConsent() !== null;
+export const setAiConsent = () => setLocalStorageItem(AI_CONSENT_KEY, {
+    version: AI_PRIVACY_NOTICE_VERSION,
+    acceptedAt: new Date().toISOString()
+});
+export const revokeAiConsent = () => {
+    try {
+        localStorage.removeItem(AI_CONSENT_KEY);
+    } catch (error) {
+        console.warn('Error removing AI consent:', error);
+    }
+};

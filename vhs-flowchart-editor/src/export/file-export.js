@@ -1,4 +1,6 @@
-import { jsPDF } from 'jspdf';
+// jsPDF (inkl. html2canvas/DOMPurify) ist groß und wird nur für PDF-Exporte
+// gebraucht – daher erst beim ersten Export nachladen.
+const loadJsPDF = async () => (await import('jspdf')).jsPDF;
 
 // Compress an image dataUrl to JPEG and cap resolution for smaller PDF embeds
 const compressForPdf = (dataUrl, maxPx = 1200, quality = 0.78) =>
@@ -73,7 +75,9 @@ const getSvgString = async (paper, title = '') => {
                     cssText += rules[i].cssText;
                 }
             }
-        } catch (e) {}
+        } catch {
+            // Cross-Origin-Stylesheets sind nicht lesbar und werden übersprungen
+        }
     });
     
     const styleElement = document.createElement('style');
@@ -112,10 +116,10 @@ const getSvgString = async (paper, title = '') => {
     svgClone.appendChild(headerGroup);
 
     let svgString = serializer.serializeToString(svgClone);
-    if (!svgString.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
+    if (!svgString.match(/^<svg[^>]+xmlns="http:\/\/www\.w3\.org\/2000\/svg"/)) {
         svgString = svgString.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
     }
-    if (!svgString.match(/^<svg[^>]+xmlns\:xlink="http\:\/\/www\.w3\.org\/1999\/xlink"/)) {
+    if (!svgString.match(/^<svg[^>]+xmlns:xlink="http:\/\/www\.w3\.org\/1999\/xlink"/)) {
         svgString = svgString.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
     }
     
@@ -238,6 +242,7 @@ export const exportToPDF = async (paper, filename = 'vhs-flowchart.pdf', title =
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, width, height);
 
+    const jsPDF = await loadJsPDF();
     const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(svgBlob);
 
@@ -405,6 +410,7 @@ export const exportQualityReportPDF = async (
     return { b64, w: dims.w * scale, h: dims.h * scale };
   };
 
+  const jsPDF = await loadJsPDF();
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const PW = 210;
   const PH = 297;
@@ -794,7 +800,7 @@ export const exportQualityReportPDF = async (
 
 const escapeCsv = (value) => `"${String(value || '').replace(/"/g, '""')}"`;
 
-const downloadBlob = (blob, filename) => {
+export const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

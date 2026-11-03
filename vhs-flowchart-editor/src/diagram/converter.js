@@ -1,4 +1,3 @@
-import * as joint from 'jointjs';
 import { createStartNode, createEndNode, createProcessNode, createDecisionNode, createLink, createAnnotationNode, createLaneNode } from './shapes';
 
 export class JSONConverter {
@@ -19,8 +18,8 @@ export class JSONConverter {
         // Parse Nodes
         json.nodes.forEach(node => {
             let jointNode;
-            const x = node.position?.x || 100;
-            const y = node.position?.y || 100;
+            const x = node.position?.x ?? 100;
+            const y = node.position?.y ?? 100;
             const label = node.label || '';
 
             switch (node.type.toLowerCase()) {

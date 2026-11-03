@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": []
+  },
+  "include": [
+    "src/diagram/types.js",
+    "src/diagram/auto-layout.js",
+    "src/diagram/clipboard.js",
+    "src/diagram/arrange.js",
+    "src/storage/schema.js",
+    "src/storage/autosave.js",
+    "src/export/process-description.js",
+    "src/analysis/diagram-diff.js",
+    "src/vite-env.d.ts"
+  ]
+}

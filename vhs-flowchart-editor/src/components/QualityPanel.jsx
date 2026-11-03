@@ -4,6 +4,7 @@ import { REVIEW_SCORE_GUIDES, REVIEW_SCORE_LABELS, getReviewScoreSummary, valida
 import { exportQualityReport, exportQualityReportPDF } from '../export/file-export';
 import SimulationPanel from './SimulationPanel';
 import { generateImprovements } from '../ai/gemini-client';
+import { useAiConsent } from '../hooks/useAiConsent';
 
 const SCORE_OPTIONS = [
   { value: 0, label: '0', sublabel: 'kritisch' },
@@ -35,12 +36,6 @@ const emptyMeasure = (nodeId = '', colorIndex = 0) => ({
   color: MEASURE_COLORS[colorIndex % MEASURE_COLORS.length].id
 });
 
-const severityClasses = {
-  error: 'bg-red-50 text-red-700 border-red-200',
-  warning: 'bg-amber-50 text-amber-800 border-amber-200',
-  info: 'bg-blue-50 text-blue-700 border-blue-200'
-};
-
 const scoreToTone = (score) => {
   if (score <= 1) return 'text-red-600';
   if (score === 2) return 'text-amber-600';
@@ -67,6 +62,7 @@ const QualityPanel = ({
   const [wizardCompact, setWizardCompact] = useState(false);
   const [aiAnalysisLoading, setAiAnalysisLoading] = useState(false);
   const [aiAnalysisError, setAiAnalysisError] = useState('');
+  const ensureAiConsent = useAiConsent();
 
   const validation = useMemo(() => validateDiagram(diagramData, metadata.improvementItems), [diagramData, metadata.improvementItems]);
   const reviewSummary = useMemo(() => getReviewScoreSummary(metadata.reviewScores), [metadata.reviewScores]);
@@ -134,6 +130,7 @@ const QualityPanel = ({
   };
 
   const handleAiAnalysis = async () => {
+    if (!(await ensureAiConsent())) return;
     setAiAnalysisLoading(true);
     setAiAnalysisError('');
     try {
