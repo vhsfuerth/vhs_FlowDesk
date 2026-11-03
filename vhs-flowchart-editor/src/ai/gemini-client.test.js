@@ -65,6 +65,26 @@ describe('gemini-client', () => {
     expect(fetchMock.mock.calls[1][0]).toContain(`/models/${GEMINI_MODELS[1]}:`);
   });
 
+  it('weicht bei Überlastung (503) auf das nächste Modell aus', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(errorResponse(503))
+      .mockResolvedValueOnce(geminiResponse(diagram));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const pending = generateFlowchartFromText('Ein Antrag geht ein und wird geprüft.');
+    await vi.runAllTimersAsync();
+    await pending;
+
+    expect(fetchMock.mock.calls[1][0]).toContain(`/models/${GEMINI_MODELS[1]}:generateContent`);
+  });
+
+  it('meldet verständlich, wenn alle Modelle überlastet sind', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(errorResponse(503)));
+    const pending = expect(generateFlowchartFromText('Text')).rejects.toThrow(/stark ausgelastet/);
+    await vi.runAllTimersAsync();
+    await pending;
+  });
+
   it('meldet, wenn kein Modell verfügbar ist', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(errorResponse(404)));
     const pending = expect(generateFlowchartFromText('Text')).rejects.toThrow(/Kein kompatibles KI-Modell/);

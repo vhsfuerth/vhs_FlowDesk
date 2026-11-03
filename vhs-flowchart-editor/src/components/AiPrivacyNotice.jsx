@@ -6,7 +6,8 @@ const AiPrivacyNotice = ({ compact = false }) => (
   <div className={`space-y-2 whitespace-normal ${compact ? 'text-xs text-gray-600' : 'text-sm text-gray-700'}`}>
     <p>
       Bei Nutzung der KI-Funktionen wird Ihre Prozessbeschreibung bzw. das aktuelle Diagramm
-      (inkl. Bewertungen) an die <strong>Google Gemini API</strong> übertragen. Alle übrigen Daten
+      (inkl. Bewertungen) an die <strong>Google Gemini API</strong> übertragen. Beim KI-Copilot sind das
+      zusätzlich Ihre Antworten auf Rückfragen und die Hinweise aus den Einstellungen. Alle übrigen Daten
       bleiben lokal in diesem Browser.
     </p>
     <p>

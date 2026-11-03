@@ -6,7 +6,8 @@ export const MODALS = {
   DIAGRAM_LIST: 'diagramList',
   TEMPLATES: 'templates',
   GUIDE: 'guide',
-  VERSIONS: 'versions'
+  VERSIONS: 'versions',
+  COPILOT: 'copilot'
 };
 
 export const QUALITY_PANEL_MIN_WIDTH = 380;

@@ -1,5 +1,6 @@
 import * as joint from 'jointjs';
 import { COLORS, FONTS } from '../utils/constants';
+import { estimateNodeSize } from './node-size';
 
 // Shared styling mixins
 const textStyle = {
@@ -282,30 +283,8 @@ Object.assign(joint.shapes, {
 
 // Helper: auto-size a node to fit its text
 export function autoSizeForText(node, label, type) {
-    const minWidths = { start: 140, end: 140, process: 160, decision: 180, annotation: 200 };
-    const minHeights = { start: 70, end: 70, process: 60, decision: 110, annotation: 80 };
-    
-    const charWidth = 8; // approx char width at 13px
-    const lineHeight = 18;
-    const maxCharsPerLine = type === 'decision' ? 12 : 18;
-    
-    const lines = Math.ceil(label.length / maxCharsPerLine);
-    const longestLineLen = Math.min(label.length, maxCharsPerLine);
-    
-    let w = Math.max(minWidths[type] || 160, longestLineLen * charWidth + 40);
-    let h = Math.max(minHeights[type] || 60, lines * lineHeight + 30);
-    
-    // Ovals and diamonds need extra space
-    if (type === 'start' || type === 'end') {
-        w = Math.max(w, h * 2); // keep oval proportions
-        h = Math.max(h, 70);
-    }
-    if (type === 'decision') {
-        w = Math.max(w, 180);
-        h = Math.max(h, 110);
-    }
-    
-    node.resize(w, h);
+    const { width, height } = estimateNodeSize(label, type);
+    node.resize(width, height);
 }
 
 export const createStartNode = (x, y, label = 'Start') => {

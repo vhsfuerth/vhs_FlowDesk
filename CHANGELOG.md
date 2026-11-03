@@ -2,6 +2,34 @@
 
 Alle nennenswerten Änderungen am vhs Workflow-Algorithm Editor. Die Versionsnummern folgen [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.2.0] – 2026-11-03
+
+Geführter KI-Copilot statt Einmal-Generierung.
+
+### KI-Copilot
+
+- Neuer Button „Mit KI-Copilot erstellen“: Die KI analysiert die Prozessbeschreibung zuerst, statt sofort ein Diagramm zu zeichnen.
+- Rückfragen: Bei Lücken (fehlende Zweige, unklare Zuständigkeit, unklares Ende) stellt die KI bis zu fünf gezielte Fragen mit Antwortvorschlägen. Fragen können übersprungen werden; die KI nennt dann ihre Annahmen.
+- Formulierungsvarianten: kompakt, fachlich präzise, bürgernah sowie Schulung & Dokumentation (mit kurzen Erläuterungen je Schritt).
+- Prüfansicht „So habe ich den Prozess verstanden“: nummerierte Schritte mit Zuständigkeit, Entscheidungen mit ihren Zweigen, unsichere Schritte markiert, automatische Korrekturen und Annahmen ausgewiesen – daneben eine Live-Vorschau des Diagramms.
+- Korrekturen vor der Übernahme: Beschriftungen, Zuständigkeiten und Ausgänge ändern, Schritte entfernen (der Ablauf bleibt dabei zusammenhängend).
+- Zuständigkeiten werden auf Wunsch als Swimlanes dargestellt (automatisch an, sobald mindestens zwei Rollen erkannt werden); Hinweise der KI optional als Kommentare am Rand.
+- Das Ergebnis öffnet als neues, noch ungespeichertes Diagramm, benannt nach dem erkannten Prozess.
+- Laufende Anfragen lassen sich abbrechen; Fehler werden im Dialog angezeigt, die Eingaben bleiben erhalten.
+- Neue Einstellung „Hinweise an den KI-Copilot“ (z. B. Hausbegriffe, feste Zuständigkeiten).
+- „Direkt erzeugen“ bleibt für die schnelle Erzeugung ohne Rückfragen erhalten.
+
+### Technik
+
+- Die KI liefert ein Prozessmodell statt eines Diagramms; Start, Ende, Entscheidungszweige, Swimlanes und Layout erzeugt die App selbst. Gemini erhält dafür ein festes Antwortschema; lehnt ein Modell das Schema ab, wird ohne Schema wiederholt.
+- Entscheidungen zuverlässiger: Im Antwortschema muss die KI für jeden Schritt ausdrücklich die Übergänge angeben (Pflichtfeld, feste Feldreihenfolge); der Prompt enthält ein vollständiges Beispiel mit Nein-Zweig und Rücksprung sowie Regeln zum Erkennen von Entscheidungen („wenn“, „falls“, „ob“, „sonst“).
+- Fehlerhafte KI-Antworten werden tolerant repariert (unbekannte Typen und Verweise, doppelte IDs, zu viele Schritte). Als Frage formulierte Schritte bleiben Entscheidungen; ein fehlender Zweig wird mit dem Schritt verbunden, der sonst unverbunden bliebe (typischerweise der vergessene Nein-Weg), und als „Bitte prüfen“ markiert.
+- Selbstkorrektur: Bleiben strukturelle Fehler (Entscheidungen mit nur einem Ausgang, unerreichbare Schritte), erhält die KI einmalig die konkrete Fehlerliste zur Korrektur; das Ergebnis wird nur übernommen, wenn es besser ist.
+- Ist ein Gemini-Modell überlastet (HTTP 503), wird – wie bei nicht verfügbaren Modellen – automatisch das nächste Modell der Liste versucht.
+- Sehr kurze Beschreibungen („Ablauf für ein BEM-Verfahren“) führen zu einem üblichen Musterablauf mit markierten Annahmen und gezielten Rückfragen.
+- Datenschutzhinweis ergänzt (Antworten auf Rückfragen und Copilot-Hinweise werden ebenfalls übertragen); er muss daher einmal neu bestätigt werden.
+- Neue Module `src/ai/copilot/` und `src/state/copilotState.js` (mit TypeScript-Prüfung) samt Unit- und Komponententests; Elementgrößen werden über `diagram/node-size.js` ohne JointJS berechnet.
+
 ## [1.1.0] – 2026-11-03
 
 Mehr Komfort beim Bearbeiten, Prozessbeschreibung als Text und Versionsvergleich.

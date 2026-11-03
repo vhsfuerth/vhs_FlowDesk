@@ -1,5 +1,5 @@
 import React, { useId, useState } from 'react';
-import { getApiKey, setApiKey, getCustomPrompt, setCustomPrompt, getAiConsent, revokeAiConsent } from '../storage/settings';
+import { getApiKey, setApiKey, getCustomPrompt, setCustomPrompt, getCopilotHints, setCopilotHints, getAiConsent, revokeAiConsent } from '../storage/settings';
 import { SYSTEM_PROMPT } from '../ai/prompts';
 import { GEMINI_MODELS } from '../ai/config';
 import { Settings, X, Key, Sparkles, RotateCcw, Activity, Loader2, CheckCircle2, AlertCircle, Info, Scale, ShieldCheck } from 'lucide-react';
@@ -13,6 +13,7 @@ import AiPrivacyNotice from './AiPrivacyNotice';
 const SettingsModal = ({ onClose }) => {
   const [apiKey, setKeyValue] = useState(getApiKey());
   const [customPrompt, setCustomPromptValue] = useState(getCustomPrompt() || SYSTEM_PROMPT);
+  const [copilotHints, setCopilotHintsValue] = useState(getCopilotHints());
   const [apiStatus, setApiStatus] = useState(null); // { status, message }
   const [isChecking, setIsChecking] = useState(false);
   const [availableModels, setAvailableModels] = useState([]);
@@ -23,10 +24,12 @@ const SettingsModal = ({ onClose }) => {
   const titleId = useId();
   const apiKeyId = useId();
   const promptId = useId();
+  const hintsId = useId();
 
   const handleSave = () => {
     setApiKey(apiKey);
     setCustomPrompt(customPrompt);
+    setCopilotHints(copilotHints.trim());
     onClose();
   };
 
@@ -173,6 +176,25 @@ const SettingsModal = ({ onClose }) => {
           </div>
 
           <div className="pt-4 border-t border-gray-100">
+            <label htmlFor={hintsId} className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+              <Sparkles className="w-4 h-4 mr-1 text-[var(--color-vhs-orange)]" aria-hidden="true" />
+              Hinweise an den KI-Copilot (optional)
+            </label>
+            <textarea
+              id={hintsId}
+              value={copilotHints}
+              onChange={(e) => setCopilotHintsValue(e.target.value)}
+              rows={3}
+              maxLength={1000}
+              className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-[var(--color-vhs-orange-hell)] focus:border-transparent resize-y"
+              placeholder="z. B. „Wir sagen ‚Fachbereichsleitung‘ statt ‚Abteilungsleitung‘. Zahlungen laufen immer über die Kasse.“"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Werden bei jeder Copilot-Analyse mitgeschickt, etwa Hausbegriffe oder feste Zuständigkeiten. Keine personenbezogenen Daten eintragen.
+            </p>
+          </div>
+
+          <div className="pt-4 border-t border-gray-100">
             <div className="flex justify-between items-center mb-1">
                 <label htmlFor={promptId} className="block text-sm font-medium text-gray-700 flex items-center">
                 <Sparkles className="w-4 h-4 mr-1 text-[var(--color-vhs-gelb)]" aria-hidden="true" />
@@ -195,7 +217,7 @@ const SettingsModal = ({ onClose }) => {
               placeholder="Systemanweisungen für die KI..."
             />
             <p className="text-xs text-gray-500 mt-1">
-              Diese Anweisungen steuern, wie die KI Diagramme generiert. Änderungen können das Ergebnis stark beeinflussen.
+              Diese Anweisungen gelten für „Direkt erzeugen“ (nicht für den KI-Copilot). Änderungen können das Ergebnis stark beeinflussen.
             </p>
           </div>
 

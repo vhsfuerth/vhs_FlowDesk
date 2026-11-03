@@ -29,8 +29,15 @@ const SHORTCUTS = [
 const sections = [
   {
     icon: Sparkles,
-    title: 'KI-Diagramm-Generierung',
-    text: 'Beschreibe deinen Prozess als Freitext in der oberen Leiste. Die KI erstellt daraus automatisch ein Flussdiagramm mit passenden Elementen und Verbindungen.'
+    title: 'KI-Copilot: Diagramm aus einer Beschreibung',
+    text: 'Beschreibe deinen Prozess in der oberen Leiste und klicke „Mit KI-Copilot erstellen“. Der Copilot führt dich in drei Schritten zum Diagramm:',
+    steps: [
+      'Beschreiben: Ablauf in eigenen Worten oder Stichpunkten, dazu die Formulierung wählen (kompakt, fachlich präzise, bürgernah oder für Schulungen).',
+      'Rückfragen: Bei Lücken stellt die KI gezielte Fragen. Du kannst sie beantworten oder überspringen – dann trifft die KI eine Annahme.',
+      'Prüfen: Liste der erkannten Schritte mit Vorschau. Texte, Zuständigkeiten und Ausgänge lassen sich korrigieren, Schritte entfernen. Zuständigkeiten werden auf Wunsch als Swimlanes dargestellt.',
+      '„Diagramm übernehmen“ öffnet das Ergebnis als neues, noch ungespeichertes Diagramm.'
+    ],
+    note: '„Direkt erzeugen“ erstellt wie bisher ohne Rückfragen und Vorschau sofort ein Diagramm. Hausbegriffe oder feste Zuständigkeiten kannst du in den Einstellungen unter „Hinweise an den KI-Copilot“ hinterlegen.'
   },
   {
     icon: KeyRound,
