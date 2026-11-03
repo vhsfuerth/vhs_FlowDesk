@@ -1,3 +1,43 @@
+// @ts-check
+// Strukturprüfung (Prozess-Check) und Qualitätsbewertung von Diagrammen.
+
+/** @typedef {import('../diagram/types').DiagramData} DiagramData */
+/** @typedef {import('../diagram/types').DiagramNode} DiagramNode */
+/** @typedef {import('../diagram/types').DiagramEdge} DiagramEdge */
+
+/** @typedef {'clarity' | 'mediaBreaks' | 'risk' | 'participantFocus' | 'ownership'} ReviewScoreField */
+/** @typedef {Record<ReviewScoreField, number>} ReviewScores */
+/** @typedef {Record<ReviewScoreField, string>} ReviewNotes */
+/** @typedef {'error' | 'warning' | 'info'} FindingSeverity */
+
+/**
+ * @typedef {Object} Finding
+ * @property {FindingSeverity} severity
+ * @property {string} code
+ * @property {string} message
+ * @property {string | null} nodeId
+ */
+
+/**
+ * @typedef {Object} ValidationResult
+ * @property {Finding[]} findings
+ * @property {Record<FindingSeverity, number>} counts
+ * @property {boolean} isValid
+ */
+
+/**
+ * Metadaten eines Diagramms (Qualitätsbewertung, Maßnahmen, Vorlage).
+ * Weitere Felder werden unverändert durchgereicht.
+ * @typedef {{
+ *   templateId: string | null,
+ *   improvementItems: any[],
+ *   reviewScores: ReviewScores,
+ *   reviewNotes: ReviewNotes,
+ *   [key: string]: any
+ * }} DiagramMetadata
+ */
+
+/** @type {ReviewScoreField[]} */
 const AUTOMATED_SCORE_FIELDS = [
   'clarity',
   'mediaBreaks',
@@ -6,6 +46,7 @@ const AUTOMATED_SCORE_FIELDS = [
   'ownership'
 ];
 
+/** @type {Readonly<ReviewScores>} */
 export const DEFAULT_REVIEW_SCORES = {
   clarity: 2,
   mediaBreaks: 2,
@@ -14,6 +55,7 @@ export const DEFAULT_REVIEW_SCORES = {
   ownership: 2
 };
 
+/** @type {Readonly<Record<ReviewScoreField, string>>} */
 export const REVIEW_SCORE_LABELS = {
   clarity: 'Klarheit',
   mediaBreaks: 'Medienbruch',
@@ -22,6 +64,7 @@ export const REVIEW_SCORE_LABELS = {
   ownership: 'Verantwortlichkeit'
 };
 
+/** @type {Readonly<Record<ReviewScoreField, string>>} */
 export const REVIEW_SCORE_GUIDES = {
   clarity:          'Würde eine außenstehende Person den Ablauf sofort verstehen?',
   mediaBreaks:      'Wie viele Übergänge zwischen digital und analog gibt es im Prozess?',
@@ -30,6 +73,13 @@ export const REVIEW_SCORE_GUIDES = {
   ownership:        'Ist für jeden Schritt klar, wer die Aufgabe übernimmt?'
 };
 
+/**
+ * @param {FindingSeverity} severity
+ * @param {string} code
+ * @param {string} message
+ * @param {string | null} [nodeId]
+ * @returns {Finding}
+ */
 const createFinding = (severity, code, message, nodeId = null) => ({
   severity,
   code,
@@ -37,6 +87,7 @@ const createFinding = (severity, code, message, nodeId = null) => ({
   nodeId
 });
 
+/** @type {Readonly<ReviewNotes>} */
 const DEFAULT_REVIEW_NOTES = {
   clarity: '',
   mediaBreaks: '',
@@ -45,6 +96,7 @@ const DEFAULT_REVIEW_NOTES = {
   ownership: ''
 };
 
+/** @returns {DiagramMetadata} */
 export const getDefaultMetadata = () => ({
   templateId: null,
   improvementItems: [],
@@ -52,21 +104,34 @@ export const getDefaultMetadata = () => ({
   reviewNotes: { ...DEFAULT_REVIEW_NOTES }
 });
 
-export const normalizeMetadata = (metadata = {}) => ({
-  ...getDefaultMetadata(),
-  ...metadata,
-  improvementItems: Array.isArray(metadata.improvementItems) ? metadata.improvementItems : [],
-  reviewScores: {
-    ...DEFAULT_REVIEW_SCORES,
-    ...(metadata.reviewScores || {})
-  },
-  reviewNotes: {
-    ...DEFAULT_REVIEW_NOTES,
-    ...(metadata.reviewNotes || {})
-  }
-});
+/**
+ * Ergänzt fehlende Felder mit Standardwerten; unbekannte Felder bleiben erhalten.
+ * @param {Record<string, any> | null | undefined} [input]
+ * @returns {DiagramMetadata}
+ */
+export const normalizeMetadata = (input = {}) => {
+  const metadata = input || {};
+  return {
+    ...getDefaultMetadata(),
+    ...metadata,
+    improvementItems: Array.isArray(metadata.improvementItems) ? metadata.improvementItems : [],
+    reviewScores: {
+      ...DEFAULT_REVIEW_SCORES,
+      ...(metadata.reviewScores || {})
+    },
+    reviewNotes: {
+      ...DEFAULT_REVIEW_NOTES,
+      ...(metadata.reviewNotes || {})
+    }
+  };
+};
 
+/**
+ * @param {Partial<ReviewScores>} [reviewScores]
+ * @returns {{ average: number, hotspots: ReviewScoreField[] }}
+ */
 export const getReviewScoreSummary = (reviewScores = DEFAULT_REVIEW_SCORES) => {
+  /** @type {ReviewScores} */
   const normalized = {
     ...DEFAULT_REVIEW_SCORES,
     ...reviewScores
@@ -79,20 +144,30 @@ export const getReviewScoreSummary = (reviewScores = DEFAULT_REVIEW_SCORES) => {
   };
 };
 
+/**
+ * Prüft die Diagrammstruktur (Start/Ende, Verbindungen, Entscheidungen, Komplexität).
+ * Swimlanes werden ignoriert.
+ * @param {Partial<DiagramData> | null | undefined} diagram
+ * @param {any[]} [improvementItems]
+ * @returns {ValidationResult}
+ */
 export const validateDiagram = (diagram, improvementItems = []) => {
   const allNodes = Array.isArray(diagram?.nodes) ? diagram.nodes : [];
   // Lanes are background containers – exclude from all structural validation
   const nodes = allNodes.filter(n => n.type !== 'lane');
   const edges = Array.isArray(diagram?.edges) ? diagram.edges : [];
 
+  /** @type {Finding[]} */
   const findings = [];
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  /** @type {Map<string, DiagramEdge[]>} */
   const incoming = new Map(nodes.map((node) => [node.id, []]));
+  /** @type {Map<string, DiagramEdge[]>} */
   const outgoing = new Map(nodes.map((node) => [node.id, []]));
 
   edges.forEach((edge) => {
-    if (incoming.has(edge.to)) incoming.get(edge.to).push(edge);
-    if (outgoing.has(edge.from)) outgoing.get(edge.from).push(edge);
+    incoming.get(edge.to)?.push(edge);
+    outgoing.get(edge.from)?.push(edge);
   });
 
   const startNodes = nodes.filter((node) => node.type === 'start');
@@ -147,6 +222,12 @@ export const validateDiagram = (diagram, improvementItems = []) => {
       `${decisionNodes.length} von ${processNodes.length} Prozessschritten sind Entscheidungen – der Prozess könnte zu komplex sein.`));
   }
 
+  /**
+   * Länge der linearen Kette (je genau ein Ein- und Ausgang) ab einem Knoten.
+   * @param {string} startNodeId
+   * @param {Set<string>} [visited]
+   * @returns {number}
+   */
   const getChainLength = (startNodeId, visited = new Set()) => {
     if (visited.has(startNodeId)) return 0;
     visited.add(startNodeId);
@@ -179,10 +260,11 @@ export const validateDiagram = (diagram, improvementItems = []) => {
       `${annotationNodes.length} Kommentare vorhanden, aber keine Maßnahmen erfasst. Kommentare oft als Ausgangspunkt für Maßnahmen nutzen.`));
   }
 
-  const counts = findings.reduce((acc, finding) => {
-    acc[finding.severity] += 1;
-    return acc;
-  }, { error: 0, warning: 0, info: 0 });
+  /** @type {Record<FindingSeverity, number>} */
+  const counts = { error: 0, warning: 0, info: 0 };
+  findings.forEach((finding) => {
+    counts[finding.severity] += 1;
+  });
 
   return {
     findings,

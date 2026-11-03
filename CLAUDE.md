@@ -17,7 +17,7 @@ npm run dev        # start Vite dev server
 npm run build      # production build to dist/
 npm run lint       # ESLint (flat config, JS/JSX only)
 npm run typecheck  # tsc over the JSDoc-typed modules listed in jsconfig.json
-npm test           # Vitest (jsdom); tests live next to modules as *.test.js
+npm test           # Vitest (jsdom); tests live next to modules as *.test.js / component tests as *.test.jsx (Testing Library, fake-indexeddb; helpers in src/test/)
 npm run check      # lint + typecheck + test (also run by CI and the Vercel build)
 npm run preview    # preview production build with the security headers from ../vercel.json
 ```

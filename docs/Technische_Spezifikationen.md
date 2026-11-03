@@ -152,7 +152,8 @@ Orientierung an WCAG 2.1 AA, soweit mit einem grafischen Editor sinnvoll: Dialog
 
 ## 5. Qualitätssicherung
 
-- **Tests** (`npm test`): Konverter (verlustfreie Hin- und Rückumwandlung, alle Vorlagen), automatisches Anordnen (inkl. Swimlanes), Zwischenablage, Ausrichten/Verteilen, Undo/Redo, Prozessbeschreibung (Reihenfolge, Verzweigungen, Schleifen, Lanes, Word-Datei), Versionsvergleich, Prüfregeln, Datenformat und Migration, Import/Backup, Autosave-Logik, KI-Client (Header statt URL-Parameter, Modell-Fallback, Fehlermeldungen).
+- **Tests** (`npm test`): Konverter (verlustfreie Hin- und Rückumwandlung, alle Vorlagen), automatisches Anordnen (inkl. Swimlanes), Zwischenablage, Ausrichten/Verteilen, Undo/Redo, Prozessbeschreibung (Reihenfolge, Verzweigungen, Schleifen, Lanes, Word-Datei), Versionsvergleich, Prüfregeln, Datenformat und Migration, Import/Backup, Autosave-Logik, KI-Client (Header statt URL-Parameter, Modell-Fallback, Fehlermeldungen), IndexedDB-Zugriff (gegen `fake-indexeddb`: Versionsgrenze, Löschen samt Versionen/Entwürfen, Migration beim Lesen).
+- **Komponententests** (Testing Library, im selben `npm test`): Bestätigungsdialog (Ergebnis, Escape, Fokusführung), Diagrammliste (Öffnen, Löschen, Import von Projektdatei/Diagramm/Backup, Fehlermeldungen, Backup erstellen), Versionshistorie (Wiederherstellen, Notizen, Löschen, Vergleichsauswahl) und Autosave-Hook. Gemeinsame Hilfen liegen in `src/test/`.
 - **Typprüfung** (`npm run typecheck`): JSDoc-typisierte Module, schrittweise erweiterbar über `jsconfig.json`.
 - **CI**: GitHub Actions bei jedem Push und Pull Request; der Vercel-Build führt `npm run check` aus und bricht bei Fehlern ab.
 - **Versionierung**: SemVer in `package.json`, Änderungen in `CHANGELOG.md`.

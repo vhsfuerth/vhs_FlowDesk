@@ -5,10 +5,10 @@ Geplante, noch nicht umgesetzte Erweiterungen. Umgesetzte Punkte stehen im [CHAN
 ## Offene Punkte aus den Versionen 1.0.0 und 1.1.0
 
 - **Zentraler KI-Zugang:** Kleine Proxy-Funktion (z. B. Vercel Function) mit einem zentralen vhs-API-Key. Nutzende bräuchten keinen eigenen Key mehr, Kosten und Missbrauch wären steuerbar. Voraussetzung: kostenpflichtiges Gemini-Kontingent mit Auftragsverarbeitungsvertrag; Abstimmung mit der bzw. dem Datenschutzbeauftragten. Danach `connect-src` in der CSP auf die eigene Domain beschränken.
-- **TypeScript ausweiten:** Weitere Module mit `// @ts-check` versehen und in `vhs-flowchart-editor/jsconfig.json` aufnehmen – als Nächstes `diagram/converter.js`, `storage/indexeddb.js` und `analysis/diagram-validation.js`.
+- **TypeScript ausweiten:** Weitere Module mit `// @ts-check` versehen und in `vhs-flowchart-editor/jsconfig.json` aufnehmen – als Nächstes `diagram/layout.js`, `diagram/history.js` und `export/process-export.js`.
 - **Barrierefreiheitserklärung:** Für eine öffentlich erreichbare Instanz eine formale Erklärung nach BITV 2.0 erstellen (benötigt Kontaktdaten und Feedback-Mechanismus der Einrichtung). Die technische Grundlage ist in `docs/Technische_Spezifikationen.md` (Abschnitt Barrierefreiheit) beschrieben.
 - **KI-Glättung der Prozessbeschreibung:** Optional die Schritttexte der exportierten Verfahrensanweisung sprachlich glätten lassen, ohne den Ablauf zu verändern (nur nach Datenschutzhinweis). Bewusst nicht in 1.1.0 umgesetzt, da der Export ohne KI vollständig funktioniert.
-- **Komponententests:** Ergänzend zu den Logiktests Tests für zentrale React-Komponenten (z. B. mit Testing Library) oder End-to-End-Tests (z. B. Playwright) für Speichern, Wiederherstellen und Import.
+- **End-to-End-Tests:** Komponententests für Speichern, Wiederherstellen und Import gibt es seit 1.1.0. Ergänzend könnten Browser-Tests (z. B. Playwright) den kompletten Ablauf im Editor prüfen, inklusive Zeichenfläche (JointJS lässt sich in jsdom nicht vollständig rendern).
 
 ## Funktionale Erweiterungen
 

@@ -46,6 +46,16 @@
  */
 
 /**
+ * Gespeicherte Version eines Diagramms (IndexedDB-Store `diagram-versions`).
+ * @typedef {Object} DiagramVersion
+ * @property {string} id
+ * @property {string} diagramId
+ * @property {string} [savedAt]
+ * @property {string} [note]  Notiz „Was wurde geändert?“
+ * @property {DiagramRecord} snapshot
+ */
+
+/**
  * Automatisch gesicherter Entwurf (IndexedDB-Store `drafts`).
  * @typedef {Object} DraftEntry
  * @property {string} diagramId

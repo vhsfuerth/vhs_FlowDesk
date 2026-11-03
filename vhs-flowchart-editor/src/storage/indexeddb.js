@@ -1,33 +1,59 @@
+// @ts-check
+// IndexedDB-Zugriff: Diagramme, Versionen (max. 10 je Diagramm) und Autosave-Entwürfe.
+// Gelesene Datensätze werden beim Lesen auf das aktuelle Format migriert.
+
 import { openDB } from 'idb';
 import { CURRENT_SCHEMA_VERSION, migrateDiagramRecord } from './schema';
 
-const DB_NAME = 'vhs-flowcharts-db';
-const STORE_NAME = 'diagrams';
-const VERSIONS_STORE_NAME = 'diagram-versions';
-const DRAFTS_STORE_NAME = 'drafts';
-const MAX_VERSIONS_PER_DIAGRAM = 10;
+/** @typedef {import('../diagram/types').DiagramRecord} DiagramRecord */
+/** @typedef {import('../diagram/types').DiagramVersion} DiagramVersion */
+/** @typedef {import('../diagram/types').DraftEntry} DraftEntry */
 
+/**
+ * Aufbau der Datenbank für die Typprüfung von `idb`.
+ * @typedef {{
+ *   'diagrams': { key: string, value: DiagramRecord, indexes: { updatedAt: string } },
+ *   'diagram-versions': { key: string, value: DiagramVersion, indexes: { diagramId: string, savedAt: string } },
+ *   'drafts': { key: string, value: DraftEntry }
+ * }} FlowchartDB
+ */
+
+/** @typedef {import('idb').IDBPDatabase<FlowchartDB>} Database */
+
+const DB_NAME = 'vhs-flowcharts-db';
+const DB_VERSION = 3;
+const STORE_NAME = /** @type {const} */ ('diagrams');
+const VERSIONS_STORE_NAME = /** @type {const} */ ('diagram-versions');
+const DRAFTS_STORE_NAME = /** @type {const} */ ('drafts');
+const MAX_VERSIONS_PER_DIAGRAM = 10;
+const MIN_FREE_BYTES = 1024 * 1024;
+
+/** @type {Promise<Database> | null} */
 let dbPromise = null;
 
+/** @type {import('idb').OpenDBCallbacks<FlowchartDB>} */
+const DB_CALLBACKS = {
+  upgrade(db, oldVersion) {
+    if (oldVersion < 1) {
+      const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      store.createIndex('updatedAt', 'updatedAt');
+    }
+    if (oldVersion < 2) {
+      const versionStore = db.createObjectStore(VERSIONS_STORE_NAME, { keyPath: 'id' });
+      versionStore.createIndex('diagramId', 'diagramId');
+      versionStore.createIndex('savedAt', 'savedAt');
+    }
+    if (oldVersion < 3) {
+      // Autosave-Entwürfe: höchstens einer pro Diagramm
+      db.createObjectStore(DRAFTS_STORE_NAME, { keyPath: 'diagramId' });
+    }
+  },
+};
+
+/** @returns {Promise<Database>} */
 const initDB = () => {
   if (!dbPromise) {
-    dbPromise = openDB(DB_NAME, 3, {
-      upgrade(db, oldVersion) {
-        if (oldVersion < 1) {
-          const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-          store.createIndex('updatedAt', 'updatedAt');
-        }
-        if (oldVersion < 2) {
-          const versionStore = db.createObjectStore(VERSIONS_STORE_NAME, { keyPath: 'id' });
-          versionStore.createIndex('diagramId', 'diagramId');
-          versionStore.createIndex('savedAt', 'savedAt');
-        }
-        if (oldVersion < 3) {
-          // Autosave-Entwürfe: höchstens einer pro Diagramm
-          db.createObjectStore(DRAFTS_STORE_NAME, { keyPath: 'diagramId' });
-        }
-      },
-    }).catch((error) => {
+    dbPromise = openDB(DB_NAME, DB_VERSION, DB_CALLBACKS).catch((error) => {
       dbPromise = null;
       throw error;
     });
@@ -35,19 +61,29 @@ const initDB = () => {
   return dbPromise;
 };
 
+/** Wirft einen Fehler mit deutscher Meldung, wenn weniger als 1 MB Speicher frei ist. */
 const checkStorageQuota = async () => {
   if (navigator.storage && navigator.storage.estimate) {
     const { usage, quota } = await navigator.storage.estimate();
-    const remaining = quota - usage;
-    if (remaining < 1024 * 1024) {
+    if (quota === undefined || usage === undefined) return;
+    if (quota - usage < MIN_FREE_BYTES) {
       throw new Error('Speicherplatz fast voll. Bitte alte Diagramme löschen.');
     }
   }
 };
 
+/**
+ * @param {DiagramVersion} version
+ * @returns {DiagramVersion}
+ */
 const migrateVersion = (version) => ({ ...version, snapshot: migrateDiagramRecord(version.snapshot || {}) });
 
 export const indexeddb = {
+  /**
+   * Speichert das Diagramm mit aktueller Formatversion und Zeitstempel.
+   * @param {DiagramRecord} diagramData
+   * @returns {Promise<DiagramRecord>} der gespeicherte Datensatz
+   */
   async saveDiagram(diagramData) {
     await checkStorageQuota();
     const db = await initDB();
@@ -56,19 +92,27 @@ export const indexeddb = {
     return copy;
   },
 
+  /** @returns {Promise<DiagramRecord[]>} aufsteigend nach `updatedAt` */
   async getAllDiagrams() {
     const db = await initDB();
     const all = await db.getAllFromIndex(STORE_NAME, 'updatedAt');
     return all.map(migrateDiagramRecord);
   },
 
+  /**
+   * @param {string} id
+   * @returns {Promise<DiagramRecord | null>}
+   */
   async getDiagram(id) {
     const db = await initDB();
     const record = await db.get(STORE_NAME, id);
     return record ? migrateDiagramRecord(record) : null;
   },
 
-  // Löscht das Diagramm samt Versionen und Autosave-Entwurf
+  /**
+   * Löscht das Diagramm samt Versionen und Autosave-Entwurf.
+   * @param {string} id
+   */
   async deleteDiagram(id) {
     const db = await initDB();
     const tx = db.transaction([STORE_NAME, VERSIONS_STORE_NAME, DRAFTS_STORE_NAME], 'readwrite');
@@ -83,10 +127,13 @@ export const indexeddb = {
 
   // --- Versions ---
 
+  /**
+   * Legt eine Version an; danach bleiben höchstens die 10 neuesten Versionen des Diagramms erhalten.
+   * @param {DiagramVersion} version
+   */
   async saveVersion(version) {
     const db = await initDB();
     await db.put(VERSIONS_STORE_NAME, version);
-    // Enforce max versions per diagram
     const all = await this.getVersionsForDiagram(version.diagramId);
     if (all.length > MAX_VERSIONS_PER_DIAGRAM) {
       // all is sorted ascending by savedAt; delete oldest entries
@@ -97,18 +144,26 @@ export const indexeddb = {
     }
   },
 
+  /**
+   * @param {string} diagramId
+   * @returns {Promise<DiagramVersion[]>} aufsteigend nach `savedAt`
+   */
   async getVersionsForDiagram(diagramId) {
     const db = await initDB();
     const all = await db.getAllFromIndex(VERSIONS_STORE_NAME, 'diagramId', diagramId);
-    // Sort ascending by savedAt
     return all.map(migrateVersion).sort((a, b) => (a.savedAt || '').localeCompare(b.savedAt || ''));
   },
 
+  /** @returns {Promise<DiagramVersion[]>} */
   async getAllVersions() {
     const db = await initDB();
     return (await db.getAll(VERSIONS_STORE_NAME)).map(migrateVersion);
   },
 
+  /**
+   * @param {string} versionId
+   * @param {string} note
+   */
   async updateVersionNote(versionId, note) {
     const db = await initDB();
     const version = await db.get(VERSIONS_STORE_NAME, versionId);
@@ -116,6 +171,7 @@ export const indexeddb = {
     await db.put(VERSIONS_STORE_NAME, { ...version, note });
   },
 
+  /** @param {string} versionId */
   async deleteVersion(versionId) {
     const db = await initDB();
     await db.delete(VERSIONS_STORE_NAME, versionId);
@@ -123,8 +179,14 @@ export const indexeddb = {
 
   // --- Autosave-Entwürfe ---
 
+  /**
+   * Speichert (bzw. ersetzt) den Entwurf zum Diagramm `record.id`.
+   * @param {DiagramRecord} record
+   * @returns {Promise<DraftEntry>}
+   */
   async saveDraft(record) {
     const db = await initDB();
+    /** @type {DraftEntry} */
     const entry = {
       diagramId: record.id,
       savedAt: new Date().toISOString(),
@@ -134,12 +196,17 @@ export const indexeddb = {
     return entry;
   },
 
+  /**
+   * @param {string} diagramId
+   * @returns {Promise<DraftEntry | null>}
+   */
   async getDraft(diagramId) {
     const db = await initDB();
     const entry = await db.get(DRAFTS_STORE_NAME, diagramId);
     return entry ? { ...entry, record: migrateDiagramRecord(entry.record) } : null;
   },
 
+  /** @param {string} diagramId */
   async deleteDraft(diagramId) {
     const db = await initDB();
     await db.delete(DRAFTS_STORE_NAME, diagramId);
@@ -147,7 +214,10 @@ export const indexeddb = {
 
   // --- Sicherung ---
 
-  // Spielt eine geprüfte Sicherung ein. Diagramme und Versionen mit gleicher ID werden überschrieben.
+  /**
+   * Spielt eine geprüfte Sicherung ein. Diagramme und Versionen mit gleicher ID werden überschrieben.
+   * @param {{ diagrams: DiagramRecord[], versions: DiagramVersion[] }} backup
+   */
   async importBackup({ diagrams, versions }) {
     await checkStorageQuota();
     const db = await initDB();
@@ -158,4 +228,15 @@ export const indexeddb = {
       tx.done
     ]);
   }
+};
+
+/**
+ * Nur für Tests: schließt die Verbindung, damit eine frische Datenbank geöffnet werden kann.
+ * @returns {Promise<void>}
+ */
+export const closeDatabaseForTests = async () => {
+  if (!dbPromise) return;
+  const db = await dbPromise.catch(() => null);
+  db?.close();
+  dbPromise = null;
 };
