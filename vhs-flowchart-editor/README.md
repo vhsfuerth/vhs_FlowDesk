@@ -42,4 +42,5 @@ Tests liegen neben dem getesteten Modul (`*.test.js`).
 - **Datenschutzhinweis:** Bei inhaltlichen Änderungen an `AiPrivacyNotice.jsx` die Konstante `AI_PRIVACY_NOTICE_VERSION` in `src/storage/settings.js` erhöhen, damit Nutzende erneut bestätigen.
 - **Dialoge:** Keine `window.confirm`/`alert` – stattdessen `useConfirm()`. Neue Dialoge nutzen `useDialogA11y` (Fokus, Tab, Escape) und `role="dialog"` + `aria-modal="true"`.
 - **Version:** In `package.json` nach SemVer pflegen; sie wird über `__APP_VERSION__` in der App angezeigt. Jede Änderung in `CHANGELOG.md` eintragen.
+- **Tests:** Logiktests als `*.test.js`, Komponententests als `*.test.jsx` neben dem Modul. Komponenten mit `renderWithConfirm` aus `src/test/render.jsx` rendern; für IndexedDB vor jedem Test `resetDatabase()` aus `src/test/db.js` aufrufen. Bedienung über Rollen und Beschriftungen (`getByRole`) abfragen, nicht über CSS-Klassen.
 - **Typisierung:** Schrittweise Einführung von TypeScript über JSDoc. Typgeprüfte Dateien sind in `jsconfig.json` unter `include` gelistet und beginnen mit `// @ts-check`.

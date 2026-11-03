@@ -348,6 +348,12 @@ export const createDecisionNode = (x, y, label = 'Entscheidung?') => {
     return node;
 };
 
+/**
+ * @param {number} x
+ * @param {number} y
+ * @param {string} [label]
+ * @param {{ header: string, body: string } | null} [color]
+ */
 export const createLaneNode = (x, y, label = 'Swimlane', color = null) => {
     const node = new shapes.Lane({
         position: { x, y },

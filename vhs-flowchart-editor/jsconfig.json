@@ -20,6 +20,9 @@
     "src/storage/autosave.js",
     "src/export/process-description.js",
     "src/analysis/diagram-diff.js",
+    "src/diagram/converter.js",
+    "src/storage/indexeddb.js",
+    "src/analysis/diagram-validation.js",
     "src/vite-env.d.ts"
   ]
 }

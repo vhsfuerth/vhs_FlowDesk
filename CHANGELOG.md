@@ -29,7 +29,9 @@ Mehr Komfort beim Bearbeiten, Prozessbeschreibung als Text und Versionsvergleich
 - `Strg + Z` direkt nach einer Änderung (innerhalb von 0,3 s) hatte keine Wirkung.
 - Nach einem Update der App konnte eine noch geöffnete alte Version beim Öffnen eines Dialogs abstürzen; die App lädt in diesem Fall jetzt einmalig neu (ungespeicherte Änderungen sind über den Autosave-Entwurf gesichert).
 - Flüssigeres Verschieben: Aktualisierungen von Prüfung, Qualitätspanel und Autosave werden pro Bildschirmbild gebündelt.
-- Word-Export wird erst bei Bedarf geladen; weitere Module mit TypeScript-Prüfung.
+- Word-Export wird erst bei Bedarf geladen; weitere Module mit TypeScript-Prüfung, darunter Konverter, IndexedDB-Zugriff (typisiertes Datenbankschema) und Prozess-Check.
+- Komponententests mit Testing Library für Bestätigungsdialog, Diagrammliste (Öffnen, Löschen, Import, Backup), Versionshistorie (Wiederherstellen, Notizen, Löschen) und Autosave; die IndexedDB-Schicht wird gegen eine In-Memory-Datenbank (`fake-indexeddb`) getestet.
+- `normalizeMetadata` akzeptiert auch `null` als Metadaten.
 
 ## [1.0.0] – 2026-11-03
 
