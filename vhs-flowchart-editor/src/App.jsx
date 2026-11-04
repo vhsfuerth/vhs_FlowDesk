@@ -206,6 +206,9 @@ function App() {
     setZoomLevel(prev => Math.max(0.1, Math.round((prev - 0.1) * 10) / 10));
   }, []);
 
+  // Feinere Stufen (Mausrad/Touchpad), begrenzt in DiagramCanvas
+  const handleZoomSet = useCallback((level) => setZoomLevel(level), []);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       const isModifier = e.ctrlKey || e.metaKey;
@@ -214,6 +217,14 @@ function App() {
       if (isModifier && e.key.toLowerCase() === 's') {
         e.preventDefault();
         saveDiagramRef.current?.();
+        return;
+      }
+
+      // Suche: Strg+F (auch aus dem Suchfeld heraus, nicht bei offenen Dialogen)
+      if (isModifier && e.key.toLowerCase() === 'f' && !e.shiftKey && !e.altKey) {
+        if (document.querySelector('[aria-modal="true"]')) return;
+        e.preventDefault();
+        diagramCanvasRef.current?.openSearch();
         return;
       }
 
@@ -475,8 +486,9 @@ function App() {
     showNotification(`„${title}“ erstellt – bitte prüfen und speichern.`, 'success');
   };
 
+  // Struktur-Check und Qualitätspanel: zum Element springen und es auswählen
   const handleFocusNode = (nodeId) => {
-    diagramCanvasRef.current?.focusNode(nodeId);
+    diagramCanvasRef.current?.revealNode(nodeId);
   };
 
   const handleExportProjectJSON = () => {
@@ -606,8 +618,7 @@ function App() {
            onHistoryChange={(canUndo, canRedo) => setHistoryState({ canUndo, canRedo })}
            onSelectionChange={setSelectionCount}
            zoomLevel={zoomLevel}
-           onZoomIn={handleZoomIn}
-           onZoomOut={handleZoomOut}
+           onZoomSet={handleZoomSet}
         />
         <QualityPanel
           diagramData={liveDiagramData}
@@ -639,6 +650,7 @@ function App() {
          onZoomIn={handleZoomIn}
          onZoomOut={handleZoomOut}
          onCenterContent={handleCenter}
+         onSearch={() => diagramCanvasRef.current?.openSearch()}
          onUndo={() => diagramCanvasRef.current?.undo()}
          onRedo={() => diagramCanvasRef.current?.redo()}
          canUndo={historyState.canUndo}

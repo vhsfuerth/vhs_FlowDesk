@@ -1,16 +1,7 @@
 import React, { useId, useState } from 'react';
 import { X } from 'lucide-react';
 import { useDialogA11y } from '../hooks/useDialogA11y';
-
-const LANE_COLORS = [
-    { id: 'blue',      label: 'Blau',     header: '#00285a', body: '#EEF4F7' },
-    { id: 'green',     label: 'Grün',     header: '#4ba02d', body: '#f0f7eb' },
-    { id: 'orange',    label: 'Orange',   header: '#eb640f', body: '#fef3ea' },
-    { id: 'violet',    label: 'Violett',  header: '#7d5aa5', body: '#f4f0f9' },
-    { id: 'lightblue', label: 'Hellblau', header: '#1e73af', body: '#e8f4fc' },
-    { id: 'red',       label: 'Rot',      header: '#8c0a23', body: '#fdeef0' },
-    { id: 'teal',      label: 'Türkis',   header: '#1a8070', body: '#e8f5f3' },
-];
+import { LANE_COLORS } from '../utils/constants';
 
 // Wird nur gerendert, solange der Dialog offen ist
 const EditLaneModal = ({ initialLabel, initialHeaderColor, onSave, onCancel }) => {

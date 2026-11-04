@@ -1,5 +1,5 @@
 import * as joint from 'jointjs';
-import { COLORS, FONTS } from '../utils/constants';
+import { COLORS, FONTS, LANE_COLORS } from '../utils/constants';
 import { estimateNodeSize } from './node-size';
 
 // Shared styling mixins
@@ -201,7 +201,7 @@ export const shapes = {
             body: {
                 refWidth: '100%',
                 refHeight: '100%',
-                fill: '#EEF4F7',
+                fill: LANE_COLORS[0].body,
                 stroke: COLORS.vhsBlue,
                 strokeWidth: 1.5,
                 rx: 6,
@@ -219,7 +219,7 @@ export const shapes = {
                 textVerticalAnchor: 'middle',
                 textAnchor: 'left',
                 fontFamily: FONTS.primary,
-                fill: '#ffffff',
+                fill: COLORS.white,
                 fontSize: 14,
                 fontWeight: 'bold',
                 textWrap: {

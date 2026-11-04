@@ -73,6 +73,16 @@ export const REVIEW_SCORE_GUIDES = {
   ownership:        'Ist für jeden Schritt klar, wer die Aufgabe übernimmt?'
 };
 
+// Deutsche Bezeichnungen der Knotentypen für Meldungen
+const NODE_TYPE_LABELS = {
+  start: 'Start',
+  end: 'Ende',
+  process: 'Prozessschritt',
+  decision: 'Entscheidung',
+  annotation: 'Kommentar',
+  lane: 'Swimlane'
+};
+
 /**
  * @param {FindingSeverity} severity
  * @param {string} code
@@ -144,6 +154,134 @@ export const getReviewScoreSummary = (reviewScores = DEFAULT_REVIEW_SCORES) => {
   };
 };
 
+/** @param {DiagramNode} node */
+const nameOf = (node) => node.label?.trim() || 'Unbenannter Knoten';
+
+/** @param {string | undefined} label */
+const normalizeLabel = (label) => (label || '').trim().toLocaleLowerCase('de');
+
+/**
+ * Ablaufprüfungen: Erreichbarkeit vom Start, Schleifen ohne Weg zum Ende,
+ * Verbindungen aus einem Ende heraus, doppelte Ausgänge von Entscheidungen.
+ * Kommentare und ihre Verbindungen gehören nicht zum Ablauf.
+ * @param {DiagramNode[]} nodes  ohne Lanes
+ * @param {DiagramEdge[]} edges
+ * @param {Map<string, DiagramNode>} nodeMap
+ * @param {DiagramNode[]} startNodes
+ * @param {DiagramNode[]} endNodes
+ * @returns {Finding[]}
+ */
+const checkFlow = (nodes, edges, nodeMap, startNodes, endNodes) => {
+  /** @type {Finding[]} */
+  const findings = [];
+  const isFlowNode = (/** @type {string} */ id) => {
+    const node = nodeMap.get(id);
+    return Boolean(node) && node?.type !== 'annotation';
+  };
+  const flowEdges = edges.filter((edge) => isFlowNode(edge.from) && isFlowNode(edge.to));
+  const flowNodes = nodes.filter((node) => node.type !== 'annotation');
+
+  /** @type {Map<string, string[]>} */
+  const next = new Map(flowNodes.map((node) => [node.id, []]));
+  /** @type {Map<string, string[]>} */
+  const previous = new Map(flowNodes.map((node) => [node.id, []]));
+  flowEdges.forEach((edge) => {
+    next.get(edge.from)?.push(edge.to);
+    previous.get(edge.to)?.push(edge.from);
+  });
+
+  /**
+   * @param {string[]} startIds
+   * @param {Map<string, string[]>} graph
+   */
+  const reachable = (startIds, graph) => {
+    const seen = new Set(startIds);
+    const queue = [...startIds];
+    while (queue.length) {
+      const id = /** @type {string} */ (queue.shift());
+      (graph.get(id) || []).forEach((target) => {
+        if (!seen.has(target)) {
+          seen.add(target);
+          queue.push(target);
+        }
+      });
+    }
+    return seen;
+  };
+
+  const connected = (/** @type {DiagramNode} */ node) =>
+    (next.get(node.id)?.length || 0) + (previous.get(node.id)?.length || 0) > 0;
+
+  // Vom Start aus nicht erreichbar (isolierte Knoten meldet bereits „nicht verbunden“)
+  if (startNodes.length > 0) {
+    const fromStart = reachable(startNodes.map((n) => n.id), next);
+    flowNodes
+      .filter((node) => !fromStart.has(node.id) && connected(node))
+      .forEach((node) => {
+        findings.push(createFinding('warning', 'unreachable_node', `„${nameOf(node)}“ ist vom Start aus nicht erreichbar.`, node.id));
+      });
+
+    // Schleifen ohne Weg zum Ende: erreichbar, hat Ausgänge, kommt aber nie an einem Ende an
+    if (endNodes.length > 0) {
+      const toEnd = reachable(endNodes.map((n) => n.id), previous);
+      const trapped = flowNodes.filter((node) =>
+        fromStart.has(node.id) && !toEnd.has(node.id) && (next.get(node.id)?.length || 0) > 0);
+      if (trapped.length > 0) {
+        const names = trapped.slice(0, 3).map((node) => `„${nameOf(node)}“`).join(', ');
+        const more = trapped.length > 3 ? ` und ${trapped.length - 3} weitere` : '';
+        findings.push(createFinding('warning', 'endless_loop',
+          `${names}${more} ${trapped.length === 1 ? 'führt' : 'führen'} in eine Schleife ohne Weg zu einem Ende.`, trapped[0].id));
+      }
+    }
+  }
+
+  endNodes.forEach((node) => {
+    if ((next.get(node.id)?.length || 0) > 0) {
+      findings.push(createFinding('warning', 'end_has_outgoing', `Vom Ende „${nameOf(node)}“ geht eine Verbindung weiter. Ein Ende sollte keinen Ausgang haben.`, node.id));
+    }
+  });
+
+  nodes.filter((node) => node.type === 'decision').forEach((node) => {
+    const labels = flowEdges.filter((edge) => edge.from === node.id).map((edge) => normalizeLabel(edge.label)).filter(Boolean);
+    const duplicates = [...new Set(labels.filter((label, index) => labels.indexOf(label) !== index))];
+    if (duplicates.length > 0) {
+      findings.push(createFinding('warning', 'decision_label_duplicate',
+        `Die Entscheidung „${nameOf(node)}“ hat mehrere Ausgänge mit derselben Beschriftung („${duplicates.join('“, „')}“).`, node.id));
+    }
+  });
+
+  return findings;
+};
+
+/**
+ * Werden Swimlanes verwendet, sollte jeder Ablaufschritt in einer Lane liegen.
+ * Maßgeblich ist der Mittelpunkt des Knotens (wie bei der automatischen Anordnung).
+ * @param {DiagramNode[]} nodes  ohne Lanes
+ * @param {DiagramNode[]} lanes
+ * @returns {Finding[]}
+ */
+const checkLanes = (nodes, lanes) => {
+  const laneRects = lanes
+    .filter((lane) => lane.position && lane.size)
+    .map((lane) => ({ ...(/** @type {{x: number, y: number}} */ (lane.position)), ...(/** @type {{width: number, height: number}} */ (lane.size)) }));
+  if (laneRects.length === 0) return [];
+
+  /** @type {Finding[]} */
+  const findings = [];
+  nodes
+    .filter((node) => node.type !== 'annotation' && node.position)
+    .forEach((node) => {
+      const position = /** @type {{x: number, y: number}} */ (node.position);
+      const cx = position.x + (node.size?.width || 0) / 2;
+      const cy = position.y + (node.size?.height || 0) / 2;
+      const inside = laneRects.some((r) => cx >= r.x && cx <= r.x + r.width && cy >= r.y && cy <= r.y + r.height);
+      if (!inside) {
+        findings.push(createFinding('warning', 'outside_lane', `„${nameOf(node)}“ liegt in keiner Swimlane.`, node.id));
+      }
+    });
+  return findings;
+};
+
 /**
  * Prüft die Diagrammstruktur (Start/Ende, Verbindungen, Entscheidungen, Komplexität).
  * Swimlanes werden ignoriert.
@@ -188,11 +326,11 @@ export const validateDiagram = (diagram, improvementItems = []) => {
     const nodeOutgoing = outgoing.get(node.id) || [];
 
     if (node.type !== 'annotation' && (!node.label || !node.label.trim())) {
-      findings.push(createFinding('error', 'empty_label', `Ein Knoten vom Typ „${node.type}” hat keinen Text. Bitte Label vergeben.`, node.id));
+      findings.push(createFinding('error', 'empty_label', `Ein Element vom Typ „${NODE_TYPE_LABELS[node.type] || node.type}“ hat keinen Text. Bitte Text vergeben.`, node.id));
     }
 
     if (node.type !== 'annotation' && nodeIncoming.length === 0 && nodeOutgoing.length === 0) {
-      findings.push(createFinding('warning', 'isolated_node', `„${node.label || 'Unbenannter Knoten'}” ist nicht verbunden.`, node.id));
+      findings.push(createFinding('warning', 'isolated_node', `„${node.label || 'Unbenannter Knoten'}“ ist nicht verbunden.`, node.id));
     }
 
     if (node.type === 'decision') {
@@ -214,6 +352,9 @@ export const validateDiagram = (diagram, improvementItems = []) => {
       findings.push(createFinding('info', 'orphan_annotation', `Die Annotation „${node.label || 'Kommentar'}“ ist noch nicht angebunden.`, node.id));
     }
   });
+
+  findings.push(...checkFlow(nodes, edges, nodeMap, startNodes, endNodes));
+  findings.push(...checkLanes(nodes, allNodes.filter((n) => n.type === 'lane')));
 
   const decisionNodes = nodes.filter(n => n.type === 'decision');
   const processNodes = nodes.filter(n => n.type !== 'annotation' && n.type !== 'start' && n.type !== 'end');

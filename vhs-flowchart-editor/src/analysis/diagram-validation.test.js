@@ -45,6 +45,10 @@ describe('validateDiagram', () => {
       edges: [edge('s', 'p'), edge('s', 'e')]
     });
     expect(codes(result)).toEqual(expect.arrayContaining(['dead_end', 'isolated_node', 'empty_label']));
+    // Deutsche Typbezeichnung statt internem Namen
+    const emptyLabel = result.findings.find((f) => f.code === 'empty_label');
+    expect(emptyLabel.message).toContain('„Prozessschritt“');
+    expect(emptyLabel.message).not.toContain('process');
   });
 
   it('ignoriert Swimlanes bei der Strukturprüfung', () => {
@@ -53,6 +57,62 @@ describe('validateDiagram', () => {
       edges: [edge('s', 'e')]
     });
     expect(result.findings).toEqual([]);
+  });
+
+  it('meldet Knoten, die vom Start aus nicht erreichbar sind', () => {
+    const result = validateDiagram({
+      nodes: [node('s', 'start'), node('a', 'process'), node('b', 'process', 'Waise'), node('e', 'end')],
+      edges: [edge('s', 'a'), edge('a', 'e'), edge('b', 'e')]
+    });
+    const finding = result.findings.find((f) => f.code === 'unreachable_node');
+    expect(finding).toMatchObject({ nodeId: 'b', severity: 'warning' });
+    expect(finding.message).toContain('„Waise“');
+  });
+
+  it('meldet Schleifen ohne Weg zu einem Ende', () => {
+    const result = validateDiagram({
+      nodes: [node('s', 'start'), node('d', 'decision'), node('a', 'process'), node('b', 'process'), node('e', 'end')],
+      edges: [edge('s', 'd'), edge('d', 'e', 'Ja'), edge('d', 'a', 'Nein'), edge('a', 'b'), edge('b', 'a')]
+    });
+    const finding = result.findings.find((f) => f.code === 'endless_loop');
+    expect(finding.nodeId).toBe('a');
+    expect(finding.message).toMatch(/„a“, „b“ führen in eine Schleife/);
+  });
+
+  it('akzeptiert Rücksprünge, die wieder zum Ende führen', () => {
+    const result = validateDiagram({
+      nodes: [node('s', 'start'), node('p', 'process'), node('d', 'decision'), node('e', 'end')],
+      edges: [edge('s', 'p'), edge('p', 'd'), edge('d', 'p', 'Nein'), edge('d', 'e', 'Ja')]
+    });
+    expect(result.findings).toEqual([]);
+  });
+
+  it('meldet Verbindungen aus einem Ende und doppelte Ausgänge', () => {
+    const result = validateDiagram({
+      nodes: [node('s', 'start'), node('d', 'decision'), node('e', 'end'), node('f', 'end')],
+      edges: [edge('s', 'd'), edge('d', 'e', 'Ja'), edge('d', 'f', ' ja '), edge('e', 'f')]
+    });
+    expect(codes(result)).toEqual(expect.arrayContaining(['end_has_outgoing', 'decision_label_duplicate']));
+    expect(result.findings.find((f) => f.code === 'end_has_outgoing').nodeId).toBe('e');
+  });
+
+  it('zählt Kommentare und ihre Verbindungen nicht zum Ablauf', () => {
+    const result = validateDiagram({
+      nodes: [node('s', 'start'), node('e', 'end'), node('c', 'annotation')],
+      edges: [edge('s', 'e'), edge('e', 'c')]
+    });
+    expect(codes(result)).not.toContain('end_has_outgoing');
+    expect(codes(result)).not.toContain('unreachable_node');
+  });
+
+  it('meldet Schritte außerhalb aller Swimlanes', () => {
+    const placed = (id, type, x, y) => ({ ...node(id, type), position: { x, y }, size: { width: 100, height: 50 } });
+    const lane = { id: 'l', type: 'lane', label: 'Team', position: { x: 0, y: 0 }, size: { width: 600, height: 200 } };
+    const result = validateDiagram({
+      nodes: [lane, placed('s', 'start', 10, 50), placed('e', 'end', 10, 400)],
+      edges: [edge('s', 'e')]
+    });
+    expect(result.findings.filter((f) => f.code === 'outside_lane').map((f) => f.nodeId)).toEqual(['e']);
   });
 
   it('erkennt lange lineare Ketten', () => {

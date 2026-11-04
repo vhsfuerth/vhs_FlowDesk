@@ -31,6 +31,18 @@ export const COLORS = {
   black: '#000000',
 };
 
+// Farben für Swimlanes: Kopfzeile in einer vhs-Farbe, Fläche als helle Abstufung.
+// „Türkis“ ist keine Farbe aus dem Styleguide, bleibt aber für bestehende Diagramme wählbar.
+export const LANE_COLORS = [
+  { id: 'blue', label: 'Blau', header: COLORS.vhsBlue, body: '#EEF4F7' },
+  { id: 'green', label: 'Grün', header: COLORS.vhsGreenB, body: '#f0f7eb' },
+  { id: 'orange', label: 'Orange', header: COLORS.vhsOrange, body: '#fef3ea' },
+  { id: 'violet', label: 'Violett', header: COLORS.vhsViolet, body: '#f4f0f9' },
+  { id: 'lightblue', label: 'Hellblau', header: COLORS.vhsLightBlueB, body: '#e8f4fc' },
+  { id: 'red', label: 'Rot', header: COLORS.vhsRedB, body: '#fdeef0' },
+  { id: 'teal', label: 'Türkis', header: '#1a8070', body: '#e8f5f3' },
+];
+
 export const FONTS = {
   primary: 'Arial, Calibri, Helvetica, sans-serif',
 };

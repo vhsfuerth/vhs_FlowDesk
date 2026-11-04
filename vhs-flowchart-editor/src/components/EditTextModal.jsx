@@ -3,7 +3,8 @@ import { X } from 'lucide-react';
 import { useDialogA11y } from '../hooks/useDialogA11y';
 
 // Wird nur gerendert, solange der Dialog offen ist
-const EditTextModal = ({ title, initialValue, onSave, onCancel }) => {
+// `suggestions`: Schnellauswahl (z. B. „Ja“/„Nein“ bei Ausgängen von Entscheidungen); ein Klick speichert sofort
+const EditTextModal = ({ title, initialValue, suggestions = [], onSave, onCancel }) => {
   const [value, setValue] = useState(initialValue || '');
   const dialogRef = useDialogA11y(true, onCancel);
   const titleId = useId();
@@ -52,6 +53,21 @@ const EditTextModal = ({ title, initialValue, onSave, onCancel }) => {
             className="w-full text-sm py-2 px-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-[var(--color-vhs-orange-hell)] focus:border-transparent min-h-[60px] max-h-[200px] resize-y"
             rows={2}
           />
+          {suggestions.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mt-2" role="group" aria-label="Schnellauswahl">
+              <span className="text-xs text-gray-500">Schnellauswahl:</span>
+              {suggestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => onSave(suggestion)}
+                  className="px-3 py-1 text-sm font-bold rounded-md border border-[var(--color-vhs-blau-20)] text-[var(--color-vhs-blau)] hover:bg-[var(--color-vhs-blau-10)]"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          )}
           <p className="text-xs text-gray-500 mt-1">Enter = Speichern, Esc = Abbrechen</p>
         </div>
         <div className="flex justify-end gap-2 px-4 py-3 border-t border-gray-200 bg-gray-50">

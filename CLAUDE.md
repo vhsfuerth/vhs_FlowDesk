@@ -17,7 +17,12 @@ The app lives in `vhs-flowchart-editor/`; run npm scripts from there.
 
 Version follows SemVer in `package.json` (shown in the app via `__APP_VERSION__`); record every change in `CHANGELOG.md` at the repo root. Work on a `release/x.y.z` branch, merge to `master` via PR, then tag `vx.y.z`.
 
+Editor roadmap: `improvement.md` (repo root) lists open editor improvements and records what each release implemented. Read it before editor work and update its status section afterwards.
+
 ## Rules and gotchas
+
+- **Highlights never touch the model**: temporary markings (focus, simulation dimming, search hits) go through `src/diagram/highlight.js` (JointJS highlighters), never `cell.attr(...)` -- otherwise they create undo steps and mark the diagram unsaved.
+- **Viewport**: the paper resizes to its content and its origin can be non-zero, so never compute scroll positions as `position * zoom`. Use `src/diagram/viewport.js` (`scrollToLocalRect`, `zoomAroundPoint`, `visibleCenterLocal`). Changes to the init effect in `DiagramCanvas.jsx` need a full page reload to test (hot reload skips it via `initializedRef`).
 
 - **Data format**: `{ nodes, edges }` (typedefs in `src/diagram/types.js`). Stored records carry `schemaVersion`; when the format changes, bump `CURRENT_SCHEMA_VERSION` and add a migration in `src/storage/schema.js`.
 - **AI providers**: Gemini, OpenAI-compatible (OpenAI, Mistral, custom server) and Anthropic, called directly from the browser. Presets and default models live only in `src/ai/providers.js`; request/response formats per API in `src/ai/adapters.js`; `src/ai/ai-client.js` falls back to the next model on HTTP 404/503/529 and retries once without schema/extra params on 400. API keys go in headers, never the URL. Custom server URLs must be `https://` or `http://localhost` (the CSP in `vercel.json` allows exactly that).
