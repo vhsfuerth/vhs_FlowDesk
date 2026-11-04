@@ -403,3 +403,19 @@ export const createLink = (sourceId, targetId, label = '') => {
 
     return link;
 };
+
+/**
+ * Neues Element eines Typs aus der Werkzeugleiste, zentriert um den Punkt (x, y).
+ * @param {string} type  start | end | process | decision | annotation | lane
+ */
+export const createNodeAt = (type, x, y) => {
+    switch (type) {
+        case 'start': return createStartNode(x - 70, y - 35, 'Start');
+        case 'end': return createEndNode(x - 70, y - 35, 'Ende');
+        case 'decision': return createDecisionNode(x - 90, y - 55, 'Entscheidung?');
+        case 'annotation': return createAnnotationNode(x - 100, y - 40, 'Kommentar');
+        case 'lane': return createLaneNode(x - 300, y - 100, 'Swimlane');
+        case 'process':
+        default: return createProcessNode(x - 80, y - 30, 'Prozess');
+    }
+};
