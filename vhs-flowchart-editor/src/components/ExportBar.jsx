@@ -1,5 +1,5 @@
 import React from 'react';
-import { Share2, Printer, CheckSquare, Trash2, FolderOpen, ZoomIn, ZoomOut, Maximize, Undo2, Redo2, Clock, CheckCircle2, CircleDot, CloudOff, HardDrive, LayoutGrid, FileText } from 'lucide-react';
+import { Share2, Printer, CheckSquare, Trash2, FolderOpen, ZoomIn, ZoomOut, Maximize, Undo2, Redo2, Clock, CheckCircle2, CircleDot, CloudOff, HardDrive, LayoutGrid, FileText, Search } from 'lucide-react';
 import { SAVE_STATUS } from '../storage/autosave';
 import MenuButton from './MenuButton';
 
@@ -44,6 +44,7 @@ const ExportBar = ({
   onZoomIn,
   onZoomOut,
   onCenterContent,
+  onSearch,
   onAutoLayout,
   onAlign,
   onDistribute,
@@ -143,6 +144,16 @@ const ExportBar = ({
         >
           <Maximize className="w-4 h-4" />
         </button>
+        {onSearch && (
+          <button
+            onClick={onSearch}
+            className="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-gray-500"
+            title="Im Diagramm suchen (Strg+F)"
+            aria-label="Im Diagramm suchen"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+        )}
         <div className="w-px h-6 bg-gray-200 mx-1" />
         <MenuButton
           label="Anordnen"

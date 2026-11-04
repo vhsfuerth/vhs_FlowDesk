@@ -8,6 +8,11 @@ import { exportToPNG, exportToSVG, exportToPDF, exportToJSON, getDiagramJpegForP
 import { extractFragment, instantiateFragment, readClipboard, writeClipboard } from '../diagram/clipboard';
 import { alignBoxes, distributeBoxes } from '../diagram/arrange';
 import { generateUUID } from '../utils/uuid';
+import { COLORS } from '../utils/constants';
+import { addFocusHighlight, clearFocusHighlight, clearSearchHighlights, setPresentationDim, setSearchHighlights } from '../diagram/highlight';
+import { clampZoom, fitPaperToContent, pasteOffset, scrollToLocalRect, visibleCenterLocal, wheelZoomFactor, zoomAroundPoint } from '../diagram/viewport';
+import { findMatches } from '../diagram/search';
+import DiagramSearch from './DiagramSearch';
 import EditTextModal from './EditTextModal';
 import EditLaneModal from './EditLaneModal';
 
@@ -31,8 +36,8 @@ class LaneResizeTool extends joint.dia.ToolView {
         const bg = document.createElementNS(ns, 'rect');
         bg.setAttribute('x', ox); bg.setAttribute('y', oy);
         bg.setAttribute('width', 14); bg.setAttribute('height', 14);
-        bg.setAttribute('rx', 2); bg.setAttribute('fill', '#00285a');
-        bg.setAttribute('stroke', '#ffffff'); bg.setAttribute('stroke-width', 1.5);
+        bg.setAttribute('rx', 2); bg.setAttribute('fill', COLORS.vhsBlue);
+        bg.setAttribute('stroke', COLORS.white); bg.setAttribute('stroke-width', 1.5);
         bg.setAttribute('cursor', 'nwse-resize');
         el.appendChild(bg);
 
@@ -41,21 +46,26 @@ class LaneResizeTool extends joint.dia.ToolView {
             const ln = document.createElementNS(ns, 'line');
             ln.setAttribute('x1', ox + x1); ln.setAttribute('y1', oy + y1);
             ln.setAttribute('x2', ox + x2); ln.setAttribute('y2', oy + y2);
-            ln.setAttribute('stroke', '#ffffff'); ln.setAttribute('stroke-width', 1.5);
+            ln.setAttribute('stroke', COLORS.white); ln.setAttribute('stroke-width', 1.5);
             ln.setAttribute('pointer-events', 'none');
             el.appendChild(ln);
         });
 
-        // Only attach drag listener when not already resizing (prevents re-entrant calls)
+        // Only attach drag listener when not already resizing (prevents re-entrant calls).
+        // Pointer Events: works with mouse, pen and touch.
         if (!this._resizing) {
-            bg.addEventListener('mousedown', (evt) => this._startResize(evt), { once: true });
-            // Also block pointerdown so JointJS doesn't simultaneously try to drag the lane
-            bg.addEventListener('pointerdown', (evt) => evt.stopPropagation(), { once: true });
+            bg.style.touchAction = 'none';
+            bg.addEventListener('pointerdown', (evt) => this._startResize(evt));
+            // Block JointJS' own mousedown/touchstart so it doesn't drag the lane at the same time
+            const stop = (evt) => evt.stopPropagation();
+            bg.addEventListener('mousedown', stop);
+            bg.addEventListener('touchstart', stop, { passive: true });
         }
     }
 
     _startResize(evt) {
         evt.stopPropagation();
+        evt.preventDefault();
         if (this._resizing) return;
         this._resizing = true;
 
@@ -65,8 +75,9 @@ class LaneResizeTool extends joint.dia.ToolView {
         const startX = lp.x, startY = lp.y, startW = width, startH = height;
 
         const cleanup = () => {
-            window.removeEventListener('mousemove', onMove);
-            window.removeEventListener('mouseup', onUp);
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            window.removeEventListener('pointercancel', onUp);
             window.removeEventListener('blur', onBlur);
             this._resizing = false;
             this._draw(); // restore interactive handle at final position
@@ -85,14 +96,27 @@ class LaneResizeTool extends joint.dia.ToolView {
         // mouseup never fires on window – reset state to prevent a stuck resize.
         const onBlur = () => cleanup();
 
-        window.addEventListener('mousemove', onMove);
-        window.addEventListener('mouseup', onUp);
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', onUp);
         window.addEventListener('blur', onBlur);
     }
 }
 
 // Versatz beim Einfügen und Duplizieren, damit Kopien nicht verdeckt sind
 const PASTE_OFFSET = 30;
+
+// Schnellauswahl für Ausgänge von Entscheidungen; noch nicht vergebene Antworten zuerst
+const DECISION_ANSWERS = ['Ja', 'Nein'];
+const decisionLabelSuggestions = (graph, link) => {
+    const source = link.getSourceElement();
+    if (!source || source.get('type') !== 'vhs.Decision') return [];
+    const used = graph.getConnectedLinks(source, { outbound: true })
+        .filter((other) => other !== link)
+        .map((other) => String(other.labels()[0]?.attrs?.text?.text || '').trim().toLowerCase());
+    const isUsed = (answer) => used.includes(answer.toLowerCase());
+    return [...DECISION_ANSWERS.filter((a) => !isUsed(a)), ...DECISION_ANSWERS.filter(isUsed)];
+};
 
 // Erzeugt ein neues Element, zentriert um den Punkt (x, y)
 const createNodeAt = (type, x, y) => {
@@ -107,7 +131,7 @@ const createNodeAt = (type, x, y) => {
     }
 };
 
-const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryChange, onSelectionChange, zoomLevel, onZoomIn, onZoomOut }, ref) => {
+const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryChange, onSelectionChange, zoomLevel, onZoomSet }, ref) => {
   const canvasRef = useRef(null);
   const graphRef = useRef(null);
   const paperRef = useRef(null);
@@ -117,26 +141,32 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
   const initializedRef = useRef(false);
   const selectionRef = useRef([]);
   const setSelectionRef = useRef(() => {});
-  const pasteCountRef = useRef(0);
-  const onZoomInRef = useRef(onZoomIn);
-  const onZoomOutRef = useRef(onZoomOut);
+  // Letzte Einfügestelle und wie oft dort eingefügt wurde (für versetzte Mehrfachkopien)
+  const lastPasteRef = useRef({ key: null, count: 0 });
+  // Letzte Mausposition über der Arbeitsfläche (Bildschirmkoordinaten) oder null
+  const lastPointerRef = useRef(null);
+  // Punkt, um den der nächste Zoom erfolgt (Mausrad); null = Bildmitte
+  const zoomAnchorRef = useRef(null);
+  const zoomRef = useRef(zoomLevel);
+  const fitPaperRef = useRef(() => {});
+  const onZoomSetRef = useRef(onZoomSet);
   const onGraphChangeRef = useRef(onGraphChange);
   const onHistoryChangeRef = useRef(onHistoryChange);
   const onSelectionChangeRef = useRef(onSelectionChange);
 
   useEffect(() => {
-    onZoomInRef.current = onZoomIn;
-    onZoomOutRef.current = onZoomOut;
+    onZoomSetRef.current = onZoomSet;
+    zoomRef.current = zoomLevel;
     onGraphChangeRef.current = onGraphChange;
     onHistoryChangeRef.current = onHistoryChange;
     onSelectionChangeRef.current = onSelectionChange;
-  }, [onZoomIn, onZoomOut, onGraphChange, onHistoryChange, onSelectionChange]);
+  }, [onZoomSet, zoomLevel, onGraphChange, onHistoryChange, onSelectionChange]);
 
   const highlightTimeoutRef = useRef(null);
-  // Tracks the currently red-highlighted node so it can be restored immediately
-  const highlightedNodeRef = useRef(null); // { node, stroke, strokeWidth }
   const [editModal, setEditModal] = useState({ isOpen: false, title: '', value: '', onSave: null });
-  const [laneEditModal, setLaneEditModal] = useState({ isOpen: false, label: '', headerColor: '#00285a', onSave: null });
+  const [laneEditModal, setLaneEditModal] = useState({ isOpen: false, label: '', headerColor: COLORS.vhsBlue, onSave: null });
+  // Suche (Strg+F)
+  const [search, setSearch] = useState({ isOpen: false, query: '', matches: [], index: 0, focusToken: 0 });
 
   useEffect(() => {
     if (initializedRef.current) return;
@@ -148,23 +178,24 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
     const paper = new joint.dia.Paper({
       el: canvasRef.current,
       model: graph,
-      width: 5000, 
-      height: 5000,
+      // Startgröße; danach passt fitPaperToContent die Fläche an den Inhalt an
+      width: canvasRef.current.parentNode.clientWidth || 1000,
+      height: canvasRef.current.parentNode.clientHeight || 800,
       gridSize: 10,
       drawGrid: {
         name: 'dot',
-        args: { color: '#CDD7DC', thickness: 1 }
+        args: { color: COLORS.vhsBlue20, thickness: 1 }
       },
-      background: { color: '#ffffff' },
+      background: { color: COLORS.white },
       defaultLink: () => new joint.shapes.standard.Link({
         attrs: {
           line: {
-            stroke: '#69829B',
+            stroke: COLORS.vhsBlue60,
             strokeWidth: 2,
             targetMarker: {
               type: 'path',
               d: 'M 10 -5 0 0 10 5 z',
-              fill: '#69829B',
+              fill: COLORS.vhsBlue60,
               stroke: 'none'
             }
           }
@@ -209,9 +240,45 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
 
     history.isTracking = true;
 
+    // --- Größe der Arbeitsfläche folgt dem Inhalt (auch negative Koordinaten) ---
+    // Während eines Ziehvorgangs wird nicht angepasst, sonst verschiebt sich die Ansicht unter der Maus.
+    const scrollContainer = canvasRef.current.parentNode;
+    let fitFrame = null;
+    let isPointerDragging = false;
+    const fitPaper = () => {
+        if (fitFrame !== null) {
+            cancelAnimationFrame(fitFrame);
+            fitFrame = null;
+        }
+        fitPaperToContent(paper, scrollContainer);
+    };
+    const scheduleFit = () => {
+        if (isPointerDragging || fitFrame !== null) return;
+        fitFrame = requestAnimationFrame(() => {
+            fitFrame = null;
+            fitPaperToContent(paper, scrollContainer);
+        });
+    };
+    fitPaperRef.current = fitPaper;
+    paper.on('cell:pointerdown', () => { isPointerDragging = true; });
+    const onPointerUp = () => {
+        if (!isPointerDragging) return;
+        isPointerDragging = false;
+        scheduleFit();
+    };
+    window.addEventListener('pointerup', onPointerUp);
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleFit);
+    resizeObserver?.observe(scrollContainer);
+
+    // Letzte Mausposition merken (Einfügen an der Mausposition)
+    const onContainerPointerMove = (evt) => { lastPointerRef.current = { x: evt.clientX, y: evt.clientY }; };
+    const onContainerPointerLeave = () => { lastPointerRef.current = null; };
+    scrollContainer.addEventListener('pointermove', onContainerPointerMove);
+    scrollContainer.addEventListener('pointerleave', onContainerPointerLeave);
+
     // --- Auswahl (ein oder mehrere Elemente/Verbindungen) ---
     const boundaryAttrs = {
-      rect: { fill: 'none', stroke: '#00285a', 'stroke-width': 2, 'stroke-dasharray': '5,5' }
+      rect: { fill: 'none', stroke: COLORS.vhsBlue, 'stroke-width': 2, 'stroke-dasharray': '5,5' }
     };
 
     const renderSelection = () => {
@@ -270,6 +337,9 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
       }
       if (eventName === 'add' || eventName === 'remove' || eventName === 'reset' || eventName.includes('change:')) {
           onGraphChangeRef.current?.();
+      }
+      if (eventName === 'add' || eventName === 'remove' || eventName === 'reset' || eventName === 'change:position' || eventName === 'change:size') {
+          scheduleFit();
       }
     });
 
@@ -403,7 +473,7 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
             setLaneEditModal({
                 isOpen: true,
                 label: node.attr('label/text') || '',
-                headerColor: node.attr('header/fill') || '#00285a',
+                headerColor: node.attr('header/fill') || COLORS.vhsBlue,
                 onSave: ({ label, color }) => {
                     node.attr('label/text', label);
                     node.attr('header/fill', color.header);
@@ -440,6 +510,7 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
             isOpen: true,
             title: 'Verbindungstext bearbeiten (z.B. Ja/Nein)',
             value: currentText,
+            suggestions: decisionLabelSuggestions(graph, link),
             onSave: (newText) => {
                 if (newText.trim() === '') {
                     link.labels([]);
@@ -472,15 +543,14 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
     });
 
     // Ctrl + Mouse Wheel Zoom
+    // Strg + Mausrad (auch Touchpad-Zoomgeste): Zoom um die Mausposition
     const onWheel = (e) => {
-        if (e.ctrlKey) {
-            e.preventDefault();
-            if (e.deltaY < 0) {
-                if (onZoomInRef.current) onZoomInRef.current();
-            } else {
-                if (onZoomOutRef.current) onZoomOutRef.current();
-            }
-        }
+        if (!e.ctrlKey) return;
+        e.preventDefault();
+        const next = clampZoom(zoomRef.current * wheelZoomFactor(e.deltaY));
+        if (next === zoomRef.current) return;
+        zoomAnchorRef.current = { x: e.clientX, y: e.clientY };
+        onZoomSetRef.current?.(next);
     };
 
     const container = canvasRef.current.parentNode;
@@ -493,23 +563,33 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
         window.removeEventListener('mousemove', onMouseMove);
         window.removeEventListener('mouseup', onMouseUp);
         window.removeEventListener('blur', onWindowBlur);
+        window.removeEventListener('pointerup', onPointerUp);
         container.removeEventListener('wheel', onWheel);
+        scrollContainer.removeEventListener('pointermove', onContainerPointerMove);
+        scrollContainer.removeEventListener('pointerleave', onContainerPointerLeave);
+        resizeObserver?.disconnect();
+        if (fitFrame !== null) cancelAnimationFrame(fitFrame);
     };
 
   }, []);
 
+  // Zoom um die Mausposition (Mausrad) bzw. die Bildmitte (Tasten, Schaltflächen)
   useEffect(() => {
-      if (paperRef.current) {
-          paperRef.current.scale(zoomLevel, zoomLevel);
-      }
+      const paper = paperRef.current;
+      if (!paper) return;
+      const anchor = zoomAnchorRef.current;
+      zoomAnchorRef.current = null;
+      zoomAroundPoint(paper, canvasRef.current.parentNode, zoomLevel, anchor, fitPaperRef.current);
   }, [zoomLevel]);
+
+  const scrollContainer = () => canvasRef.current.parentNode;
 
 
   const centerContent = () => {
-      const bbox = paperRef.current.getContentBBox();
-      const container = canvasRef.current.parentNode;
-      container.scrollLeft = (bbox.x * zoomLevel) - (container.clientWidth / 2) + (bbox.width * zoomLevel / 2);
-      container.scrollTop = (bbox.y * zoomLevel) - 20;
+      const paper = paperRef.current;
+      if (!paper || !graphRef.current?.getElements().length) return;
+      fitPaperRef.current();
+      scrollToLocalRect(paper, scrollContainer(), paper.getContentArea({ useModelGeometry: true }), 'top');
   };
 
   const loadJsonData = (json, shouldLayout = false) => {
@@ -523,72 +603,71 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
       }
       historyRef.current?.clear();
       historyRef.current?.saveState();
+      // Beim Laden gemeldete „Rückgängig möglich“-Zustände (entprellte Änderungen) zurücksetzen
+      notifyHistory();
+      closeSearch();
+      fitPaperRef.current();
       setTimeout(centerContent, 100);
   };
 
-  // Immediately restores the stroke of the previously highlighted node (if any)
+  const notifyHistory = () => {
+      onHistoryChangeRef.current?.(historyRef.current?.canUndo() || false, historyRef.current?.canRedo() || false);
+  };
+
+  // Entfernt die rote Markierung sofort (Hervorhebungen wirken nur auf die Darstellung)
   const clearHighlight = () => {
       if (highlightTimeoutRef.current) {
           window.clearTimeout(highlightTimeoutRef.current);
           highlightTimeoutRef.current = null;
       }
-      if (highlightedNodeRef.current) {
-          const { node, stroke, strokeWidth } = highlightedNodeRef.current;
-          node.attr('body/stroke', stroke);
-          node.attr('body/strokeWidth', strokeWidth);
-          highlightedNodeRef.current = null;
-      }
+      clearFocusHighlight(paperRef.current);
   };
 
   const focusNode = (nodeId) => {
       const node = graphRef.current?.getCell(nodeId);
       if (!node || !node.isElement()) return;
 
-      const position = node.position();
-      const size = node.size();
-      const container = canvasRef.current.parentNode;
+      scrollToLocalRect(paperRef.current, scrollContainer(), node.getBBox(), 'center');
 
-      container.scrollLeft = (position.x * zoomLevel) - (container.clientWidth / 2) + (size.width * zoomLevel / 2);
-      container.scrollTop = (position.y * zoomLevel) - (container.clientHeight / 2) + (size.height * zoomLevel / 2);
-
-      // Restore the previous node BEFORE reading the current node's stroke,
-      // so we never accidentally store '#E1000F' as the "original" colour.
       clearHighlight();
-
-      const originalStroke = node.attr('body/stroke');
-      const originalWidth = node.attr('body/strokeWidth');
-      highlightedNodeRef.current = { node, stroke: originalStroke, strokeWidth: originalWidth };
-
-      node.attr('body/stroke', '#E1000F');
-      node.attr('body/strokeWidth', 4);
-
-      highlightTimeoutRef.current = window.setTimeout(() => {
-          clearHighlight();
-      }, 1800);
+      addFocusHighlight(paperRef.current, node);
+      highlightTimeoutRef.current = window.setTimeout(clearHighlight, 1800);
   };
 
   const setPresentationFocus = (nodeId = null) => {
-      // When leaving a mode (nodeId = null), immediately remove any red highlight
-      if (!nodeId) {
-          clearHighlight();
-      }
-
-      const cells = graphRef.current?.getCells() || [];
-      cells.forEach((cell) => {
-          const isFocus = !nodeId || cell.id === nodeId;
-          const baseOpacity = !nodeId ? 1 : (isFocus ? 1 : 0.18);
-          if (cell.isElement()) {
-              cell.attr('root/opacity', baseOpacity);
-          } else if (cell.isLink()) {
-              const sourceId = cell.get('source')?.id;
-              const targetId = cell.get('target')?.id;
-              const linkFocused = !nodeId || sourceId === nodeId || targetId === nodeId;
-              cell.attr('line/opacity', linkFocused ? 1 : 0.12);
-          }
-      });
+      setPresentationDim(paperRef.current, graphRef.current, nodeId);
       if (nodeId) {
           focusNode(nodeId);
+      } else {
+          clearHighlight();
       }
+  };
+
+  // --- Suche (Strg+F) ---
+  const showSearchResult = (matches, index) => {
+      const currentId = matches[index] || null;
+      setSearchHighlights(paperRef.current, graphRef.current, matches, currentId);
+      const cell = currentId && graphRef.current?.getCell(currentId);
+      if (cell) scrollToLocalRect(paperRef.current, scrollContainer(), cell.getBBox(), 'center');
+  };
+
+  const updateSearchQuery = (query) => {
+      const nodes = converterRef.current?.toJson()?.nodes || [];
+      const matches = findMatches(nodes, query);
+      setSearch((prev) => ({ ...prev, query, matches, index: 0 }));
+      showSearchResult(matches, 0);
+  };
+
+  const stepSearch = (direction) => {
+      if (!search.matches.length) return;
+      const index = (search.index + direction + search.matches.length) % search.matches.length;
+      setSearch((prev) => ({ ...prev, index }));
+      showSearchResult(search.matches, index);
+  };
+
+  const closeSearch = () => {
+      clearSearchHighlights(paperRef.current);
+      setSearch((prev) => (prev.isOpen ? { ...prev, isOpen: false, matches: [], index: 0 } : prev));
   };
 
   // Fügt einen Diagrammausschnitt mit neuen IDs ein und wählt ihn aus
@@ -627,10 +706,11 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
     clear: () => {
         graphRef.current?.clear();
         historyRef.current?.saveState();
-        if (onHistoryChange) onHistoryChange(historyRef.current?.canUndo() || false, historyRef.current?.canRedo() || false);
+        notifyHistory();
     },
     resetHistory: () => {
         historyRef.current?.clear();
+        notifyHistory();
     },
 
     undo: () => {
@@ -671,16 +751,24 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
         const ids = selectionRef.current.filter((cell) => cell.isElement()).map((cell) => cell.id);
         if (!ids.length) return 0;
         writeClipboard(extractFragment(converterRef.current.toJson(), ids));
-        pasteCountRef.current = 0;
+        lastPasteRef.current = { key: null, count: 0 };
         return ids.length;
     },
 
+    // Fügt mittig an der Mausposition ein (Maus außerhalb: Bildmitte).
+    // Mehrfaches Einfügen an derselben Stelle versetzt die Kopien.
     paste: () => {
         const fragment = readClipboard();
         if (!fragment?.nodes?.length) return 0;
-        pasteCountRef.current += 1;
-        const step = PASTE_OFFSET * pasteCountRef.current;
-        return insertFragment(fragment, { x: step, y: step });
+        const paper = paperRef.current;
+        const pointer = lastPointerRef.current;
+        const target = pointer
+            ? paper.clientToLocalPoint(pointer.x, pointer.y)
+            : visibleCenterLocal(paper, scrollContainer());
+        const key = Math.round(target.x) + ':' + Math.round(target.y);
+        const repeat = lastPasteRef.current.key === key ? lastPasteRef.current.count : 0;
+        lastPasteRef.current = { key, count: repeat + 1 };
+        return insertFragment(fragment, pasteOffset(fragment, target, repeat, PASTE_OFFSET));
     },
 
     duplicateSelection: () => {
@@ -709,10 +797,8 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
         setSelectionRef.current(selectionRef.current);
         // An den Anfang des Diagramms scrollen, damit Start und Lane-Titel sichtbar sind
         setTimeout(() => {
-            const area = paperRef.current.getContentArea();
-            const container = canvasRef.current.parentNode;
-            container.scrollLeft = Math.max(0, area.x * zoomLevel - 20);
-            container.scrollTop = Math.max(0, area.y * zoomLevel - 20);
+            fitPaperRef.current();
+            scrollToLocalRect(paperRef.current, scrollContainer(), paperRef.current.getContentArea({ useModelGeometry: true }), 'topLeft');
         }, 50);
         return result.direction;
     },
@@ -721,15 +807,27 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
     addNodeAtCenter: (type) => {
         const paper = paperRef.current;
         if (!paper || !graphRef.current) return;
-        const container = canvasRef.current.parentNode;
-        const rect = container.getBoundingClientRect();
-        const { x, y } = paper.clientToLocalPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        const { x, y } = visibleCenterLocal(paper, scrollContainer());
         // Leicht versetzt, damit mehrere Klicks nicht exakt übereinander landen
         const offset = (graphRef.current.getElements().length % 5) * 20;
         graphRef.current.addCell(createNodeAt(type, x + offset, y + offset));
     },
 
     center: () => centerContent(),
+
+    // Strg+F: Suche öffnen bzw. wieder ins Suchfeld springen
+    openSearch: () => {
+        setSearch((prev) => ({ ...prev, isOpen: true, focusToken: prev.focusToken + 1 }));
+        if (search.query) updateSearchQuery(search.query);
+    },
+    closeSearch,
+
+    // Zum Element springen, kurz markieren und auswählen (z. B. aus dem Struktur-Check)
+    revealNode: (nodeId) => {
+        focusNode(nodeId);
+        const cell = graphRef.current?.getCell(nodeId);
+        if (cell) setSelectionRef.current([cell]);
+    },
     getZoom: () => zoomLevel,
     focusNode,
     setPresentationFocus,
@@ -761,7 +859,8 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
   };
 
   return (
-    <div className="flex-grow h-full relative overflow-auto bg-[var(--color-vhs-blau-10)] rounded-tl-lg border-l border-t border-[var(--color-vhs-blau-20)]" style={{ scrollBehavior: 'auto' }}>
+    <div className="flex-grow h-full relative min-w-0">
+    <div className="absolute inset-0 overflow-auto bg-[var(--color-vhs-blau-10)] rounded-tl-lg border-l border-t border-[var(--color-vhs-blau-20)]" style={{ scrollBehavior: 'auto' }}>
       <div
         ref={canvasRef}
         onDragOver={handleDragOver}
@@ -772,10 +871,24 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
         role="region"
         aria-label="Diagramm-Arbeitsfläche"
       />
+    </div>
+      {search.isOpen && (
+        <DiagramSearch
+          query={search.query}
+          matchCount={search.matches.length}
+          currentIndex={search.index}
+          focusToken={search.focusToken}
+          onQueryChange={updateSearchQuery}
+          onNext={() => stepSearch(1)}
+          onPrevious={() => stepSearch(-1)}
+          onClose={closeSearch}
+        />
+      )}
       {editModal.isOpen && (
         <EditTextModal
           title={editModal.title}
           initialValue={editModal.value}
+          suggestions={editModal.suggestions}
           onSave={editModal.onSave || (() => {})}
           onCancel={() => setEditModal((prev) => ({ ...prev, isOpen: false }))}
         />

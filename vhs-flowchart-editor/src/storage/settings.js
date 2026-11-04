@@ -1,6 +1,5 @@
 import { DEFAULT_PROVIDER_ID, getProviderPreset, resolveProvider } from '../ai/providers';
 
-const SETTINGS_KEY = 'vhs-settings';
 // Bis 1.2.0 gab es nur einen Gemini-Key; er wird beim Lesen als Gemini-Key übernommen
 const LEGACY_API_KEY_KEY = 'vhs-api-key';
 const API_KEYS_KEY = 'vhs-api-keys';
@@ -88,15 +87,6 @@ export const setCopilotHints = (hints) => setLocalStorageItem(COPILOT_HINTS_KEY,
 
 export const getLastDiagramId = () => getLocalStorageItem(LAST_DIAGRAM_KEY, null);
 export const setLastDiagramId = (id) => setLocalStorageItem(LAST_DIAGRAM_KEY, id);
-
-export const getSettings = () => getLocalStorageItem(SETTINGS_KEY, {
-    gridVisible: true,
-    autoLayout: true
-});
-export const saveSettings = (newSettings) => {
-    const current = getSettings();
-    setLocalStorageItem(SETTINGS_KEY, { ...current, ...newSettings });
-};
 
 // Bestätigung des KI-Datenschutzhinweises. Wird der Hinweistext inhaltlich
 // geändert, AI_PRIVACY_NOTICE_VERSION erhöhen – dann wird erneut gefragt.

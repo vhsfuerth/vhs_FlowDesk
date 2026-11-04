@@ -2,6 +2,51 @@
 
 Alle nennenswerten Änderungen am vhs Workflow-Algorithm Editor. Die Versionsnummern folgen [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.4.0] – 2026-11-04
+
+Bequemer arbeiten auf der Arbeitsfläche (Stufe „Nächstes Release“ aus `improvement.md`).
+
+### Arbeitsfläche
+
+- Die Arbeitsfläche wächst mit dem Inhalt in alle Richtungen, auch nach links und oben. Elemente können nicht mehr außerhalb des erreichbaren Bereichs verschwinden, auch nicht bei starkem Zoom.
+- Zoomen mit Strg + Mausrad bzw. Touchpad-Geste erfolgt um die Mausposition und in feineren Stufen; Schaltflächen und Tastenkürzel zoomen um die Bildmitte. Der sichtbare Ausschnitt springt nicht mehr weg.
+- „Zentrieren“ zeigt breite Diagramme ab dem linken Rand (Start und Lane-Titel bleiben sichtbar).
+- Einfügen (Strg+V) setzt die Kopie mittig an die Mausposition, ist die Maus außerhalb, in die Bildmitte. Mehrfaches Einfügen an derselben Stelle versetzt die Kopien.
+
+### Suche
+
+- Neue Suche im Diagramm mit Strg+F oder über die Lupe in der unteren Leiste. Alle Treffer werden gelb markiert, der aktuelle orange; Enter bzw. Umschalt+Enter springt zum nächsten bzw. vorherigen Treffer, Esc schließt die Suche. Die Markierungen verändern das Diagramm nicht.
+
+### Verbindungen
+
+- Beim Beschriften eines Ausgangs einer Entscheidung bietet der Dialog „Ja“ und „Nein“ als Schnellauswahl an (noch nicht vergebene Antwort zuerst); ein Klick speichert.
+
+### Struktur-Check
+
+- Neue Prüfungen: vom Start aus nicht erreichbare Schritte, Schleifen ohne Weg zu einem Ende, Verbindungen aus einem Ende heraus, doppelt beschriftete Ausgänge einer Entscheidung und Schritte außerhalb aller Swimlanes (wenn Swimlanes verwendet werden).
+- Ein Klick auf einen Befund springt zum Element und wählt es aus, sodass es direkt bearbeitet werden kann.
+
+### Technik
+
+- Neue Module `diagram/viewport.js` (Flächengröße, Zoom, Scrollen, Einfügeposition) und `diagram/search.js`, neue Komponente `DiagramSearch.jsx`.
+
+## [1.3.1] – 2026-11-04
+
+Fehlerbehebungen im Editor (Stufe „Sofort“ aus `improvement.md`).
+
+### Behoben
+
+- Markierungen im Struktur-Check und in der Simulation verändern das Diagramm nicht mehr: kein „ungespeicherter“ Stand und keine zusätzlichen Rückgängig-Schritte mehr durch bloßes Anklicken oder Durchspielen.
+- „Rückgängig“ ist direkt nach dem Öffnen eines Diagramms nicht mehr fälschlich aktiv.
+- Der Struktur-Check nennt den Elementtyp auf Deutsch (z. B. „Prozessschritt“ statt „process“).
+- Die Größe von Swimlanes lässt sich auch mit Stift oder Touch ändern.
+
+### Technik
+
+- Neues Modul `diagram/highlight.js` für vorübergehende Hervorhebungen (JointJS-Highlighter statt Modelländerungen).
+- Farben des Editors und die Lane-Farbpalette (`LANE_COLORS`) kommen zentral aus `utils/constants.js`.
+- Ungenutzte Einstellungen (`getSettings`/`saveSettings`) entfernt.
+
 ## [1.3.0] – 2026-11-04
 
 KI-Anbieter frei wählbar.
