@@ -127,3 +127,99 @@ export function pasteOffset(fragment, target, repeat = 0, step = 30) {
         y: snap(target.y - (bounds.y + bounds.height / 2) + shift)
     };
 }
+
+// --- Anbindung an die Arbeitsfläche (Ereignisse) ---
+
+/** Graph-Ereignisse, nach denen sich die Größe des Inhalts ändern kann */
+const FIT_EVENTS = 'add remove reset change:position change:size';
+
+/**
+ * Hält die Papergröße passend zum Inhalt: nach Änderungen am Graphen (gebündelt per
+ * requestAnimationFrame) und wenn sich der sichtbare Bereich ändert. Während ein Element
+ * gezogen wird, wird nicht angepasst, sonst verschiebt sich die Ansicht unter der Maus.
+ * @returns {{ fit: () => void, schedule: () => void, detach: () => void }}
+ */
+export function createAutoFit({ paper, graph, container }) {
+    let frame = null;
+    let isDragging = false;
+
+    const cancel = () => {
+        if (frame === null) return;
+        cancelAnimationFrame(frame);
+        frame = null;
+    };
+    const fit = () => {
+        cancel();
+        fitPaperToContent(paper, container);
+    };
+    const schedule = () => {
+        if (isDragging || frame !== null) return;
+        frame = requestAnimationFrame(() => {
+            frame = null;
+            fitPaperToContent(paper, container);
+        });
+    };
+    const onCellPointerDown = () => { isDragging = true; };
+    const onPointerUp = () => {
+        if (!isDragging) return;
+        isDragging = false;
+        schedule();
+    };
+
+    paper.on('cell:pointerdown', onCellPointerDown);
+    graph.on(FIT_EVENTS, schedule);
+    window.addEventListener('pointerup', onPointerUp);
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
+    resizeObserver?.observe(container);
+
+    return {
+        fit,
+        schedule,
+        detach: () => {
+            cancel();
+            paper.off('cell:pointerdown', onCellPointerDown);
+            graph.off(FIT_EVENTS, schedule);
+            window.removeEventListener('pointerup', onPointerUp);
+            resizeObserver?.disconnect();
+        }
+    };
+}
+
+/**
+ * Strg + Mausrad (auch die Zoomgeste am Touchpad) zoomt um die Mausposition.
+ * @param {HTMLElement} container
+ * @param {{ getZoom: () => number, setZoom: (zoom: number, anchor: { x: number, y: number }) => void }} options
+ * @returns {() => void} Abmelden
+ */
+export function attachWheelZoom(container, { getZoom, setZoom }) {
+    const onWheel = (evt) => {
+        if (!evt.ctrlKey) return;
+        evt.preventDefault();
+        const current = getZoom();
+        const next = clampZoom(current * wheelZoomFactor(evt.deltaY));
+        if (next !== current) setZoom(next, { x: evt.clientX, y: evt.clientY });
+    };
+    container.addEventListener('wheel', onWheel, { passive: false });
+    return () => container.removeEventListener('wheel', onWheel);
+}
+
+/**
+ * Merkt sich die letzte Mausposition über dem Container (Bildschirmkoordinaten),
+ * z. B. für Einfügen an der Mausposition. Außerhalb: null.
+ * @param {HTMLElement} container
+ * @returns {{ get: () => ({ x: number, y: number } | null), detach: () => void }}
+ */
+export function trackPointer(container) {
+    let last = null;
+    const onMove = (evt) => { last = { x: evt.clientX, y: evt.clientY }; };
+    const onLeave = () => { last = null; };
+    container.addEventListener('pointermove', onMove);
+    container.addEventListener('pointerleave', onLeave);
+    return {
+        get: () => last,
+        detach: () => {
+            container.removeEventListener('pointermove', onMove);
+            container.removeEventListener('pointerleave', onLeave);
+        }
+    };
+}

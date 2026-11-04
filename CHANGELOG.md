@@ -2,6 +2,26 @@
 
 Alle nennenswerten Änderungen am vhs Workflow-Algorithm Editor. Die Versionsnummern folgen [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.4.1] – 2026-11-04
+
+Interner Umbau der Arbeitsfläche (Punkt 5.1 aus `improvement.md`) und eine Fehlerbehebung.
+
+### Fehlerbehebung
+
+- Der Griff zum Vergrößern und Verkleinern von Swimlanes ist wieder da. Seit 1.4.0 (Arbeitsfläche wächst mit dem Inhalt) wurde er neben der Lane gezeichnet und war meist nicht sichtbar. Bei Zoom ungleich 100 % saß er auch vorher schon falsch.
+
+### Code-Qualität
+
+- `DiagramCanvas.jsx` aufgeteilt (von rund 900 auf rund 470 Zeilen). Die Teile liegen jetzt als eigene, einzeln getestete Module in `src/diagram/`:
+  - `paper.js`: Einrichtung der Arbeitsfläche, erlaubte Verbindungen, Anschlusspunkte beim Überfahren
+  - `selection.js`: Auswahl per Klick, Strg/Umschalt + Klick, gemeinsames Verschieben, Auswahlrahmen
+  - `pan-select.js`: Ansicht verschieben und Rahmenauswahl
+  - `lane-resize-tool.js`: Griff zum Ändern der Swimlane-Größe
+  - `text-editing.js`: Texte von Elementen, Verbindungen und Swimlanes ändern, Ja/Nein-Vorschläge
+  - `viewport.js` (erweitert): Fläche an den Inhalt anpassen, Zoom mit dem Mausrad, Mausposition merken
+- Die Suche liegt im Hook `hooks/useDiagramSearch.js`, das Anlegen neuer Elemente (`createNodeAt`) in `diagram/shapes.js`.
+- 27 neue Tests für diese Module (`diagram/canvas-parts.test.js`).
+
 ## [1.4.0] – 2026-11-04
 
 Bequemer arbeiten auf der Arbeitsfläche (Stufe „Nächstes Release“ aus `improvement.md`).

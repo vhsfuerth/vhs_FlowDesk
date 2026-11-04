@@ -12,7 +12,24 @@ Status: ✅ erledigt (mit Version), 🔶 teilweise erledigt, offen = ohne Markie
 | 1. Sofort | 1.1, 1.6, 5.3 | ✅ 1.3.1 (Branch `release/1.3.1`) |
 | 2. Nächstes Release | 1.2, 1.3, 2.3, 2.5, 3.3, 3.6 | ✅ 1.4.0 (2.3 ohne verschiebbare Beschriftungen; Browsertest teilweise offen) |
 | 3. Mit `schemaVersion` 2 | 1.4, 1.5, 2.1, 3.1, 3.2 + verschiebbare Beschriftungen aus 2.3 | offen |
-| 4. Laufend | 4.x, 5.x | offen (5.3 erledigt) |
+| 4. Laufend | 4.x, 5.x | offen (5.3 in 1.3.1, 5.1 in 1.4.1 erledigt) |
+
+### Was sich mit 1.4.1 geändert hat (Wissen für Folgeschritte)
+
+- **`DiagramCanvas.jsx` ist nur noch die React-Hülle:** Sie legt Graph, Paper und Verlauf an, meldet die Teilmodule im Init-Effekt an (jedes liefert eine Abmeldefunktion bzw. `detach`) und stellt die Imperative-API und die Dialoge bereit. Neue Interaktionen gehören als eigenes Modul nach `src/diagram/`, nicht in den Init-Effekt.
+- **Module und ihre Aufgaben:**
+  - `paper.js`: `createPaper`, `validateConnection`, `attachPortHover`
+  - `selection.js`: `createSelectionController({ graph, paper, onChange, render })` mit `get`/`set`/`detach`. Hört selbst auf `remove`/`reset` des Graphen. Reine Hilfen: `toggleSelection`, `startGroupDrag`, `applyGroupDrag`, `isAdditiveEvent`. `render` ist austauschbar (Standard `renderSelectionTools`), damit die Auswahl ohne SVG testbar ist.
+  - `pan-select.js`: `attachPanAndRubberBand`, `rectBetween`
+  - `lane-resize-tool.js`: `LaneResizeTool`, `laneSizeForDrag` (Mindestgröße 200 × 60)
+  - `text-editing.js`: `setNodeText`, `setLinkLabelText`, `getLinkLabelText`, `setLaneLabelAndColor`, `decisionLabelSuggestions`
+  - `viewport.js`, neu: `createAutoFit({ paper, graph, container })` mit `fit`/`schedule`/`detach`, außerdem `attachWheelZoom` und `trackPointer`
+  - `shapes.js`, neu: `createNodeAt(type, x, y)`
+  - `hooks/useDiagramSearch.js`: Zustand und Ablauf der Suche
+- **Fehler aus 1.4.0 behoben (Lane-Griff):** Werkzeuge (`ToolView`) liegen in der transformierten Ebene des Papers. Ihre Position muss deshalb aus der Modellgeometrie in Diagrammkoordinaten kommen (`model.getBBox()`), nie aus `view.getBBox()`, das Paper-Koordinaten mit Verschiebung und Zoom liefert. Seit das Paper einen Ursprung ungleich 0 hat (1.2), fällt dieser Unterschied sofort auf.
+- **Doppelklick-Bearbeitung:** Der Init-Effekt ruft die Dialog-Funktionen über `editorsRef` auf, damit sie immer den aktuellen Stand der Komponente nutzen.
+- **Tests:** `diagram/canvas-parts.test.js` prüft die Module mit einer Paper-Attrappe (nur `on`/`off`/`trigger`) und einem echten JointJS-Graphen. Dieses Muster eignet sich auch für 5.4.
+- **Browsertest (von Hand):** Auswahl, Verschieben, Zoom, Doppelklick und Suche funktionieren. Der Lane-Griff fehlte, das ist jetzt behoben (siehe oben). Die Korrektur ist noch nicht im Browser bestätigt.
 
 ### Was sich mit 1.4.0 geändert hat (Wissen für Folgeschritte)
 
@@ -215,7 +232,9 @@ Verschieben der Ansicht und Rahmenauswahl nutzen noch `mousemove`/`mouseup` am F
 
 ## 5. Code-Qualität im Editor
 
-### 5.1 `DiagramCanvas.jsx` aufteilen — M
+### 5.1 ✅ `DiagramCanvas.jsx` aufteilen — M
+
+> **Erledigt in 1.4.1:** Die Datei hat jetzt rund 470 statt 908 Zeilen. Die Module sind im Umsetzungsstand beschrieben. Abweichend vom Vorschlag liegt die Auswahl nicht in einem Hook, sondern als Controller in `diagram/selection.js`, weil sie fast nur JointJS-Ereignisse betrifft.
 
 Die Datei hat rund 800 Zeilen, davon ein einziger großer `useEffect` mit allen Ereignissen. Vorschlag:
 
@@ -249,4 +268,4 @@ Die reinen Funktionen (Anordnen, Ablage, Layout, Konverter, seit 1.3.1 auch Herv
 1. ✅ **Sofort (1.3.1):** 1.1 (Hervorhebung), 1.6 (kleine Fehler), 5.3 (Farben).
 2. ✅ **Nächstes Release (1.4.0):** 1.2 (Fläche anpassen), 1.3 (Zoom zur Maus), 2.3 (Ja/Nein), 2.5 (Einfügen), 3.3 (Suche), 3.6 (Struktur-Check).
 3. **Danach, mit einer gemeinsamen `schemaVersion`-Erhöhung:** 1.4 (Knickpunkte), 1.5 (Lanes einbetten), 2.1 (Folgeschritt), 3.1 (Eigenschaften), 3.2 (Elementtypen), verschiebbare Beschriftungen (Rest von 2.3).
-4. **Laufend:** 4.x (Barrierefreiheit) und 5.x (Code-Qualität), vor allem 5.1 vor größeren Umbauten an der Arbeitsfläche.
+4. **Laufend:** 4.x (Barrierefreiheit) und 5.x (Code-Qualität); 5.1 ist erledigt (1.4.1).
