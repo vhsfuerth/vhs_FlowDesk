@@ -1,17 +1,27 @@
 import React, { useId, useState } from 'react';
-import { getApiKey, setApiKey, getCustomPrompt, setCustomPrompt, getCopilotHints, setCopilotHints, getAiConsent, revokeAiConsent } from '../storage/settings';
+import {
+  getApiKeys, setApiKey, getAiProviderSettings, setAiProviderSettings,
+  getCustomPrompt, setCustomPrompt, getCopilotHints, setCopilotHints, getAiConsent, revokeAiConsent
+} from '../storage/settings';
 import { SYSTEM_PROMPT } from '../ai/prompts';
-import { GEMINI_MODELS } from '../ai/config';
-import { Settings, X, Key, Sparkles, RotateCcw, Activity, Loader2, CheckCircle2, AlertCircle, Info, Scale, ShieldCheck } from 'lucide-react';
-import { checkApiStatus, listAvailableModels } from '../ai/gemini-client';
+import { PROVIDERS, getProviderPreset, resolveProvider } from '../ai/providers';
+import { Settings, X, Key, Sparkles, RotateCcw, Activity, Loader2, CheckCircle2, AlertCircle, Info, Scale, ShieldCheck, Server } from 'lucide-react';
+import { checkApiStatus, listAvailableModels } from '../ai/ai-client';
 import { useConfirm } from '../hooks/useConfirm';
 import { useDialogA11y } from '../hooks/useDialogA11y';
 import AiPrivacyNotice from './AiPrivacyNotice';
 
+const inputClass = 'w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-[var(--color-vhs-orange-hell)] focus:border-transparent';
+
 // Wird nur gerendert, solange der Dialog offen ist – die Werte werden daher
 // bei jedem Öffnen frisch aus dem Speicher gelesen.
 const SettingsModal = ({ onClose }) => {
-  const [apiKey, setKeyValue] = useState(getApiKey());
+  const [savedProvider] = useState(getAiProviderSettings);
+  const [providerId, setProviderId] = useState(savedProvider.providerId);
+  const [baseUrl, setBaseUrl] = useState(savedProvider.baseUrl);
+  const [models, setModels] = useState(savedProvider.models);
+  const [keys, setKeys] = useState(getApiKeys);
+  const [formError, setFormError] = useState(null);
   const [customPrompt, setCustomPromptValue] = useState(getCustomPrompt() || SYSTEM_PROMPT);
   const [copilotHints, setCopilotHintsValue] = useState(getCopilotHints());
   const [apiStatus, setApiStatus] = useState(null); // { status, message }
@@ -22,12 +32,38 @@ const SettingsModal = ({ onClose }) => {
   const confirm = useConfirm();
   const dialogRef = useDialogA11y(true, onClose);
   const titleId = useId();
+  const providerSelectId = useId();
+  const baseUrlId = useId();
   const apiKeyId = useId();
+  const modelsId = useId();
   const promptId = useId();
   const hintsId = useId();
 
+  const preset = getProviderPreset(providerId);
+  const apiKey = String(keys[providerId] || '');
+  const resolved = resolveProvider({ providerId, baseUrl, models });
+
+  const resetCheck = () => {
+    setApiStatus(null);
+    setShowDiagnosis(false);
+    setAvailableModels([]);
+    setFormError(null);
+  };
+
+  const handleProviderChange = (id) => {
+    setProviderId(id);
+    // Modellnamen gelten nur für einen Anbieter – beim Wechsel die Voreinstellung nutzen
+    setModels(id === savedProvider.providerId ? savedProvider.models : '');
+    resetCheck();
+  };
+
   const handleSave = () => {
-    setApiKey(apiKey);
+    if (resolved.problem) {
+      setFormError(resolved.problem);
+      return;
+    }
+    setAiProviderSettings({ providerId, baseUrl, models });
+    Object.entries(keys).forEach(([id, key]) => setApiKey(String(key || ''), id));
     setCustomPrompt(customPrompt);
     setCopilotHints(copilotHints.trim());
     onClose();
@@ -50,15 +86,14 @@ const SettingsModal = ({ onClose }) => {
 
   const handleCheckStatus = async () => {
     setIsChecking(true);
-    setApiStatus(null);
-    setShowDiagnosis(false);
+    resetCheck();
     try {
-        const result = await checkApiStatus(apiKey);
+        const overrides = { providerId, baseUrl, models, apiKey };
+        const result = await checkApiStatus(overrides);
         setApiStatus(result);
 
         if (result.status !== 'ok') {
-            const models = await listAvailableModels(apiKey);
-            setAvailableModels(models);
+            setAvailableModels(result.models || await listAvailableModels(overrides));
             setShowDiagnosis(true);
         }
     } catch {
@@ -89,19 +124,93 @@ const SettingsModal = ({ onClose }) => {
 
         <div className="space-y-4">
           <div>
-            <label htmlFor={apiKeyId} className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-              <Key className="w-4 h-4 mr-1" aria-hidden="true" />
-              Google Gemini API-Key
+            <label htmlFor={providerSelectId} className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+              <Server className="w-4 h-4 mr-1" aria-hidden="true" />
+              KI-Anbieter
             </label>
-            <input
-              id={apiKeyId}
-              type="password"
-              value={apiKey}
-              onChange={(e) => setKeyValue(e.target.value)}
-              placeholder="AIzaSy..."
-              autoComplete="off"
-              className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-[var(--color-vhs-orange-hell)] focus:border-transparent"
-            />
+            <select
+              id={providerSelectId}
+              value={providerId}
+              onChange={(e) => handleProviderChange(e.target.value)}
+              className={`${inputClass} bg-white`}
+            >
+              {PROVIDERS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+            </select>
+
+            {providerId !== 'gemini' && (
+              <p className="mt-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md p-2 flex items-start" role="note">
+                <AlertCircle className="w-4 h-4 mr-1 mt-0.5 shrink-0" aria-hidden="true" />
+                <span>
+                  Bisher ist nur Google Gemini im Praxiseinsatz getestet. Die Anbindung an {preset.label} ist noch
+                  nicht getestet. Falls Fehler auftreten, bitte mit einem Bugreport beim Autor melden
+                  (Tobias Götz, vhs Fürth) – mit Anbieter, Modell und der angezeigten Fehlermeldung.
+                </span>
+              </p>
+            )}
+
+            {!preset.baseUrl && (
+              <div className="mt-3">
+                <label htmlFor={baseUrlId} className="block text-sm font-medium text-gray-700 mb-1">
+                  Server-Adresse (OpenAI-kompatibel)
+                </label>
+                <input
+                  id={baseUrlId}
+                  type="url"
+                  value={baseUrl}
+                  onChange={(e) => { setBaseUrl(e.target.value); resetCheck(); }}
+                  placeholder="https://ki.example.de/v1"
+                  autoComplete="off"
+                  className={inputClass}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Adresse bis einschließlich Versionspfad, z.&nbsp;B. <code>https://…/v1</code> oder für ein lokales Ollama <code>http://localhost:11434/v1</code>.
+                  Der Server muss Aufrufe direkt aus dem Browser erlauben (CORS).
+                </p>
+              </div>
+            )}
+
+            <div className="mt-3">
+              <label htmlFor={apiKeyId} className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                <Key className="w-4 h-4 mr-1" aria-hidden="true" />
+                API-Key {preset.label}{preset.keyRequired ? '' : ' (optional)'}
+              </label>
+              <input
+                id={apiKeyId}
+                type="password"
+                value={apiKey}
+                onChange={(e) => setKeys((current) => ({ ...current, [providerId]: e.target.value }))}
+                placeholder={preset.keyPlaceholder}
+                autoComplete="off"
+                className={inputClass}
+              />
+              {preset.keyUrl && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Key erstellen:{' '}
+                  <a href={preset.keyUrl} target="_blank" rel="noopener noreferrer" className="text-[var(--color-vhs-blau)] underline">
+                    {preset.keyUrl.replace('https://', '')}
+                  </a>
+                </p>
+              )}
+            </div>
+
+            <div className="mt-3">
+              <label htmlFor={modelsId} className="block text-sm font-medium text-gray-700 mb-1">
+                Modell(e)
+              </label>
+              <input
+                id={modelsId}
+                type="text"
+                value={models}
+                onChange={(e) => { setModels(e.target.value); setFormError(null); }}
+                placeholder={preset.models.length > 0 ? preset.models.join(', ') : 'z. B. llama3.1:8b'}
+                autoComplete="off"
+                className={inputClass}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                {preset.models.length > 0 ? 'Leer lassen für die Voreinstellung. ' : 'Pflichtfeld beim eigenen Server. '}
+                Mehrere Modelle durch Komma trennen – ist eines nicht verfügbar oder überlastet, wird das nächste versucht.
+              </p>
+            </div>
 
             <div className="mt-3 flex items-center justify-between bg-gray-50 p-3 rounded-md border border-gray-200">
                 <div className="flex items-center text-sm" role="status">
@@ -121,7 +230,7 @@ const SettingsModal = ({ onClose }) => {
                 </div>
                 <button
                     onClick={handleCheckStatus}
-                    disabled={isChecking || !apiKey}
+                    disabled={isChecking || (preset.keyRequired && !apiKey.trim())}
                     className="text-xs bg-white border border-gray-300 px-3 py-1 rounded hover:bg-gray-50 disabled:opacity-50 flex items-center shadow-sm"
                 >
                     {isChecking ? <Loader2 className="w-3 h-3 mr-1 animate-spin" aria-hidden="true" /> : null}
@@ -130,28 +239,39 @@ const SettingsModal = ({ onClose }) => {
             </div>
 
             {showDiagnosis && (
-                <div className="mt-2 p-2 bg-purple-50 border border-purple-100 rounded text-[10px] text-purple-800">
+                <div className="mt-2 p-2 bg-purple-50 border border-purple-100 rounded text-xs text-purple-800">
                     <div className="font-bold flex items-center mb-1">
                         <Info className="w-3 h-3 mr-1" aria-hidden="true" />
-                        Diagnose: Verfügbare Modelle für diesen Key:
+                        Diagnose: Verfügbare Modelle für diesen Key (anklicken zum Übernehmen):
                     </div>
                     {availableModels.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-1 uppercase">
-                            {availableModels.map(m => (
-                                <div key={m.name} className="bg-white/50 px-1 rounded truncate" title={m.name}>
-                                    {m.name.split('/').pop()}
-                                </div>
+                        <div className="grid grid-cols-2 gap-1 max-h-40 overflow-y-auto">
+                            {availableModels.map((name) => (
+                                <button
+                                    key={name}
+                                    type="button"
+                                    onClick={() => setModels(name)}
+                                    className="bg-white/50 hover:bg-white px-1 rounded truncate text-left"
+                                    title={name}
+                                >
+                                    {name}
+                                </button>
                             ))}
                         </div>
                     ) : (
-                        <p className="italic">Keine Modelle gefunden. Ist die "Generative Language API" aktiviert?</p>
+                        <p className="italic">Keine Modelle gefunden. Stimmen Key und Adresse? Bei Google muss die „Generative Language API“ aktiviert sein.</p>
                     )}
                 </div>
             )}
 
+            {formError && (
+                <p className="mt-2 text-sm text-red-700" role="alert">{formError}</p>
+            )}
+
             <p className="text-xs text-gray-500 mt-2">
-              Wird zur KI-Generierung von Diagrammen benötigt. Wird ausschließlich lokal in Ihrem Webbrowser gespeichert
-              und nur an die Google Gemini API übertragen. Verwendete Modelle (in dieser Reihenfolge): {GEMINI_MODELS.join(', ')}.
+              Der Key wird ausschließlich lokal in Ihrem Webbrowser gespeichert und nur an {preset.label}
+              {resolved.baseUrl ? ` (${resolved.baseUrl})` : ''} übertragen.
+              {resolved.models.length > 0 && ` Verwendete Modelle (in dieser Reihenfolge): ${resolved.models.join(', ')}.`}
             </p>
           </div>
 
@@ -160,7 +280,7 @@ const SettingsModal = ({ onClose }) => {
               <ShieldCheck className="w-4 h-4 mr-1" aria-hidden="true" />
               Datenschutz bei KI-Nutzung
             </h3>
-            <AiPrivacyNotice compact />
+            <AiPrivacyNotice compact providerId={providerId} />
             <div className="mt-2 flex items-center justify-between text-xs bg-gray-50 border border-gray-200 rounded-md p-2">
               <span className="text-gray-600">
                 {aiConsent

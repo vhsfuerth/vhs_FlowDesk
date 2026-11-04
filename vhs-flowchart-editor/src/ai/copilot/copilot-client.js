@@ -1,9 +1,9 @@
-// KI-Aufrufe des Copilots. Nutzt die bestehende Gemini-Anbindung (Modell-Fallback,
+// KI-Aufrufe des Copilots. Nutzt die bestehende KI-Anbindung (Modell-Fallback,
 // Header-Authentifizierung, Fehlertexte) und liefert immer ein normalisiertes Modell.
 // Enthält die erste Antwort strukturelle Fehler (z. B. Entscheidungen mit nur einem
 // Ausgang), wird die KI einmal mit der konkreten Fehlerliste um Korrektur gebeten.
 
-import { AI_ABORTED, generateWithFallback } from '../gemini-client';
+import { AI_ABORTED, generateWithFallback } from '../ai-client';
 import { getCopilotHints } from '../../storage/settings';
 import { normalizeProcessModel } from './process-model';
 import {

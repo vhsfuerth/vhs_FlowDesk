@@ -1,10 +1,10 @@
 import React, { useEffect, useId, useReducer, useRef } from 'react';
 import { AlertTriangle, Loader2, Sparkles, X } from 'lucide-react';
-import { AI_ABORTED, describeAiError } from '../../ai/gemini-client';
+import { AI_ABORTED, describeAiError } from '../../ai/ai-client';
 import { analyzeProcess, refineProcess } from '../../ai/copilot/copilot-client';
 import { buildDiagramFromModel } from '../../ai/copilot/model-to-diagram';
 import { MIN_DESCRIPTION_LENGTH, collectAnswers, copilotReducer, createCopilotState, hasAnyAnswer } from '../../state/copilotState';
-import { getApiKey } from '../../storage/settings';
+import { getAiSetupProblem } from '../../storage/settings';
 import { useAiConsent } from '../../hooks/useAiConsent';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useDialogA11y } from '../../hooks/useDialogA11y';
@@ -51,8 +51,9 @@ const CopilotDialog = ({ initialText = '', onClose, onApply }) => {
 
   /** Führt eine KI-Anfrage aus und meldet Ergebnis oder Fehler an den Reducer. */
   const runRequest = async (label, request, successType) => {
-    if (!getApiKey()) {
-      dispatch({ type: 'failed', error: 'Für den KI-Copilot wird ein Gemini-API-Key benötigt. Bitte in den Einstellungen (Zahnrad oben rechts) hinterlegen.' });
+    const setupProblem = getAiSetupProblem();
+    if (setupProblem) {
+      dispatch({ type: 'failed', error: setupProblem });
       return;
     }
     if (!(await ensureAiConsent())) return;

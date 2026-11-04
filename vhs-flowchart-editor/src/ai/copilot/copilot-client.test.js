@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { analyzeProcess, refineProcess } from './copilot-client';
 import { normalizeProcessModel } from './process-model';
-import { AI_ABORTED, describeAiError } from '../gemini-client';
+import { AI_ABORTED, describeAiError } from '../ai-client';
 import { setApiKey, setCopilotHints } from '../../storage/settings';
 import { GOOD_RESPONSE } from '../../test/copilot-fixtures';
 

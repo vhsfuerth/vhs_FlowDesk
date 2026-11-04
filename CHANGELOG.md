@@ -2,6 +2,28 @@
 
 Alle nennenswerten Änderungen am vhs Workflow-Algorithm Editor. Die Versionsnummern folgen [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.3.0] – 2026-11-04
+
+KI-Anbieter frei wählbar.
+
+### KI-Anbindung
+
+- In den Einstellungen lässt sich der KI-Anbieter wählen: Google Gemini, OpenAI, Mistral AI, Anthropic Claude oder ein eigener Server mit OpenAI-kompatibler Schnittstelle (z. B. Angebote des Trägers, deutsche Hoster oder ein lokales Ollama). Damit sind auch Modelle mit Verarbeitung in der EU oder selbst betriebene Modelle möglich. Getestet ist bisher nur Gemini; bei anderen Anbietern zeigen die Einstellungen einen roten Hinweis mit der Bitte um Bugreports.
+- Je Anbieter ein eigener API-Key (beim eigenen Server optional); der bisherige Gemini-Key wird automatisch übernommen.
+- Modelle sind je Anbieter voreingestellt und in den Einstellungen änderbar; mehrere Modelle (durch Komma getrennt) werden der Reihe nach probiert.
+- „Status prüfen“ funktioniert für alle Anbieter; die Diagnose listet die verfügbaren Modelle, ein Klick übernimmt ein Modell.
+- Verständliche Meldungen bei Verbindungsproblemen (z. B. wenn ein Server keine Aufrufe aus dem Browser erlaubt) und bei abgelehnten Anfragen.
+
+### Datenschutz
+
+- Der Datenschutzhinweis nennt den gewählten Anbieter und muss einmal neu bestätigt werden – außerdem nach jedem Anbieterwechsel.
+
+### Technik
+
+- Neue Anbieter-Schicht (`providers.js`, `adapters.js`); `gemini-client.js` heißt jetzt `ai-client.js`.
+- Das Copilot-Antwortschema wird für OpenAI-kompatible Dienste und Claude in ein JSON-Schema umgewandelt. Lehnt eine Schnittstelle Schema oder Zusatzparameter ab, wird einmal ohne wiederholt; in Codeblöcke verpacktes JSON wird erkannt.
+- Content-Security-Policy: Verbindungen zu HTTPS-Adressen und `http://localhost` erlaubt (nötig für frei eintragbare Server).
+
 ## [1.2.0] – 2026-11-03
 
 Geführter KI-Copilot statt Einmal-Generierung.

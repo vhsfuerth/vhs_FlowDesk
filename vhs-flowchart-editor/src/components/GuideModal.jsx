@@ -41,20 +41,19 @@ const sections = [
   },
   {
     icon: KeyRound,
-    title: 'Google Gemini API-Key einrichten',
+    title: 'KI-Anbieter und API-Key einrichten',
     steps: [
-      'Gehe zu aistudio.google.com und melde dich mit einem Google-Konto an.',
-      'Klicke oben links auf „API-Key erstellen" und wähle „In neuem Projekt erstellen".',
-      'Kopiere den generierten Key (beginnt mit „AIza…").',
-      'Öffne in der App die Einstellungen über das Zahnrad-Symbol im Header.',
-      'Füge den Key in das Feld „Gemini API-Key" ein und klicke „Speichern".',
+      'Öffne die Einstellungen über das Zahnrad-Symbol im Header und wähle unter „KI-Anbieter“ Google Gemini, OpenAI, Mistral AI, Anthropic Claude oder einen eigenen Server.',
+      'Erstelle beim Anbieter einen API-Key (der passende Link steht unter dem Key-Feld), z. B. bei Google über aistudio.google.com → „API-Key erstellen“.',
+      'Füge den Key ein. Beim eigenen Server (z. B. einem Angebot eures Trägers oder einem lokalen Ollama) zusätzlich Server-Adresse und Modellnamen eintragen.',
+      'Mit „Status prüfen“ testest du die Verbindung, dann „Speichern“.'
     ],
-    note: 'Der kostenlose Free-Tier von Google AI Studio reicht für den normalen Alltagseinsatz aus. Der Key wird nur lokal in deinem Browser gespeichert.'
+    note: 'Der kostenlose Free-Tier von Google AI Studio reicht für den Alltag aus. Datenschutzfreundlicher sind Anbieter mit Verarbeitung in der EU oder selbst betriebene Modelle. Getestet ist bisher nur Google Gemini; Fehler mit anderen Anbietern bitte per Bugreport beim Autor melden. Der Key wird nur lokal in deinem Browser gespeichert.'
   },
   {
     icon: ShieldCheck,
     title: 'Datenschutz bei KI-Nutzung',
-    text: 'Für die KI-Funktionen werden Prozessbeschreibung bzw. Diagramm an Google übertragen. Im kostenlosen Kontingent darf Google diese Inhalte zur Verbesserung seiner Dienste nutzen. Gib deshalb keine personenbezogenen Daten (z. B. Namen von Teilnehmenden) und keine vertraulichen Informationen ein.',
+    text: 'Für die KI-Funktionen werden Prozessbeschreibung bzw. Diagramm an den gewählten KI-Anbieter übertragen. Manche Anbieter (z. B. Google im kostenlosen Kontingent) dürfen diese Inhalte zur Verbesserung ihrer Dienste nutzen. Gib deshalb keine personenbezogenen Daten (z. B. Namen von Teilnehmenden) und keine vertraulichen Informationen ein.',
     note: 'Vor der ersten KI-Nutzung erscheint ein Hinweis, den du bestätigen musst. Die Bestätigung kannst du in den Einstellungen zurücknehmen.'
   },
   {
@@ -157,7 +156,7 @@ const sections = [
   {
     icon: Settings,
     title: 'Einstellungen',
-    text: 'Konfiguriere deinen Gemini-API-Key und passe den KI-Prompt an deine Bedürfnisse an. Die Einstellungen findest du über das Zahnrad-Symbol im Header.'
+    text: 'Wähle deinen KI-Anbieter, hinterlege den API-Key und passe den KI-Prompt an deine Bedürfnisse an. Die Einstellungen findest du über das Zahnrad-Symbol im Header.'
   }
 ];
 

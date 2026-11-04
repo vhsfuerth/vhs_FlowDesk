@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { describeAiError, generateFlowchartFromText } from '../ai/gemini-client';
-import { getApiKey } from '../storage/settings';
+import { describeAiError, generateFlowchartFromText } from '../ai/ai-client';
+import { getAiSetupProblem } from '../storage/settings';
 import { useAiConsent } from '../hooks/useAiConsent';
 import { Sparkles, Loader2, ChevronDown, ChevronUp, Wand2 } from 'lucide-react';
 
@@ -16,8 +16,9 @@ const AiInputPanel = ({ onOpenCopilot, onBeforeGenerate, onDiagramGenerated, onE
       return;
     }
 
-    if (!getApiKey()) {
-        onError("API-Key fehlt. Bitte in den Einstellungen hinterlegen.");
+    const setupProblem = getAiSetupProblem();
+    if (setupProblem) {
+        onError(setupProblem);
         return;
     }
 
