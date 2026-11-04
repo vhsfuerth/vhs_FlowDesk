@@ -4,72 +4,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**vhs Workflow-Algorithm Editor** -- a client-only Progressive Web App (PWA) for creating algorithmic flowcharts for organizational processes at German adult education centers (Volkshochschulen). Built with React + Vite + JointJS. All data stays local (IndexedDB); the only external call is to the Gemini API for AI-powered diagram generation from free text.
+**vhs Workflow-Algorithm Editor** -- a client-only PWA (React + Vite + JointJS) for creating algorithmic flowcharts for organizational processes at German adult education centers (Volkshochschulen). All data stays local (IndexedDB); the only external calls go to the AI provider the user picks in Settings.
 
-## Development Commands
+## Commands
 
-All commands run from `vhs-flowchart-editor/`:
+The app lives in `vhs-flowchart-editor/`; run npm scripts from there.
 
-```bash
-cd vhs-flowchart-editor
-npm install        # install dependencies
-npm run dev        # start Vite dev server
-npm run build      # production build to dist/
-npm run lint       # ESLint (flat config, JS/JSX only)
-npm run typecheck  # tsc over the JSDoc-typed modules listed in jsconfig.json
-npm test           # Vitest (jsdom); tests live next to modules as *.test.js / component tests as *.test.jsx (Testing Library, fake-indexeddb; helpers in src/test/)
-npm run check      # lint + typecheck + test (also run by CI and the Vercel build)
-npm run preview    # preview production build with the security headers from ../vercel.json
-```
+- `npm run check` = lint + typecheck + test. CI (`.github/workflows/ci.yml`) and the Vercel build run it; it must pass before merging.
+- `npm run typecheck` only covers the JSDoc-typed modules listed in `jsconfig.json` (files start with `// @ts-check`); add new pure modules there.
+- `npm run preview` serves the production build with the security headers (CSP) from `../vercel.json`.
+- Tests sit next to modules (`*.test.js`, component tests `*.test.jsx` with Testing Library + fake-indexeddb; helpers in `src/test/`). In tests, unmount (`cleanup()`) before `vi.restoreAllMocks()` -- hooks like `useAutosave` write on unmount, which otherwise hits real IndexedDB after teardown (fails only on CI).
 
-CI runs in `.github/workflows/ci.yml`. Version follows SemVer in `package.json` (shown in the app via `__APP_VERSION__`); record every change in `CHANGELOG.md` at the repo root.
+Version follows SemVer in `package.json` (shown in the app via `__APP_VERSION__`); record every change in `CHANGELOG.md` at the repo root. Work on a `release/x.y.z` branch, merge to `master` via PR, then tag `vx.y.z`.
 
-## Architecture
+## Rules and gotchas
 
-### Data Flow
-
-User text input -> Gemini API -> JSON `{nodes, edges}` -> JointJS graph -> visual editor -> IndexedDB persistence
-
-The canonical diagram format is `{ nodes: [...], edges: [...] }` where nodes have `{id, type, label, position, size}` and edges have `{id, from, to, label, sourcePort, targetPort}`. Typedefs are in `src/diagram/types.js`. Stored records carry `schemaVersion`; bump `CURRENT_SCHEMA_VERSION` and add a migration in `src/storage/schema.js` when the format changes.
-
-### Key Modules
-
-- **`src/App.jsx`** -- Root component, holds the document state (current diagram, metadata, live data, notifications). UI state (open modal, panels) is a reducer in `src/state/uiState.js`. Modals are lazy-loaded and only mounted while open. Child components communicate via callbacks.
-- **`src/diagram/shapes.js`** -- Custom JointJS element definitions under the `vhs.*` namespace (`vhs.Start`, `vhs.End`, `vhs.Process`, `vhs.Decision`, `vhs.Annotation`, `vhs.Lane`). Registers them on `joint.shapes.vhs`. All shape styling uses constants from `utils/constants.js`.
-- **`src/diagram/converter.js`** -- `JSONConverter` class: bidirectional conversion between the app's JSON format and JointJS graph cells.
-- **`src/diagram/layout.js`** -- `DiagramLayout` applies the pure `computeAutoLayout` from `src/diagram/auto-layout.js` (dagre; with swimlanes: left-to-right flow, nodes kept inside their lane, lanes stacked and resized).
-- **`src/diagram/clipboard.js` / `src/diagram/arrange.js`** -- Pure helpers for copy/paste fragments (new IDs, localStorage clipboard) and align/distribute. Multi-selection lives in `DiagramCanvas` (`selectionRef`); App handles the shortcuts (Ctrl+C/V/D/A, arrows).
-- **`src/diagram/history.js`** -- Undo/redo stack for diagram state (debounced snapshots; undo/redo flush a pending snapshot first).
-- **`src/ai/gemini-client.js`** -- Gemini API client. API key goes in the `x-goog-api-key` header, never the URL. Falls back to the next model on HTTP 404 and 503 (overloaded). Also handles improvement suggestion generation.
-- **`src/ai/config.js`** -- Model list and API settings (single place to update when Google retires models).
-- **`src/hooks/useAiConsent.jsx`** -- Shows the privacy notice (`components/AiPrivacyNotice.jsx`) before the first AI call; bump `AI_PRIVACY_NOTICE_VERSION` in `storage/settings.js` when the notice text changes.
-- **`src/ai/prompts.js`** -- System prompts for AI generation ("Direkt erzeugen" and improvement suggestions).
-- **`src/ai/copilot/`** -- Guided AI copilot. The AI returns a *process model* (steps/decisions/roles/questions, schema in `prompts.js`), never a diagram. `process-model.js` normalizes any AI answer (steps carry required `transitions`; all references explicit, `END` sentinel; question-labelled steps stay decisions and get their missing branch wired to the otherwise unreachable step) and returns `warnings` (for users) plus `issues` (fed back to the AI once for self-correction in `copilot-client.js`); it also holds review edits; `model-to-diagram.js` builds the diagram locally (start/end, lanes per role, `computeAutoLayout`, notes as margin annotations). `variants.js` defines wording variants as data. UI: `components/copilot/` with reducer `state/copilotState.js`; result opens as a new unsaved diagram (`handleCopilotApply` in App).
-- **`src/storage/indexeddb.js`** -- IndexedDB wrapper (DB: `vhs-flowcharts-db` v3, stores: `diagrams`, `diagram-versions`, `drafts`). Max 10 versions per diagram. Records are migrated on read.
-- **`src/storage/schema.js`** -- Format version, migrations, import validation (German error messages), backup format.
-- **`src/hooks/useAutosave.js`** -- Compares current content with the last saved snapshot and writes debounced drafts to the `drafts` store.
-- **`src/storage/settings.js`** -- localStorage-based settings (API key, custom prompt, last diagram ID, AI privacy consent).
-- **`src/hooks/useConfirm.js` + `components/ConfirmDialog.jsx`** -- Promise-based confirm dialog; never use `window.confirm`/`alert`. New modals use `hooks/useDialogA11y.js` (focus, Tab trap, Escape) with `role="dialog"` and `aria-modal="true"`.
-- **`src/export/file-export.js`** -- Export to PNG, SVG, PDF (via jsPDF, dynamically imported on first use), JSON, CSV.
-- **`src/export/process-description.js` + `process-export.js`** -- Process description (numbered steps, branches, roles from lanes) as Markdown and .docx (`docx` library, dynamically imported).
-- **`src/analysis/diagram-diff.js` + `components/VersionCompareModal.jsx`** -- Read-only version comparison; `DiagramPreview.jsx` renders it with its own JointJS graph so the editor is never touched.
-- **`src/components/DiagramCanvas.jsx`** -- Core canvas component wrapping JointJS Paper. Exposed via `ref` with imperative methods (`loadDiagram`, `exportAsPNG`, `undo`, `redo`, etc.).
-- **`src/components/QualityPanel.jsx`** -- Right-side panel for quality review scores and improvement items.
-- **`src/analysis/diagram-validation.js`** -- Validates diagram structure (orphan nodes, missing start/end, etc.).
-
-### Vite Configuration
-
-JointJS is aliased to its CJS build (`joint.js` instead of `joint.mjs`) because the ESM build creates a frozen module namespace that breaks `Object.assign(joint.shapes, ...)`. See `vite.config.js`.
+- **Data format**: `{ nodes, edges }` (typedefs in `src/diagram/types.js`). Stored records carry `schemaVersion`; when the format changes, bump `CURRENT_SCHEMA_VERSION` and add a migration in `src/storage/schema.js`.
+- **AI providers**: Gemini, OpenAI-compatible (OpenAI, Mistral, custom server) and Anthropic, called directly from the browser. Presets and default models live only in `src/ai/providers.js`; request/response formats per API in `src/ai/adapters.js`; `src/ai/ai-client.js` falls back to the next model on HTTP 404/503/529 and retries once without schema/extra params on 400. API keys go in headers, never the URL. Custom server URLs must be `https://` or `http://localhost` (the CSP in `vercel.json` allows exactly that).
+- **Privacy notice**: when the text of `components/AiPrivacyNotice.jsx` changes, bump `AI_PRIVACY_NOTICE_VERSION` in `storage/settings.js` so users confirm again.
+- **Dialogs**: never use `window.confirm`/`alert` -- use `useConfirm()`. New modals use `hooks/useDialogA11y.js` with `role="dialog"` and `aria-modal="true"`; modals are lazy-loaded and only mounted while open.
+- **Previews never touch the editor**: read-only renderings (`DiagramPreview.jsx`) use their own JointJS graph.
+- **JointJS alias**: `vite.config.js` aliases `jointjs` to its CJS build because the ESM build's frozen module namespace breaks `Object.assign(joint.shapes, ...)`.
 
 ## Corporate Design (vhs)
 
-The app follows the vhs corporate design (detailed in `docs/Styleguide_für_KI_Agenten.md`):
-
-- **Primary color**: `#00285A` (vhs Blau) -- all color constants are in `src/utils/constants.js`
-- **Font**: `Arial, Calibri, Helvetica, sans-serif`
-- **Styling framework**: Tailwind CSS v4
-- **"vhs" is always written in lowercase**
+Follow `docs/Styleguide_für_KI_Agenten.md`: primary color `#00285A` (vhs Blau), all colors from `src/utils/constants.js`, font `Arial, Calibri, Helvetica, sans-serif`, Tailwind CSS v4. **"vhs" is always written in lowercase.**
 
 ## Language
 
-The UI is in **German**. All user-facing strings, notifications, and labels should be in German.
+The UI is in **German**. All user-facing strings, notifications, and labels must be German.

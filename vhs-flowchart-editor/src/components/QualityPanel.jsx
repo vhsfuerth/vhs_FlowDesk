@@ -3,7 +3,7 @@ import { AlertTriangle, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Ch
 import { REVIEW_SCORE_GUIDES, REVIEW_SCORE_LABELS, getReviewScoreSummary, validateDiagram } from '../analysis/diagram-validation';
 import { exportQualityReport, exportQualityReportPDF } from '../export/file-export';
 import SimulationPanel from './SimulationPanel';
-import { generateImprovements } from '../ai/gemini-client';
+import { generateImprovements } from '../ai/ai-client';
 import { useAiConsent } from '../hooks/useAiConsent';
 
 const SCORE_OPTIONS = [

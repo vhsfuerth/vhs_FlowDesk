@@ -1,6 +1,6 @@
 // @ts-check
 // Prompts und Antwortschema des KI-Copilots (Analyse, Verfeinerung, Selbstkorrektur).
-// Das Schema wird Gemini als `responseSchema` mitgegeben; die Antwort wird trotzdem
+// Das Schema wird der KI mitgegeben (für OpenAI/Claude umgewandelt, siehe providers.js); die Antwort wird trotzdem
 // immer durch normalizeProcessModel geprüft, da sich Modelle nicht immer daran halten.
 
 import { VARIANT_IDS, getVariant } from './variants';
@@ -9,7 +9,7 @@ import { MAX_QUESTIONS, toRawModel } from './process-model';
 const STRING = { type: 'STRING' };
 
 /**
- * Antwortschema (OpenAPI-Teilmenge, wie von der Gemini-API erwartet).
+ * Antwortschema (OpenAPI-Teilmenge im Gemini-Format; toJsonSchema wandelt es für andere Anbieter um).
  * `transitions` ist bei jedem Schritt Pflicht: Die KI muss für jeden Schritt ausdrücklich
  * angeben, wie es weitergeht – optionale Zweige ließ sie sonst gern weg.
  * `propertyOrdering` sorgt dafür, dass erst formuliert und dann entschieden wird.

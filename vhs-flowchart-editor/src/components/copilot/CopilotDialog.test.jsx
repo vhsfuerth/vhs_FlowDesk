@@ -4,7 +4,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import CopilotDialog from './CopilotDialog';
 import { analyzeProcess, refineProcess } from '../../ai/copilot/copilot-client';
 import { normalizeProcessModel } from '../../ai/copilot/process-model';
-import { AI_ABORTED } from '../../ai/gemini-client';
+import { AI_ABORTED } from '../../ai/ai-client';
 import { hasAiConsent, setAiConsent, setApiKey } from '../../storage/settings';
 import { GOOD_RESPONSE } from '../../test/copilot-fixtures';
 import { renderWithConfirm } from '../../test/render';

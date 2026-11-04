@@ -1,12 +1,12 @@
 # vhs Workflow-Algorithm Editor
 
-Browserbasiertes PWA-Tool (Progressive Web App) zur Erstellung algorithmischer Ablaufpläne, Flowcharts und Entscheidungsbäume im vhs Corporate Design. Alle Diagramme bleiben lokal im Browser; nur für die KI-Funktionen werden Daten an die Google Gemini API übertragen.
+Browserbasiertes PWA-Tool (Progressive Web App) zur Erstellung algorithmischer Ablaufpläne, Flowcharts und Entscheidungsbäume im vhs Corporate Design. Alle Diagramme bleiben lokal im Browser; nur für die KI-Funktionen werden Daten an den gewählten KI-Anbieter übertragen (Google Gemini, OpenAI, Mistral AI, Anthropic Claude oder ein eigener OpenAI-kompatibler Server).
 
 Aktuelle Version und Änderungen: siehe [CHANGELOG.md](CHANGELOG.md).
 
 ## Hauptfunktionen
 
-- **KI-Copilot**: Analysiert eine Prozessbeschreibung per Google Gemini API, stellt bei Lücken Rückfragen und zeigt das Ergebnis mit Vorschau zur Prüfung, bevor das Diagramm (auf Wunsch mit Swimlanes) entsteht. Alternativ „Direkt erzeugen“ ohne Rückfragen.
+- **KI-Copilot**: Analysiert eine Prozessbeschreibung per KI (Anbieter frei wählbar), stellt bei Lücken Rückfragen und zeigt das Ergebnis mit Vorschau zur Prüfung, bevor das Diagramm (auf Wunsch mit Swimlanes) entsteht. Alternativ „Direkt erzeugen“ ohne Rückfragen.
 - **Visueller Editor**: Diagrammeditor mit JointJS – Elemente per Drag & Drop oder Klick hinzufügen, Mehrfachauswahl, Kopieren/Einfügen, automatisches Anordnen, Ausrichten und Verteilen.
 - **Swimlanes (Verantwortungsbereiche)**: Visuelle Abgrenzung von Rollen und Zuständigkeiten direkt im Diagramm.
 - **vhs-Starter-Vorlagen**: Sofort nutzbare Vorlagen für typische vhs-Prozesse wie Kursplanung, Dozierenden-Onboarding, Beschwerdebearbeitung oder Raumbuchung.
@@ -37,7 +37,7 @@ Sinnvoll für:
 
 ### 2. KI-Generierung und Datenschutz
 
-1. Google-Gemini-API-Key in den **Einstellungen** (Zahnrad im Header) hinterlegen.
+1. In den **Einstellungen** (Zahnrad im Header) den KI-Anbieter wählen und den API-Key hinterlegen. Beim eigenen Server (z. B. ein Angebot des Trägers, ein deutscher Hoster oder ein lokales Ollama) Server-Adresse und Modellnamen eintragen; der Server muss Aufrufe direkt aus dem Browser erlauben (CORS). **Getestet ist bisher nur Google Gemini**; Fehler mit anderen Anbietern bitte per Bugreport beim Autor melden (Anbieter, Modell, Fehlermeldung).
 2. Prozess im Feld „KI-Assistent“ beschreiben und **„Mit KI-Copilot erstellen“** klicken.
 3. Formulierung wählen (kompakt, fachlich präzise, bürgernah, Schulung) und **„Prozess analysieren“**.
 4. Rückfragen beantworten oder überspringen, dann die erkannten Schritte prüfen und bei Bedarf korrigieren.
@@ -46,9 +46,9 @@ Sinnvoll für:
 
 **„Direkt erzeugen“** erstellt wie bisher ohne Rückfragen sofort ein Diagramm.
 
-> **Wichtig:** Im kostenlosen Kontingent von Google AI Studio darf Google Eingaben und Antworten zur Verbesserung seiner Dienste verwenden. Keine personenbezogenen Daten (z. B. Namen von Teilnehmenden) und keine vertraulichen Informationen eingeben. Für vertrauliche Inhalte ein kostenpflichtiges Kontingent nutzen und vorher mit der bzw. dem Datenschutzbeauftragten abstimmen.
+> **Wichtig:** Was ein Anbieter mit den Daten tun darf, regeln dessen Nutzungsbedingungen. Im kostenlosen Kontingent von Google AI Studio darf Google Eingaben und Antworten zur Verbesserung seiner Dienste verwenden. Keine personenbezogenen Daten (z. B. Namen von Teilnehmenden) und keine vertraulichen Informationen eingeben. Datenschutzfreundlicher sind Anbieter mit Verarbeitung in der EU oder selbst betriebene Modelle. Für vertrauliche Inhalte einen geeigneten Anbieter bzw. ein kostenpflichtiges Kontingent nutzen und vorher mit der bzw. dem Datenschutzbeauftragten abstimmen.
 
-Der API-Key wird nur lokal im Browser gespeichert und ausschließlich im Request-Header an die Gemini API übertragen. Die verwendeten Modelle sind zentral in `vhs-flowchart-editor/src/ai/config.js` konfiguriert.
+Der API-Key wird nur lokal im Browser gespeichert und ausschließlich im Request-Header an den gewählten Anbieter übertragen. Anbieter und voreingestellte Modelle sind in `vhs-flowchart-editor/src/ai/providers.js` konfiguriert; die Modelle lassen sich in den Einstellungen ändern.
 
 ### 3. Bearbeiten, Anordnen und Ausrichten
 
@@ -217,7 +217,7 @@ Jeder `git push` auf den `master`-Branch löst einen neuen Build aus. Der Build 
 | Referrer-Policy | Datenlecks über Referer-Header |
 | Permissions-Policy | Kamera, Mikrofon, Geolocation gesperrt |
 
-> **Hinweis zum API-Key:** Der Google-Gemini-API-Key wird lokal im Browser gespeichert und nur an die Gemini API übertragen, nicht an Vercel oder andere Server.
+> **Hinweis zum API-Key:** Der API-Key wird lokal im Browser gespeichert und nur an den gewählten KI-Anbieter übertragen, nicht an Vercel oder andere Server. Damit eigene Server erreichbar sind, erlaubt die CSP Verbindungen zu beliebigen HTTPS-Adressen sowie zu `http://localhost`.
 
 ### 4. Als ZIP-Archiv
 

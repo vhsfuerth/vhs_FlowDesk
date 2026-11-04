@@ -14,7 +14,7 @@ Die Anwendung ist **kein BPMN-Tool**. Nicht enthalten sind Workflow-Automatisier
 
 ### Aktueller Status
 
-Version 1.2.0 (siehe [CHANGELOG.md](../CHANGELOG.md)). Editor mit Mehrfachauswahl und automatischem Anordnen, KI-Copilot via Google Gemini (Analyse, Rückfragen, Prüfansicht), lokale Speicherung mit Autosave, Versionen und Versionsvergleich, Import/Backup sowie Exporte inkl. Prozessbeschreibung sind umgesetzt und durch automatisierte Tests abgesichert.
+Version 1.3.0 (siehe [CHANGELOG.md](../CHANGELOG.md)). Editor mit Mehrfachauswahl und automatischem Anordnen, KI-Copilot mit frei wählbarem KI-Anbieter (Analyse, Rückfragen, Prüfansicht), lokale Speicherung mit Autosave, Versionen und Versionsvergleich, Import/Backup sowie Exporte inkl. Prozessbeschreibung sind umgesetzt und durch automatisierte Tests abgesichert.
 
 ---
 
@@ -23,7 +23,7 @@ Version 1.2.0 (siehe [CHANGELOG.md](../CHANGELOG.md)). Editor mit Mehrfachauswah
 | Funktion | Technische Umsetzung |
 |----------|----------------------|
 | **Visueller Editor** | JointJS mit vhs-spezifischen Shapes (`vhs.Start`, `vhs.End`, `vhs.Process`, `vhs.Decision`, `vhs.Annotation`, `vhs.Lane`). |
-| **KI-Copilot** | Freitext → Gemini-Analyse → Prozessmodell (Schritte, Entscheidungen, Rollen, Rückfragen) → optionale Rückfragen → Prüfansicht → lokale Umwandlung inkl. Swimlanes und Layout → JointJS-Diagramm. „Direkt erzeugen“: Freitext → Gemini → `{ nodes, edges }`. |
+| **KI-Copilot** | Freitext → KI-Analyse → Prozessmodell (Schritte, Entscheidungen, Rollen, Rückfragen) → optionale Rückfragen → Prüfansicht → lokale Umwandlung inkl. Swimlanes und Layout → JointJS-Diagramm. „Direkt erzeugen“: Freitext → KI → `{ nodes, edges }`. |
 | **Manueller Modus** | Drag & Drop oder Klick in der Elementleiste, Verbindung via Ports (sichtbar bei Hover). |
 | **Bearbeiten** | Mehrfachauswahl (Strg/Umschalt + Klick, Rahmen), gemeinsames Verschieben, Kopieren/Einfügen/Duplizieren, Pfeiltasten, automatisches Anordnen (Swimlane-bewusst), Ausrichten und Verteilen. |
 | **Text-Bearbeitung** | Doppelklick auf Elemente oder Linien; automatische Größenanpassung. |
@@ -42,14 +42,14 @@ Version 1.2.0 (siehe [CHANGELOG.md](../CHANGELOG.md)). Editor mit Mehrfachauswah
 - **Basis**: React 19 + Vite
 - **Styling**: Tailwind CSS v4 (vhs Design-Tokens in `src/index.css` und `src/utils/constants.js`)
 - **Diagramm-Engine**: JointJS + Dagre.js (Auto-Layout)
-- **KI**: Google Gemini API (direkt aus dem Browser)
+- **KI**: Google Gemini, OpenAI-kompatible Schnittstellen (OpenAI, Mistral, eigene Server) oder Anthropic Claude – jeweils direkt aus dem Browser
 - **Export**: jsPDF und docx (werden erst beim ersten PDF- bzw. Word-Export nachgeladen), Canvas API (PNG), SVG
 - **Qualitätssicherung**: Vitest + jsdom, ESLint, TypeScript-Prüfung über JSDoc, GitHub Actions
 
 ### 3.2 Datenfluss
 
 ```
-Prozessbeschreibung ─► Gemini API ─► { nodes, edges } ─► Dagre-Layout ─► JointJS-Graph
+Prozessbeschreibung ─► KI-Anbieter ─► { nodes, edges } ─► Dagre-Layout ─► JointJS-Graph
                                                                               │
                          IndexedDB ◄─ Speichern / Autosave ◄─ JSONConverter ◄─┘
 ```
@@ -88,11 +88,13 @@ Kanonisches Diagrammformat (Typen in `src/diagram/types.js`):
 
 **Autosave** (`src/hooks/useAutosave.js`): Der bearbeitbare Inhalt (Name, Diagramm, Metadaten) wird mit dem zuletzt gespeicherten Stand verglichen. Bei Abweichung wird nach 1,5 s ein Entwurf geschrieben; das gespeicherte Diagramm bleibt unverändert. Beim Öffnen wird ein Entwurf angeboten, wenn er neuer als der gespeicherte Stand ist. Speichern oder Verwerfen löscht den Entwurf.
 
-### 3.5 KI-Integration (Gemini)
+### 3.5 KI-Integration
 
-- **Modelle**: zentral in `src/ai/config.js`. Bei HTTP 404 (Modell nicht verfügbar) und 503 (Modell überlastet) wird das nächste Modell probiert, andere Fehler brechen mit deutscher Meldung ab.
-- **API-Key**: lokal im Browser gespeichert; Übertragung ausschließlich im Header `x-goog-api-key`.
-- **Datenschutz**: Vor der ersten KI-Nutzung muss ein Hinweis bestätigt werden (`AiPrivacyNotice.jsx`). Im kostenlosen Kontingent darf Google Ein- und Ausgaben zur Verbesserung seiner Dienste nutzen; personenbezogene und vertrauliche Daten dürfen daher nicht eingegeben werden.
+- **Anbieter**: `src/ai/providers.js` (Voreinstellungen, Prüfung der Server-Adresse, Umwandlung des Antwortschemas), `src/ai/adapters.js` (Anfrage- und Antwortformat je Schnittstelle: Gemini, OpenAI-kompatibel, Claude), `src/ai/ai-client.js` (Modell-Fallback, Fehlertexte). Eigene Server: nur `https://` bzw. `http://localhost`.
+- **Antwortformat**: Gemini erhält das Schema als `responseSchema`, OpenAI-kompatible Dienste als `response_format` (`json_schema`), Claude als `output_config.format`. Lehnt eine Schnittstelle Schema oder Zusatzparameter ab (HTTP 400), wird einmal ohne wiederholt; JSON in Codeblöcken wird toleriert.
+- **Modelle**: Voreinstellung je Anbieter, in den Einstellungen änderbar (mehrere durch Komma). Bei HTTP 404 (Modell nicht verfügbar) und 503/529 (Modell überlastet) wird das nächste Modell probiert, andere Fehler brechen mit deutscher Meldung ab.
+- **API-Key**: je Anbieter lokal im Browser gespeichert (der Gemini-Key aus 1.2.0 wird übernommen); Übertragung ausschließlich im Header (`x-goog-api-key`, `Authorization: Bearer` bzw. `x-api-key`).
+- **Datenschutz**: Vor der ersten KI-Nutzung muss ein Hinweis bestätigt werden (`AiPrivacyNotice.jsx`), nach einem Anbieterwechsel erneut. Im kostenlosen Kontingent darf z. B. Google Ein- und Ausgaben zur Verbesserung seiner Dienste nutzen; personenbezogene und vertrauliche Daten dürfen daher nicht eingegeben werden.
 - **Robustheit**: Zeitlimit 30 s pro Anfrage (Copilot 60 s), abbrechbar; KI-Antworten werden geprüft (fehlender Start wird ergänzt, ungültige Verbindungen entfernt).
 - **KI-Copilot** (`src/ai/copilot/`): Die KI liefert kein Diagramm, sondern ein Prozessmodell nach festem Antwortschema (`responseSchema`; bei HTTP 400 einmal ohne Schema wiederholt). Jeder Schritt muss seine Übergänge (`transitions: [{ label, to }]`) angeben; der Prompt enthält ein Beispiel. `process-model.js` normalisiert jede Antwort tolerant (Typ-Aliasse, eindeutige IDs, explizite Nachfolger, Fragen als Entscheidungen, fehlender Zweig zum sonst unverbundenen Schritt, Begrenzung auf 40 Schritte/5 Rückfragen) und meldet Korrekturen für Nutzende (`warnings`) sowie strukturelle Mängel (`issues`). Bei `issues` bittet `copilot-client.js` die KI einmalig mit der Fehlerliste um Korrektur und übernimmt das Ergebnis nur, wenn es weniger Mängel hat. `model-to-diagram.js` erzeugt daraus lokal Start, Ende, Verbindungen, Swimlanes je Rolle und das Layout; Hinweise werden als Randkommentare neben den Ablauf gesetzt. Varianten (`variants.js`) steuern nur die Formulierung. Der Dialogzustand ist ein Reducer (`state/copilotState.js`).
 
@@ -118,7 +120,7 @@ Wegen Browser-Sicherheitsbeschränkungen (Tainted Canvas) wird das vhs-Logo vor 
 
 ### 3.10 Sicherheit
 
-- Content-Security-Policy (`vercel.json`): Skripte nur von der eigenen Domain, kein `eval`, Netzwerkzugriffe nur zur eigenen Domain und zur Gemini API.
+- Content-Security-Policy (`vercel.json`): Skripte nur von der eigenen Domain, kein `eval`, Netzwerkzugriffe zur eigenen Domain, zu HTTPS-Adressen (KI-Anbieter und eigene Server) und zu `http://localhost`.
 - `npm run preview` verwendet dieselben Header, sodass der Produktions-Build lokal unter Produktionsbedingungen getestet werden kann.
 
 ### 3.11 Barrierefreiheit
@@ -138,7 +140,7 @@ Orientierung an WCAG 2.1 AA, soweit mit einem grafischen Editor sinnvoll: Dialog
 └── vhs-flowchart-editor/
     ├── install.bat / start.bat  # Installation und lokaler Start
     └── src/
-        ├── ai/                  # Gemini-Client, Modellkonfiguration, Prompts
+        ├── ai/                  # KI-Anbieter, Adapter, Client, Prompts
         ├── analysis/            # Strukturprüfung und Selbstbewertung
         ├── components/          # React-UI (Canvas, Leisten, Dialoge)
         ├── data/                # Starter-Vorlagen
