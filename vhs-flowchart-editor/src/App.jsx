@@ -6,6 +6,7 @@ import DiagramCanvas from './components/DiagramCanvas';
 import ExportBar from './components/ExportBar';
 import Notification from './components/Notification';
 import QualityPanel from './components/QualityPanel';
+import DiagramTextAlternative from './components/DiagramTextAlternative';
 import { indexeddb } from './storage/indexeddb';
 import { getLastDiagramId, setLastDiagramId } from './storage/settings';
 import { CURRENT_SCHEMA_VERSION } from './storage/schema';
@@ -24,6 +25,7 @@ const TemplateModal = lazy(() => import('./components/TemplateModal'));
 const GuideModal = lazy(() => import('./components/GuideModal'));
 const VersionHistoryModal = lazy(() => import('./components/VersionHistoryModal'));
 const CopilotDialog = lazy(() => import('./components/copilot/CopilotDialog'));
+const SubprocessDialog = lazy(() => import('./components/SubprocessDialog'));
 
 const EMPTY_DIAGRAM = { nodes: [], edges: [] };
 
@@ -43,6 +45,8 @@ function App() {
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
   const [selectionCount, setSelectionCount] = useState(0);
   const [copilotText, setCopilotText] = useState('');
+  // Teilprozess-Abfrage bzw. -Ansicht: { record, mode: 'ask' | 'preview' }
+  const [subprocessView, setSubprocessView] = useState(null);
 
   const diagramCanvasRef = useRef(null);
   const resizeStateRef = useRef({ isActive: false, startX: 0, startWidth: initialUiState.qualityPanelWidth });
@@ -209,6 +213,25 @@ function App() {
   // Feinere Stufen (Mausrad/Touchpad), begrenzt in DiagramCanvas
   const handleZoomSet = useCallback((level) => setZoomLevel(level), []);
 
+  // Entf bzw. X am Element: Liegt ein einzelner Schritt im Ablauf, wird angeboten,
+  // Vorgänger und Nachfolger direkt zu verbinden. Beides lässt sich mit Strg+Z zurücknehmen.
+  const handleDeleteSelection = useCallback(async () => {
+    const canvas = diagramCanvasRef.current;
+    if (!canvas) return;
+    const bridge = canvas.getBridgeInfo();
+    if (!bridge) {
+      canvas.deleteSelected();
+      return;
+    }
+    const keepFlow = await confirm({
+      title: 'Schritt entfernen',
+      message: `„${bridge.label || 'Unbenannter Schritt'}“ liegt zwischen anderen Schritten. Sollen Vorgänger und Nachfolger danach direkt verbunden werden, damit der Ablauf erhalten bleibt?`,
+      confirmLabel: 'Entfernen und Ablauf verbinden',
+      cancelLabel: 'Nur entfernen'
+    });
+    canvas.deleteSelected({ bridge: keepFlow });
+  }, [confirm]);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       const isModifier = e.ctrlKey || e.metaKey;
@@ -254,11 +277,27 @@ function App() {
         if (e.key === 'Backspace') {
           e.preventDefault();
         }
-        diagramCanvasRef.current?.deleteSelected();
+        handleDeleteSelection();
+        return;
       }
 
       const canvas = diagramCanvasRef.current;
       const key = e.key.toLowerCase();
+
+      // Text auf der Fläche bearbeiten – nur, wenn kein Bedienelement den Fokus hat
+      const active = document.activeElement;
+      const focusOnCanvas = !active || active === document.body || Boolean(active.closest?.('#vhs-canvas-scroll'));
+      if (canvas && focusOnCanvas && !isModifier && !e.altKey) {
+        if (e.key === 'F2' || e.key === 'Enter') {
+          if (canvas.editSelection()) e.preventDefault();
+          return;
+        }
+        // Lostippen ersetzt den Text des ausgewählten Elements
+        if (e.key.length === 1 && e.key !== ' ' && canvas.editSelection(e.key)) {
+          e.preventDefault();
+          return;
+        }
+      }
 
       // Kopieren / Einfügen / Duplizieren / Alles auswählen
       if (isModifier && !e.shiftKey && canvas) {
@@ -319,7 +358,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleZoomIn, handleZoomOut, showNotification]);
+  }, [handleZoomIn, handleZoomOut, showNotification, handleDeleteSelection]);
 
   const getCleanFilename = () => {
       const name = currentDiagram?.name || 'diagram';
@@ -398,6 +437,29 @@ function App() {
         draftRecord ? `Entwurf von "${record.name}" wiederhergestellt` : `Diagramm "${record.name}" geladen`,
         'info'
       );
+  };
+
+  // Teilprozess öffnen. mode: 'ask' = nachfragen (Symbol im Element), 'preview' = hier anzeigen,
+  // 'switch' = zum Teilprozess wechseln (fragt bei ungespeicherten Änderungen nach)
+  const handleOpenSubprocess = async (diagramId, mode = 'ask') => {
+      const record = await indexeddb.getDiagram(diagramId).catch(() => null);
+      if (!record) {
+          showNotification('Das verknüpfte Diagramm wurde nicht gefunden. Bitte die Verknüpfung prüfen.', 'error');
+          return;
+      }
+      if (mode === 'switch') {
+          await handleDiagramSelect(record);
+          return;
+      }
+      setSubprocessView({ record, mode });
+      openModal(MODALS.SUBPROCESS);
+  };
+
+  const handleSubprocessSwitch = async () => {
+      const record = subprocessView?.record;
+      closeModal();
+      setSubprocessView(null);
+      if (record) await handleDiagramSelect(record);
   };
 
   const handleNewDiagram = async () => {
@@ -577,15 +639,31 @@ function App() {
     diagramCanvasRef.current?.center();
   };
 
+  // IDs der gespeicherten Diagramme, damit der Struktur-Check Teilprozess-Verknüpfungen prüfen kann
+  const [savedDiagramIds, setSavedDiagramIds] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    indexeddb.getAllDiagrams()
+      .then((all) => { if (!cancelled) setSavedDiagramIds(all.map((d) => d.id)); })
+      .catch(() => { if (!cancelled) setSavedDiagramIds(null); });
+    return () => { cancelled = true; };
+  }, [currentDiagram?.id, currentDiagram?.updatedAt, ui.openModal]);
+
   const validation = useMemo(
-    () => validateDiagram(liveDiagramData, diagramMetadata.improvementItems),
-    [liveDiagramData, diagramMetadata.improvementItems]
+    () => validateDiagram(liveDiagramData, diagramMetadata.improvementItems, {
+      diagramIds: savedDiagramIds,
+      currentDiagramId: currentDiagram?.id || null
+    }),
+    [liveDiagramData, diagramMetadata.improvementItems, savedDiagramIds, currentDiagram?.id]
   );
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[var(--color-vhs-blau-10)]">
       <a href="#vhs-jointjs-paper" className="sr-only focus:not-sr-only focus:absolute focus:z-[70] focus:top-2 focus:left-2 focus:bg-white focus:text-[var(--color-vhs-blau)] focus:px-3 focus:py-2 focus:rounded focus:shadow">
         Zur Arbeitsfläche springen
+      </a>
+      <a href="#vhs-text-alternative" className="sr-only focus:not-sr-only focus:absolute focus:z-[70] focus:top-2 focus:left-56 focus:bg-white focus:text-[var(--color-vhs-blau)] focus:px-3 focus:py-2 focus:rounded focus:shadow">
+        Zum Ablauf als Text springen
       </a>
       <Header
         onSettingsClick={() => openModal(MODALS.SETTINGS)}
@@ -619,6 +697,10 @@ function App() {
            onSelectionChange={setSelectionCount}
            zoomLevel={zoomLevel}
            onZoomSet={handleZoomSet}
+           currentDiagramId={currentDiagram?.id}
+           onOpenSubprocess={handleOpenSubprocess}
+           onNotify={showNotification}
+           onDeleteRequest={handleDeleteSelection}
         />
         <QualityPanel
           diagramData={liveDiagramData}
@@ -633,8 +715,11 @@ function App() {
           width={ui.qualityPanelWidth}
           onToggleCollapsed={() => dispatch({ type: 'toggleQualityPanel' })}
           onResizeStart={handleQualityPanelResizeStart}
+          validation={validation}
         />
       </main>
+
+      <DiagramTextAlternative diagram={liveDiagramData} onFocusNode={handleFocusNode} />
 
       <ExportBar
          onExportSVG={() => diagramCanvasRef.current?.exportAsSVG(`${getCleanFilename()}.svg`, currentDiagram?.name)?.catch((err) => showNotification(err.message, 'error'))}
@@ -685,6 +770,14 @@ function App() {
             diagramId={currentDiagram.id}
             onRestore={handleVersionRestore}
             currentDiagram={liveDiagramData}
+          />
+        )}
+        {ui.openModal === MODALS.SUBPROCESS && subprocessView && (
+          <SubprocessDialog
+            record={subprocessView.record}
+            initialMode={subprocessView.mode}
+            onSwitch={handleSubprocessSwitch}
+            onClose={() => { closeModal(); setSubprocessView(null); }}
           />
         )}
         {ui.openModal === MODALS.COPILOT && (

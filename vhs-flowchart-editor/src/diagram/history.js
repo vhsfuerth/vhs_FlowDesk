@@ -24,7 +24,7 @@ export class HistoryManager {
         const targetEvents = [
             'change:position', 'change:size', 'change:angle', 
             'change:attrs', 'change:vertices', 'change:source', 'change:target',
-            'change:labels', 'add', 'remove'
+            'change:labels', 'change:router', 'change:details', 'change:parent', 'change:embeds', 'add', 'remove'
         ];
 
         if (targetEvents.some(te => eventName.includes(te))) {

@@ -162,3 +162,36 @@ describe('parseImportFile', () => {
     expect(() => parseImportFile(backup)).toThrow(/keine ID/);
   });
 });
+
+describe('Format 2', () => {
+  const lane = { id: 'l1', type: 'lane', label: 'Verwaltung', position: { x: 0, y: 0 }, size: { width: 800, height: 200 } };
+  const inside = { id: 'a', type: 'process', label: 'Prüfen', position: { x: 50, y: 60 }, size: { width: 160, height: 60 } };
+  const outside = { id: 'b', type: 'end', label: 'Ende', position: { x: 50, y: 600 }, size: { width: 140, height: 70 } };
+
+  it('ordnet beim Hochstufen von Format 1 die Elemente ihrer Swimlane zu', () => {
+    const migrated = migrateDiagramRecord({ id: '1', name: 'Alt', schemaVersion: 1, diagram: { nodes: [lane, inside, outside], edges: [] } });
+    expect(migrated.schemaVersion).toBe(2);
+    expect(migrated.diagram?.nodes.find((n) => n.id === 'a')?.laneId).toBe('l1');
+    expect(migrated.diagram?.nodes.find((n) => n.id === 'b')).not.toHaveProperty('laneId');
+  });
+
+  it('akzeptiert die neuen Angaben und Elementtypen', () => {
+    const diagram = {
+      nodes: [lane, { ...inside, laneId: 'l1', description: 'x', system: 'Kufer' }, { id: 's', type: 'subprocess', label: 'Abrechnung', subprocessId: 'd2' }, { id: 'w', type: 'wait', label: 'Warten' }],
+      edges: [{ from: 'a', to: 's', vertices: [{ x: 1, y: 2 }], labelPosition: { distance: 0.4 }, routing: 'straight' }]
+    };
+    expect(validateDiagramData(diagram)).toEqual([]);
+  });
+
+  it('meldet ungültige neue Angaben', () => {
+    const errors = validateDiagramData({
+      nodes: [{ ...inside, laneId: 'fehlt', duration: 14 }, outside],
+      edges: [{ from: 'a', to: 'b', vertices: [{ x: 'a' }], labelPosition: { offset: 3 }, routing: 'kurvig' }]
+    });
+    expect(errors.join('\n')).toMatch(/Swimlane „fehlt“ existiert nicht/);
+    expect(errors.join('\n')).toMatch(/„duration“ muss Text sein/);
+    expect(errors.join('\n')).toMatch(/Ungültige Knickpunkte/);
+    expect(errors.join('\n')).toMatch(/Lage der Beschriftung/);
+    expect(errors.join('\n')).toMatch(/Linienführung „kurvig“/);
+  });
+});

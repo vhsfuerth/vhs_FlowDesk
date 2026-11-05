@@ -1,4 +1,4 @@
-import { Play, CircleStop, Square, Diamond, MessageSquareDashed, ArrowRight, ChevronLeft, ChevronRight, CheckCircle2, AlertTriangle, Search, ChevronDown, ChevronUp, Rows3 } from 'lucide-react';
+import { Play, CircleStop, Square, Diamond, MessageSquareDashed, ArrowRight, FileText, Database, Layers, Hourglass, Shuffle, ChevronLeft, ChevronRight, CheckCircle2, AlertTriangle, Search, ChevronDown, ChevronUp, Rows3 } from 'lucide-react';
 import { useState } from 'react';
 
 const Toolbar = ({ onDragStart, onAddNode, isCollapsed, onToggleCollapsed, validation, onFocusNode }) => {
@@ -15,6 +15,10 @@ const Toolbar = ({ onDragStart, onAddNode, isCollapsed, onToggleCollapsed, valid
     { type: 'end', icon: CircleStop, label: 'Ende', color: 'text-[var(--color-vhs-orange)]' },
     { type: 'process', icon: Square, label: 'Prozess', color: 'text-[var(--color-vhs-blau)]' },
     { type: 'decision', icon: Diamond, label: 'Entscheidung', color: 'text-[var(--color-vhs-orange-hell)]' },
+    { type: 'document', icon: FileText, label: 'Dokument/Formular', color: 'text-[var(--color-vhs-hellblau-b)]' },
+    { type: 'system', icon: Database, label: 'IT-System', color: 'text-[var(--color-vhs-violett)]' },
+    { type: 'wait', icon: Hourglass, label: 'Warten/Frist', color: 'text-[var(--color-vhs-orange-hell)]' },
+    { type: 'subprocess', icon: Layers, label: 'Teilprozess', color: 'text-[var(--color-vhs-blau)]' },
     { type: 'annotation', icon: MessageSquareDashed, label: 'Kommentar', color: 'text-[var(--color-vhs-blau-60)]' },
     { type: 'lane', icon: Rows3, label: 'Swimlane', color: 'text-[var(--color-vhs-blau-40)]' }
   ];
@@ -174,6 +178,12 @@ const Toolbar = ({ onDragStart, onAddNode, isCollapsed, onToggleCollapsed, valid
             <ArrowRight className="w-3 h-3 text-[var(--color-vhs-blau-60)]" />
           </div>
           <span className="leading-tight">Klicke und ziehe vom Rand eines Elements zum nächsten</span>
+        </div>
+        <div className="flex items-center space-x-2 text-xs text-gray-500 mt-2">
+          <div className="p-1.5 bg-white border border-gray-300 rounded" aria-hidden="true">
+            <Shuffle className="w-3 h-3 text-[var(--color-vhs-blau-60)]" />
+          </div>
+          <span className="leading-tight">Umhängen: Verbindung anklicken und ihr Ende (Pfeilspitze) auf ein anderes Element ziehen</span>
         </div>
       </div>
     </aside>

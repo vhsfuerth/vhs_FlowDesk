@@ -1,7 +1,9 @@
 // @ts-check
 // Bidirektionale Umwandlung zwischen dem App-Format `{ nodes, edges }` und JointJS-Zellen.
 
-import { createStartNode, createEndNode, createProcessNode, createDecisionNode, createLink, createAnnotationNode, createLaneNode } from './shapes';
+import { createLink, createNode } from './shapes';
+import { NODE_DETAIL_FIELDS } from './types';
+import { laneOf } from './lanes';
 
 /** @typedef {import('jointjs').dia.Graph} Graph */
 /** @typedef {import('jointjs').dia.Element} Element */
@@ -11,32 +13,46 @@ import { createStartNode, createEndNode, createProcessNode, createDecisionNode, 
 /** @typedef {import('./types').DiagramEdge} DiagramEdge */
 /** @typedef {import('./types').NodeType} NodeType */
 
-/**
- * Erzeugt das JointJS-Element für einen Knoten (unbekannte Typen werden zu Prozessschritten).
- * @param {DiagramNode} node
- * @returns {Element}
- */
-const createElementForNode = (node) => {
-    const x = node.position?.x ?? 100;
-    const y = node.position?.y ?? 100;
-    const label = node.label || '';
+/** Router je Linienführung (JointJS-Name) */
+export const ROUTERS = /** @type {const} */ ({ orthogonal: 'manhattan', straight: 'normal' });
 
-    switch (node.type.toLowerCase()) {
-        case 'start':
-            return createStartNode(x, y, label);
-        case 'end':
-            return createEndNode(x, y, label);
-        case 'decision':
-            return createDecisionNode(x, y, label);
-        case 'annotation':
-            return createAnnotationNode(x, y, label);
-        case 'lane':
-            return createLaneNode(x, y, label, node.laneColor || null);
-        case 'process':
-        default:
-            return createProcessNode(x, y, label);
+/**
+ * Zusatzangaben eines Elements (Erläuterung, Zuständigkeit …) aus dem Modell.
+ * @param {Element} element
+ * @returns {Record<string, string>}
+ */
+export const getNodeDetails = (element) => ({ ...(element.get('details') || {}) });
+
+/**
+ * Setzt eine Zusatzangabe; leerer Text entfernt sie.
+ * @param {Element} element
+ * @param {string} field
+ * @param {string} value
+ */
+export function setNodeDetail(element, field, value) {
+    const details = getNodeDetails(element);
+    if (value && value.trim()) {
+        details[field] = value;
+    } else {
+        delete details[field];
     }
-};
+    element.set('details', details);
+}
+
+/**
+ * Bettet ein Element in eine Lane ein bzw. löst es (lane = null).
+ * @param {Element} element
+ * @param {Element | null} lane
+ */
+export function setElementLane(element, lane) {
+    const parent = element.getParentCell();
+    if (parent === lane) return;
+    if (parent) parent.unembed(element);
+    if (lane) lane.embed(element);
+}
+
+/** @param {any} cell */
+const isLaneCell = (cell) => Boolean(cell) && cell.get('type') === 'vhs.Lane';
 
 export class JSONConverter {
     /** @param {Graph} graph */
@@ -47,6 +63,7 @@ export class JSONConverter {
     /**
      * Fügt die Knoten und Verbindungen aus `json` in den Graphen ein.
      * Verbindungen mit unbekanntem Start- oder Zielknoten werden übersprungen.
+     * Elemente ohne gültige `laneId` werden nach Lage einer Swimlane zugeordnet.
      * @param {DiagramData} json
      */
     fromJson(json) {
@@ -57,47 +74,62 @@ export class JSONConverter {
         /** @type {Map<string, Element>} */
         const nodesMap = new Map();
 
-        // Disable history tracking during import
         this.graph.startBatch('import');
 
-        // Parse Nodes
-        json.nodes.forEach(node => {
-            const jointNode = createElementForNode(node);
+        json.nodes.forEach((node) => {
+            const element = createNode(
+                node.type.toLowerCase(),
+                node.position?.x ?? 100,
+                node.position?.y ?? 100,
+                node.label || '',
+                node.laneColor || null
+            );
+            if (node.id) element.set('id', node.id);
+            if (node.size) element.resize(node.size.width, node.size.height);
 
-            if (node.id) {
-                jointNode.set('id', node.id);
-            }
+            /** @type {Record<string, string>} */
+            const details = {};
+            NODE_DETAIL_FIELDS.forEach((field) => {
+                const value = node[field];
+                if (typeof value === 'string' && value.trim()) details[field] = value;
+            });
+            if (Object.keys(details).length) element.set('details', details);
 
-            if (node.size) {
-                jointNode.resize(node.size.width, node.size.height);
-            }
-
-            nodesMap.set(node.id, jointNode);
-            this.graph.addCell(jointNode);
+            nodesMap.set(node.id, element);
+            this.graph.addCell(element);
         });
 
-        // Parse Edges
-        if (json.edges && Array.isArray(json.edges)) {
-            json.edges.forEach(edge => {
-                const sourceNode = nodesMap.get(edge.from);
-                const targetNode = nodesMap.get(edge.to);
-
-                if (sourceNode && targetNode) {
-                    const link = createLink(sourceNode.id, targetNode.id, edge.label);
-
-                    if (edge.sourcePort) link.source({ id: sourceNode.id, port: edge.sourcePort });
-                    if (edge.targetPort) link.target({ id: targetNode.id, port: edge.targetPort });
-
-                    if (edge.id) {
-                        link.set('id', edge.id);
-                    }
-
-                    this.graph.addCell(link);
-                } else {
-                    console.warn(`Failed to create link: Missing source (${edge.from}) or target (${edge.to})`);
-                }
+        // Swimlanes halten ihre Elemente (Einbettung)
+        const laneNodes = json.nodes.filter((n) => n.type === 'lane');
+        if (laneNodes.length) {
+            json.nodes.forEach((node) => {
+                const lane = laneOf(node, laneNodes);
+                const element = nodesMap.get(node.id);
+                const laneElement = lane ? nodesMap.get(lane.id) : null;
+                if (element && laneElement) setElementLane(element, laneElement);
             });
         }
+
+        (json.edges || []).forEach((edge) => {
+            const sourceNode = nodesMap.get(edge.from);
+            const targetNode = nodesMap.get(edge.to);
+            if (!sourceNode || !targetNode) {
+                console.warn(`Failed to create link: Missing source (${edge.from}) or target (${edge.to})`);
+                return;
+            }
+            const link = createLink(sourceNode.id, targetNode.id, edge.label);
+            if (edge.sourcePort) link.source({ id: sourceNode.id, port: edge.sourcePort });
+            if (edge.targetPort) link.target({ id: targetNode.id, port: edge.targetPort });
+            if (edge.id) link.set('id', edge.id);
+            if (Array.isArray(edge.vertices) && edge.vertices.length) {
+                link.vertices(edge.vertices.map(({ x, y }) => ({ x, y })));
+            }
+            if (edge.routing === 'straight') link.router({ name: ROUTERS.straight });
+            if (edge.labelPosition && link.labels().length) {
+                link.prop(['labels', 0, 'position'], { ...edge.labelPosition });
+            }
+            this.graph.addCell(link);
+        });
 
         this.graph.stopBatch('import');
     }
@@ -108,26 +140,20 @@ export class JSONConverter {
      */
     toJson() {
         /** @type {DiagramData} */
-        const json = {
-            nodes: [],
-            edges: []
-        };
+        const json = { nodes: [], edges: [] };
 
-        const cells = this.graph.getCells();
-
-        cells.forEach(cell => {
+        this.graph.getCells().forEach((cell) => {
             if (cell.isElement()) {
                 const element = /** @type {Element} */ (cell);
                 const typeName = /** @type {NodeType} */ (String(element.get('type')).replace('vhs.', '').toLowerCase());
                 const position = element.position();
                 const size = element.size();
-                const labelText = element.attr('label/text') || '';
 
                 /** @type {DiagramNode} */
                 const nodeData = {
                     id: String(element.id),
                     type: typeName,
-                    label: labelText,
+                    label: element.attr('label/text') || '',
                     position: { x: position.x, y: position.y },
                     size: { width: size.width, height: size.height }
                 };
@@ -135,33 +161,43 @@ export class JSONConverter {
                 if (typeName === 'lane') {
                     const headerFill = element.attr('header/fill');
                     const bodyFill = element.attr('body/fill');
-                    if (headerFill) {
-                        nodeData.laneColor = { header: headerFill, body: bodyFill };
-                    }
+                    if (headerFill) nodeData.laneColor = { header: headerFill, body: bodyFill };
+                } else {
+                    const parent = element.getParentCell();
+                    if (parent && isLaneCell(parent)) nodeData.laneId = String(parent.id);
                 }
 
+                Object.assign(nodeData, getNodeDetails(element));
                 json.nodes.push(nodeData);
             } else if (cell.isLink()) {
                 const link = /** @type {Link} */ (cell);
                 const source = link.source();
                 const target = link.target();
+                if (!source || !target || !source.id || !target.id) return; // Lose Verbindungen entfallen
 
-                if (!source || !target || !source.id || !target.id) return; // Skip floating links
-
-                let labelText = '';
-                const labels = link.labels();
-                if (labels && labels.length > 0 && labels[0].attrs && labels[0].attrs.text) {
-                    labelText = String(labels[0].attrs.text.text ?? '');
-                }
-
-                json.edges.push({
+                const firstLabel = link.labels()[0];
+                /** @type {DiagramEdge} */
+                const edgeData = {
                     id: String(link.id),
                     from: String(source.id),
                     to: String(target.id),
                     sourcePort: source.port,
                     targetPort: target.port,
-                    label: labelText
-                });
+                    label: String(firstLabel?.attrs?.text?.text ?? '')
+                };
+
+                const vertices = link.vertices();
+                if (vertices.length) edgeData.vertices = vertices.map(({ x, y }) => ({ x, y }));
+                const position = /** @type {any} */ (firstLabel?.position);
+                if (edgeData.label && position && typeof position === 'object' && Number.isFinite(position.distance)) {
+                    edgeData.labelPosition = Number.isFinite(position.offset) && position.offset
+                        ? { distance: position.distance, offset: position.offset }
+                        : { distance: position.distance };
+                }
+                const router = /** @type {any} */ (link.router());
+                if (router?.name === ROUTERS.straight) edgeData.routing = 'straight';
+
+                json.edges.push(edgeData);
             }
         });
 

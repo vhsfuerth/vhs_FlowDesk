@@ -4,6 +4,7 @@
 /** @typedef {import('../diagram/types').DiagramData} DiagramData */
 /** @typedef {import('../diagram/types').DiagramNode} DiagramNode */
 /** @typedef {import('../diagram/types').DiagramEdge} DiagramEdge */
+import { NODE_TYPE_LABELS } from '../diagram/types';
 
 /** @typedef {'clarity' | 'mediaBreaks' | 'risk' | 'participantFocus' | 'ownership'} ReviewScoreField */
 /** @typedef {Record<ReviewScoreField, number>} ReviewScores */
@@ -74,14 +75,6 @@ export const REVIEW_SCORE_GUIDES = {
 };
 
 // Deutsche Bezeichnungen der Knotentypen für Meldungen
-const NODE_TYPE_LABELS = {
-  start: 'Start',
-  end: 'Ende',
-  process: 'Prozessschritt',
-  decision: 'Entscheidung',
-  annotation: 'Kommentar',
-  lane: 'Swimlane'
-};
 
 /**
  * @param {FindingSeverity} severity
@@ -274,11 +267,41 @@ const checkLanes = (nodes, lanes) => {
       const position = /** @type {{x: number, y: number}} */ (node.position);
       const cx = position.x + (node.size?.width || 0) / 2;
       const cy = position.y + (node.size?.height || 0) / 2;
-      const inside = laneRects.some((r) => cx >= r.x && cx <= r.x + r.width && cy >= r.y && cy <= r.y + r.height);
+      const inside = (node.laneId && lanes.some((lane) => lane.id === node.laneId))
+        || laneRects.some((r) => cx >= r.x && cx <= r.x + r.width && cy >= r.y && cy <= r.y + r.height);
       if (!inside) {
         findings.push(createFinding('warning', 'outside_lane', `„${nameOf(node)}“ liegt in keiner Swimlane.`, node.id));
       }
     });
+  return findings;
+};
+
+// Dokumente und IT-Systeme dürfen als angehängte Ablage enden (Schritt → Ablage ohne Ausgang)
+const STORAGE_TYPES = ['document', 'system'];
+
+/**
+ * Prüft die neuen Elementtypen (Teilprozess, Warten/Frist).
+ * @param {DiagramNode[]} nodes
+ * @param {{ diagramIds?: string[] | null, currentDiagramId?: string | null }} context
+ * @returns {Finding[]}
+ */
+const checkElementTypes = (nodes, { diagramIds = null, currentDiagramId = null }) => {
+  /** @type {Finding[]} */
+  const findings = [];
+  nodes.forEach((node) => {
+    if (node.type === 'subprocess') {
+      if (!node.subprocessId) {
+        findings.push(createFinding('info', 'subprocess_unlinked', `Der Teilprozess „${nameOf(node)}“ ist mit keinem Diagramm verknüpft (Eigenschaften-Leiste).`, node.id));
+      } else if (currentDiagramId && node.subprocessId === currentDiagramId) {
+        findings.push(createFinding('warning', 'subprocess_self', `Der Teilprozess „${nameOf(node)}“ verweist auf dieses Diagramm selbst.`, node.id));
+      } else if (diagramIds && !diagramIds.includes(node.subprocessId)) {
+        findings.push(createFinding('warning', 'subprocess_missing', `Das verknüpfte Diagramm von „${nameOf(node)}“ gibt es nicht mehr. Bitte die Verknüpfung prüfen.`, node.id));
+      }
+    }
+    if (node.type === 'wait' && !node.duration?.trim()) {
+      findings.push(createFinding('info', 'wait_without_duration', `Für „${nameOf(node)}“ ist keine Dauer oder Frist angegeben.`, node.id));
+    }
+  });
   return findings;
 };
 
@@ -287,9 +310,10 @@ const checkLanes = (nodes, lanes) => {
  * Swimlanes werden ignoriert.
  * @param {Partial<DiagramData> | null | undefined} diagram
  * @param {any[]} [improvementItems]
+ * @param {{ diagramIds?: string[] | null, currentDiagramId?: string | null }} [context]  gespeicherte Diagramme (für Teilprozesse)
  * @returns {ValidationResult}
  */
-export const validateDiagram = (diagram, improvementItems = []) => {
+export const validateDiagram = (diagram, improvementItems = [], context = {}) => {
   const allNodes = Array.isArray(diagram?.nodes) ? diagram.nodes : [];
   // Lanes are background containers – exclude from all structural validation
   const nodes = allNodes.filter(n => n.type !== 'lane');
@@ -344,7 +368,8 @@ export const validateDiagram = (diagram, improvementItems = []) => {
       });
     }
 
-    if (node.type !== 'end' && node.type !== 'annotation' && nodeOutgoing.length === 0) {
+    const isStorageSink = STORAGE_TYPES.includes(node.type) && nodeIncoming.length > 0;
+    if (node.type !== 'end' && node.type !== 'annotation' && !isStorageSink && nodeOutgoing.length === 0) {
       findings.push(createFinding('warning', 'dead_end', `„${node.label || 'Unbenannter Knoten'}“ endet ohne klaren Abschluss.`, node.id));
     }
 
@@ -354,6 +379,7 @@ export const validateDiagram = (diagram, improvementItems = []) => {
   });
 
   findings.push(...checkFlow(nodes, edges, nodeMap, startNodes, endNodes));
+  findings.push(...checkElementTypes(nodes, context));
   findings.push(...checkLanes(nodes, allNodes.filter((n) => n.type === 'lane')));
 
   const decisionNodes = nodes.filter(n => n.type === 'decision');

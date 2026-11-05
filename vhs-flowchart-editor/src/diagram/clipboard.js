@@ -34,21 +34,28 @@ export function extractFragment(diagram, selectedIds) {
 export function instantiateFragment(fragment, { offset = { x: 30, y: 30 }, createId }) {
   /** @type {Record<string, string>} */
   const idMap = {};
+  fragment.nodes.forEach((node) => { idMap[node.id] = createId(); });
   const nodes = fragment.nodes.map((node) => {
-    const id = createId();
-    idMap[node.id] = id;
-    return {
+    const copy = {
       ...structuredClone(node),
-      id,
+      id: idMap[node.id],
       position: {
         x: (node.position?.x ?? 100) + offset.x,
         y: (node.position?.y ?? 100) + offset.y
       }
     };
+    // Lane mitkopiert: neue ID; sonst entscheidet die Lage beim Einfügen
+    if (copy.laneId && idMap[copy.laneId]) copy.laneId = idMap[copy.laneId];
+    else delete copy.laneId;
+    return copy;
   });
   const edges = fragment.edges
     .filter((edge) => idMap[edge.from] && idMap[edge.to])
-    .map((edge) => ({ ...structuredClone(edge), id: createId(), from: idMap[edge.from], to: idMap[edge.to] }));
+    .map((edge) => {
+      const copy = { ...structuredClone(edge), id: createId(), from: idMap[edge.from], to: idMap[edge.to] };
+      if (copy.vertices) copy.vertices = copy.vertices.map((v) => ({ x: v.x + offset.x, y: v.y + offset.y }));
+      return copy;
+    });
   return { nodes, edges, idMap };
 }
 

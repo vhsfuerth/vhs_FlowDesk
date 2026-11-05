@@ -82,6 +82,12 @@ export const exportProcessDescriptionDocx = async (diagram, title, diagramImage,
       keepNext: true,
       children: [new TextRun({ text: `${step.typeLabel}${step.role ? ` · Zuständig: ${step.role}` : ''}`, italics: true, color: VHS_BLUE_60, size: 20 })]
     }));
+    if (step.description) {
+      children.push(new Paragraph({ children: [new TextRun(step.description)] }));
+    }
+    step.facts.forEach((fact) => {
+      children.push(new Paragraph({ bullet: { level: 0 }, children: [new TextRun({ text: `${fact.label}: `, bold: true }), new TextRun(fact.value)] }));
+    });
     describeTransitions(step).forEach((sentence) => {
       children.push(new Paragraph({ bullet: { level: 0 }, children: [new TextRun(sentence)] }));
     });

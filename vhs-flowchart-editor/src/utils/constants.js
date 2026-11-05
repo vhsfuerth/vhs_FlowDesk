@@ -27,6 +27,15 @@ export const COLORS = {
   vhsOrange: '#eb640f',
   vhsOrangeB: '#b42d0f',
 
+  // Helle Abstufungen für Flächen (Swimlanes, Elementtypen)
+  vhsGreenTint: '#f0f7eb',
+  vhsOrangeTint: '#fef3ea',
+  vhsVioletTint: '#f4f0f9',
+  vhsLightBlueTint: '#e8f4fc',
+  vhsRedTint: '#fdeef0',
+  vhsYellowTint: '#fff6dc',
+  laneBlueTint: '#EEF4F7',
+
   white: '#ffffff',
   black: '#000000',
 };
@@ -34,12 +43,12 @@ export const COLORS = {
 // Farben für Swimlanes: Kopfzeile in einer vhs-Farbe, Fläche als helle Abstufung.
 // „Türkis“ ist keine Farbe aus dem Styleguide, bleibt aber für bestehende Diagramme wählbar.
 export const LANE_COLORS = [
-  { id: 'blue', label: 'Blau', header: COLORS.vhsBlue, body: '#EEF4F7' },
-  { id: 'green', label: 'Grün', header: COLORS.vhsGreenB, body: '#f0f7eb' },
-  { id: 'orange', label: 'Orange', header: COLORS.vhsOrange, body: '#fef3ea' },
-  { id: 'violet', label: 'Violett', header: COLORS.vhsViolet, body: '#f4f0f9' },
-  { id: 'lightblue', label: 'Hellblau', header: COLORS.vhsLightBlueB, body: '#e8f4fc' },
-  { id: 'red', label: 'Rot', header: COLORS.vhsRedB, body: '#fdeef0' },
+  { id: 'blue', label: 'Blau', header: COLORS.vhsBlue, body: COLORS.laneBlueTint },
+  { id: 'green', label: 'Grün', header: COLORS.vhsGreenB, body: COLORS.vhsGreenTint },
+  { id: 'orange', label: 'Orange', header: COLORS.vhsOrange, body: COLORS.vhsOrangeTint },
+  { id: 'violet', label: 'Violett', header: COLORS.vhsViolet, body: COLORS.vhsVioletTint },
+  { id: 'lightblue', label: 'Hellblau', header: COLORS.vhsLightBlueB, body: COLORS.vhsLightBlueTint },
+  { id: 'red', label: 'Rot', header: COLORS.vhsRedB, body: COLORS.vhsRedTint },
   { id: 'teal', label: 'Türkis', header: '#1a8070', body: '#e8f5f3' },
 ];
 

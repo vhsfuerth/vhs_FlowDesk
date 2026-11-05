@@ -3,13 +3,14 @@
 // Jedes gespeicherte oder exportierte Diagramm trägt `schemaVersion`. Ändert sich
 // das Format, CURRENT_SCHEMA_VERSION erhöhen und eine Migration in MIGRATIONS ergänzen.
 
-import { NODE_TYPES } from '../diagram/types';
+import { NODE_DETAIL_FIELDS, NODE_TYPES } from '../diagram/types';
+import { withLaneIds } from '../diagram/lanes';
 import { normalizeMetadata } from '../analysis/diagram-validation';
 
 /** @typedef {import('../diagram/types').DiagramData} DiagramData */
 /** @typedef {import('../diagram/types').DiagramRecord} DiagramRecord */
 
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 export const BACKUP_FORMAT = 'vhs-flowchart-backup';
 
 const MAX_REPORTED_ERRORS = 8;
@@ -29,6 +30,11 @@ const isObject = (value) => typeof value === 'object' && value !== null && !Arra
 
 /** @param {unknown} value */
 const isFiniteNumber = (value) => typeof value === 'number' && Number.isFinite(value);
+
+/** @param {unknown} value */
+const isPoint = (value) => isObject(value) && isFiniteNumber(value.x) && isFiniteNumber(value.y);
+
+const ROUTINGS = ['orthogonal', 'straight'];
 
 /**
  * Prüft die Struktur `{ nodes, edges }` und liefert eine Liste deutscher Fehlermeldungen.
@@ -76,6 +82,22 @@ export function validateDiagramData(data) {
     if (node.size !== undefined && !(isObject(node.size) && isFiniteNumber(node.size.width) && isFiniteNumber(node.size.height) && node.size.width > 0 && node.size.height > 0)) {
       errors.push(`${ref}: Ungültige Größe.`);
     }
+    NODE_DETAIL_FIELDS.forEach((field) => {
+      if (node[field] !== undefined && typeof node[field] !== 'string') {
+        errors.push(`${ref}: Die Angabe „${field}“ muss Text sein.`);
+      }
+    });
+    if (node.laneId !== undefined && typeof node.laneId !== 'string') {
+      errors.push(`${ref}: Ungültige Swimlane-Zuordnung.`);
+    }
+  });
+
+  // Zuordnung zu Swimlanes erst prüfen, wenn alle IDs bekannt sind
+  const laneIds = new Set(data.nodes.filter((n) => isObject(n) && n.type === 'lane').map((n) => n.id));
+  data.nodes.forEach((node, index) => {
+    if (isObject(node) && typeof node.laneId === 'string' && !laneIds.has(node.laneId)) {
+      errors.push(`Element ${index + 1}: Die Swimlane „${node.laneId}“ existiert nicht.`);
+    }
   });
 
   if (Array.isArray(data.edges)) {
@@ -89,6 +111,16 @@ export function validateDiagramData(data) {
       if (!ids.has(edge.to)) errors.push(`${ref}: Zielelement „${String(edge.to)}“ existiert nicht.`);
       if (edge.label !== undefined && edge.label !== null && typeof edge.label !== 'string') {
         errors.push(`${ref}: Die Beschriftung muss Text sein.`);
+      }
+      if (edge.vertices !== undefined && !(Array.isArray(edge.vertices) && edge.vertices.every(isPoint))) {
+        errors.push(`${ref}: Ungültige Knickpunkte.`);
+      }
+      if (edge.labelPosition !== undefined && !(isObject(edge.labelPosition) && isFiniteNumber(edge.labelPosition.distance)
+        && (edge.labelPosition.offset === undefined || isFiniteNumber(edge.labelPosition.offset)))) {
+        errors.push(`${ref}: Ungültige Lage der Beschriftung.`);
+      }
+      if (edge.routing !== undefined && !ROUTINGS.includes(edge.routing)) {
+        errors.push(`${ref}: Unbekannte Linienführung „${String(edge.routing)}“.`);
       }
     });
   }
@@ -107,8 +139,21 @@ export function validateDiagramData(data) {
 const MIGRATIONS = {
   // 0 → 1: Datensätze vor Einführung von schemaVersion. Struktur ist identisch,
   // nur Metadaten und leere Diagramme werden vereinheitlicht.
-  0: (record) => ({ ...record, schemaVersion: 1 })
+  0: (record) => ({ ...record, schemaVersion: 1 }),
+  // 1 → 2: Zusatzangaben, Knickpunkte usw. sind optional. Neu ist die feste
+  // Zuordnung zu Swimlanes (`laneId`), die bisher nur aus der Lage folgte.
+  1: (record) => ({ ...record, schemaVersion: 2, diagram: migrateDiagramToV2(record.diagram) })
 };
+
+/**
+ * Ergänzt `laneId` nach Lage (nur bei gültiger Grundstruktur; Fehler meldet die Prüfung).
+ * @param {unknown} diagram
+ */
+function migrateDiagramToV2(diagram) {
+  if (!isObject(diagram) || !Array.isArray(diagram.nodes)) return diagram;
+  if (!diagram.nodes.every((n) => isObject(n) && typeof n.type === 'string')) return diagram;
+  return { ...diagram, nodes: withLaneIds(diagram.nodes) };
+}
 
 /**
  * Wendet die Formatmigrationen an, ohne Inhalte zu korrigieren.

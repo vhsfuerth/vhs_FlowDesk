@@ -54,11 +54,12 @@ export function createPaper(el, graph, size) {
         interactive: {
             elementMove: true,
             addLinkFromMagnet: true,
+            // Knickpunkte entstehen erst beim Ziehen (vertex-drag.js), nicht schon beim Anklicken
             vertexAdd: false,
             vertexMove: true,
             vertexRemove: true,
             linkMove: false,
-            labelMove: false,
+            labelMove: true,
             arrowheadMove: true
         },
         snapLinks: { radius: 30 },

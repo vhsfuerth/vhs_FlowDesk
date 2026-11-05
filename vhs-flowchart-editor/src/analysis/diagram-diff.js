@@ -2,6 +2,7 @@
 // Vergleicht zwei Fassungen eines Diagramms (reine Funktion, verändert keine Daten).
 
 /** @typedef {import('../diagram/types').DiagramData} DiagramData */
+import { NODE_DETAIL_FIELDS } from '../diagram/types';
 /** @typedef {import('../diagram/types').DiagramNode} DiagramNode */
 /** @typedef {import('../diagram/types').DiagramEdge} DiagramEdge */
 
@@ -19,7 +20,11 @@ const NODE_NOUNS = /** @type {Record<string, string>} */ ({
   process: 'Schritt',
   decision: 'Entscheidung',
   annotation: 'Kommentar',
-  lane: 'Swimlane'
+  lane: 'Swimlane',
+  document: 'Dokument',
+  system: 'IT-System',
+  subprocess: 'Teilprozess',
+  wait: 'Wartezeit'
 });
 
 /** @param {string | undefined} text */
@@ -61,6 +66,8 @@ export function diffDiagrams(before, after) {
     if (clean(old.label) !== clean(node.label)) changes.push('label');
     if (old.type !== node.type) changes.push('type');
     if (JSON.stringify(old.laneColor || null) !== JSON.stringify(node.laneColor || null)) changes.push('laneColor');
+    if (NODE_DETAIL_FIELDS.some((field) => clean(old[field]) !== clean(node[field]))) changes.push('details');
+    if ((old.laneId || null) !== (node.laneId || null)) changes.push('lane');
     if (changes.length) diff.nodes.changed.push({ before: old, after: node, changes });
 
     const moved = JSON.stringify(old.position || null) !== JSON.stringify(node.position || null)
@@ -99,6 +106,8 @@ export function diffDiagrams(before, after) {
     if (changes.includes('label')) parts.push(`${nounOf(node)} ${nameOf(old)} umbenannt in ${nameOf(node)}`);
     if (changes.includes('type')) parts.push(`${nameOf(node)} ist jetzt ${nounOf(node) === 'Entscheidung' ? 'eine' : 'ein'} ${nounOf(node)} (vorher: ${nounOf(old)})`);
     if (changes.includes('laneColor')) parts.push(`Farbe der Swimlane ${nameOf(node)} geändert`);
+    if (changes.includes('details')) parts.push(`Angaben zu ${nameOf(node)} geändert (Erläuterung, Zuständigkeit o. Ä.)`);
+    if (changes.includes('lane')) parts.push(`${nameOf(node)} liegt jetzt in einer anderen Swimlane`);
     parts.forEach((text) => diff.summary.push({ kind: 'changed', text, nodeId: node.id }));
   });
   diff.nodes.removed.forEach((node) => diff.summary.push({ kind: 'removed', text: `Entfernt: ${nounOf(node)} ${nameOf(node)}`, nodeId: node.id }));

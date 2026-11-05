@@ -25,7 +25,7 @@ export const COPILOT_VARIANTS = [
     name: 'Fachlich präzise',
     description: 'Fachbegriffe, Fristen und Zuständigkeiten ausdrücklich.',
     example: 'Zahlungseingang binnen 14 Tagen prüfen',
-    instruction: 'Formuliere fachlich exakt mit den in der Verwaltung üblichen Begriffen. Nenne Fristen, Formulare und Systeme, wenn sie in der Beschreibung vorkommen. Entscheidungen als eindeutige Prüfbedingung („Zahlung vollständig eingegangen?“). Höchstens 12 Wörter je Schritt.'
+    instruction: 'Formuliere fachlich exakt mit den in der Verwaltung üblichen Begriffen. Trage Fristen, Formulare und Systeme, die in der Beschreibung vorkommen, in "duration", "document" und "system" ein und nutze die Arten "document", "system" und "wait", wo sie passen. Entscheidungen als eindeutige Prüfbedingung („Zahlung vollständig eingegangen?“). Höchstens 12 Wörter je Schritt.'
   },
   {
     id: 'buergernah',
@@ -39,7 +39,7 @@ export const COPILOT_VARIANTS = [
     name: 'Schulung & Dokumentation',
     description: 'Wie „fachlich“, dazu kurze Erläuterungen je Schritt.',
     example: 'Teilnahmeliste ausgeben (Hinweis: Vorlage im Intranet)',
-    instruction: 'Formuliere fachlich klar (höchstens 10 Wörter je Schritt) und ergänze bei wichtigen Schritten im Feld "note" eine kurze Erläuterung für neue Mitarbeitende (worauf achten, welche Unterlagen). Höchstens ein Satz je Erläuterung.'
+    instruction: 'Formuliere fachlich klar (höchstens 10 Wörter je Schritt) und ergänze bei wichtigen Schritten im Feld "description" eine kurze Erläuterung für neue Mitarbeitende (worauf achten, welche Unterlagen). Höchstens ein Satz je Erläuterung. "note" bleibt Unsicherheiten vorbehalten.'
   }
 ];
 

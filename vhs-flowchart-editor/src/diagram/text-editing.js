@@ -15,7 +15,19 @@ export function setLinkLabelText(link, text) {
     }
     const label = JSON.parse(JSON.stringify(linkLabelStyle));
     label.attrs.text.text = text;
+    // Verschobene Beschriftung behält ihre Lage
+    const position = link.labels()[0]?.position;
+    if (position) label.position = position;
     link.label(0, label);
+}
+
+/** Setzt eine verschobene Beschriftung wieder auf die Mitte der Linie. */
+export function resetLinkLabelPosition(link) {
+    const [label, ...rest] = link.labels();
+    if (!label?.position) return;
+    const withoutPosition = { ...label };
+    delete withoutPosition.position;
+    link.labels([withoutPosition, ...rest]);
 }
 
 /** Setzt den Text eines Elements und passt seine Größe an (nicht bei Lanes). */

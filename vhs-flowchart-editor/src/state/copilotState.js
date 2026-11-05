@@ -55,7 +55,7 @@ export const MIN_DESCRIPTION_LENGTH = 20;
  *   | { type: 'back' }
  *   | { type: 'setUseLanes', value: boolean }
  *   | { type: 'setIncludeNotes', value: boolean }
- *   | { type: 'editStep', stepId: string, label?: string, role?: string }
+ *   | ({ type: 'editStep', stepId: string } & import('../ai/copilot/process-model').StepChanges)
  *   | { type: 'editBranch', stepId: string, branchIndex: number, label: string }
  *   | { type: 'removeStep', stepId: string }} CopilotAction
  */
@@ -115,7 +115,18 @@ export function copilotReducer(state, action) {
       return { ...state, includeNotes: action.value };
     case 'editStep':
       if (!state.model) return state;
-      return { ...state, model: updateStep(state.model, action.stepId, { label: action.label, role: action.role }) };
+      return {
+        ...state,
+        model: updateStep(state.model, action.stepId, {
+          label: action.label,
+          role: action.role,
+          taskType: action.taskType,
+          description: action.description,
+          document: action.document,
+          system: action.system,
+          duration: action.duration
+        })
+      };
     case 'editBranch':
       if (!state.model) return state;
       return { ...state, model: updateBranchLabel(state.model, action.stepId, action.branchIndex, action.label) };

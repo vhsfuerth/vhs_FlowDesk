@@ -32,6 +32,27 @@ export const nodeIdForStep = (stepId) => `n-${stepId}`;
 /** @type {Record<ProcessStep['kind'], NodeType>} */
 const NODE_TYPE = { task: 'process', decision: 'decision', end: 'end' };
 
+/** Elementtyp eines Schritts: Tätigkeiten je nach Art als Dokument, IT-System oder Warten/Frist */
+/** @param {ProcessStep} step @returns {NodeType} */
+const nodeTypeOf = (step) => (step.kind === 'task' ? (step.taskType || 'process') : NODE_TYPE[step.kind]);
+
+/**
+ * Zusatzangaben für den Knoten. Die Rolle steht ohne Swimlanes als Zuständigkeit am Schritt.
+ * @param {ProcessStep} step
+ * @param {boolean} useLanes
+ * @returns {Partial<DiagramNode>}
+ */
+const detailsOf = (step, useLanes) => {
+  /** @type {Partial<DiagramNode>} */
+  const details = {};
+  if (step.description) details.description = step.description;
+  if (step.document) details.document = step.document;
+  if (step.system) details.system = step.system;
+  if (step.duration) details.duration = step.duration;
+  if (!useLanes && step.role) details.role = step.role;
+  return details;
+};
+
 /**
  * Soll das Modell mit Swimlanes dargestellt werden, wenn niemand etwas anderes gewählt hat?
  * @param {ProcessModel} model
@@ -57,9 +78,10 @@ export function buildDiagramFromModel(model, { useLanes = false, includeNotes = 
    * @param {NodeType} type
    * @param {string} label
    * @param {string} role
+   * @param {Partial<DiagramNode>} [details]  Erläuterung, Dokument, IT-System, Dauer
    */
-  const addNode = (id, type, label, role) => {
-    nodes.push({ id, type, label, size: estimateNodeSize(label, type) });
+  const addNode = (id, type, label, role, details = {}) => {
+    nodes.push({ id, type, label, size: estimateNodeSize(label, type), ...details });
     roleOfNode.set(id, role);
   };
 
@@ -92,7 +114,10 @@ export function buildDiagramFromModel(model, { useLanes = false, includeNotes = 
   const firstRole = steps[0]?.role || '';
   const inheritedRole = inheritRolesForEnds(steps);
   addNode(START_NODE_ID, 'start', model.trigger || 'Start', firstRole);
-  steps.forEach((step) => addNode(nodeIdForStep(step.id), NODE_TYPE[step.kind], step.label, step.role || inheritedRole.get(step.id) || ''));
+  steps.forEach((step) => {
+    const role = step.role || inheritedRole.get(step.id) || '';
+    addNode(nodeIdForStep(step.id), nodeTypeOf(step), step.label, role, detailsOf(step, useLanes));
+  });
 
   if (steps.length > 0) addEdge(START_NODE_ID, nodeIdForStep(steps[0].id));
   steps.forEach((step) => {
@@ -156,6 +181,8 @@ function addLanes(diagram, model, roleOfNode) {
     const index = laneIndex.get(roleOfNode.get(node.id) || UNASSIGNED_ROLE) ?? roles.length - 1;
     const height = node.size?.height ?? 60;
     node.position = { x: 40, y: index * LANE_INITIAL_HEIGHT + (LANE_INITIAL_HEIGHT - height) / 2 + 20 };
+    // Feste Zuordnung (Format 2), damit Layout und Editor nicht nach Lage raten müssen
+    node.laneId = `lane-${index + 1}`;
   });
 
   /** @type {DiagramNode[]} */

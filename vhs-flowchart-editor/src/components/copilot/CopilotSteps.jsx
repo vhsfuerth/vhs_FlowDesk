@@ -195,21 +195,46 @@ export const QuestionsStep = ({ state, dispatch, onRefine }) => {
 
 const KIND_BADGES = {
   task: { label: 'Schritt', className: 'bg-[var(--color-vhs-blau-10)] text-[var(--color-vhs-blau)]' },
+  document: { label: 'Dokument', className: 'bg-[var(--color-vhs-blau-10)] text-[var(--color-vhs-hellblau-b)]' },
+  system: { label: 'IT-System', className: 'bg-[var(--color-vhs-blau-10)] text-[var(--color-vhs-violett)]' },
+  wait: { label: 'Warten/Frist', className: 'bg-[var(--color-vhs-blau-10)] text-[var(--color-vhs-orange-hell-b)]' },
   decision: { label: 'Entscheidung', className: 'bg-amber-100 text-amber-900' },
   end: { label: 'Ende', className: 'bg-gray-100 text-gray-700' }
 };
 
+// Art einer Tätigkeit (bestimmt die Form im Diagramm)
+const TASK_TYPES = [
+  ['process', 'Prozessschritt'],
+  ['document', 'Dokument/Formular'],
+  ['system', 'IT-System'],
+  ['wait', 'Warten/Frist']
+];
+
+/** Badge eines Schritts: Tätigkeiten nach ihrer Art */
+const badgeOf = (step) => KIND_BADGES[step.kind === 'task' && step.taskType && step.taskType !== 'process' ? step.taskType : step.kind];
+
+const editorInput = 'w-full text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-[var(--color-vhs-orange-hell)] focus:border-transparent';
+
 const StepEditor = ({ step, roles, onSave, onCancel }) => {
   const [label, setLabel] = useState(step.label);
   const [role, setRole] = useState(step.role);
+  const [taskType, setTaskType] = useState(step.taskType || 'process');
+  const [details, setDetails] = useState({
+    description: step.description || '',
+    document: step.document || '',
+    system: step.system || '',
+    duration: step.duration || ''
+  });
   const [branchLabels, setBranchLabels] = useState(step.branches.map((b) => b.label));
   const labelId = useId();
   const roleId = useId();
   const roleListId = useId();
+  const typeId = useId();
+  const setDetail = (field) => (event) => setDetails((prev) => ({ ...prev, [field]: event.target.value }));
 
   const save = (event) => {
     event.preventDefault();
-    onSave({ label, role, branchLabels });
+    onSave({ label, role, branchLabels, ...(step.kind === 'task' ? { taskType } : {}), ...details });
   };
 
   return (
@@ -223,8 +248,36 @@ const StepEditor = ({ step, roles, onSave, onCancel }) => {
       <div>
         <label htmlFor={labelId} className="block text-xs text-gray-600">Beschriftung</label>
         <input id={labelId} autoFocus value={label} onChange={(e) => setLabel(e.target.value)} maxLength={120}
-          className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-[var(--color-vhs-orange-hell)] focus:border-transparent" />
+          className={editorInput} />
       </div>
+      {step.kind === 'task' && (
+        <div>
+          <label htmlFor={typeId} className="block text-xs text-gray-600">Art</label>
+          <select id={typeId} value={taskType} onChange={(e) => setTaskType(e.target.value)} className={editorInput}>
+            {TASK_TYPES.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+          </select>
+        </div>
+      )}
+      <label className="block text-xs text-gray-600">
+        Erläuterung (optional)
+        <textarea rows={2} value={details.description} onChange={setDetail('description')} maxLength={300} className={editorInput} />
+      </label>
+      {step.kind === 'task' && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <label className="block text-xs text-gray-600">
+            Dokument/Formular
+            <input value={details.document} onChange={setDetail('document')} maxLength={80} className={editorInput} />
+          </label>
+          <label className="block text-xs text-gray-600">
+            IT-System
+            <input value={details.system} onChange={setDetail('system')} maxLength={80} className={editorInput} />
+          </label>
+          <label className="block text-xs text-gray-600">
+            Dauer/Frist
+            <input value={details.duration} onChange={setDetail('duration')} maxLength={60} className={editorInput} />
+          </label>
+        </div>
+      )}
       {step.kind !== 'end' && (
         <div>
           <label htmlFor={roleId} className="block text-xs text-gray-600">Zuständig (leer = keine Angabe)</label>
@@ -262,8 +315,8 @@ const StepList = ({ model, dispatch }) => {
   const numberOf = new Map(model.steps.map((step, index) => [step.id, index + 1]));
   const targetText = (target) => (target === END ? 'Ende' : `${numberOf.get(target)}. ${model.steps.find((s) => s.id === target)?.label || ''}`);
 
-  const saveStep = (step, { label, role, branchLabels }) => {
-    dispatch({ type: 'editStep', stepId: step.id, label, role });
+  const saveStep = (step, { branchLabels, ...changes }) => {
+    dispatch({ type: 'editStep', stepId: step.id, ...changes });
     branchLabels.forEach((value, i) => {
       if (value !== step.branches[i].label) dispatch({ type: 'editBranch', stepId: step.id, branchIndex: i, label: value });
     });
@@ -276,7 +329,12 @@ const StepList = ({ model, dispatch }) => {
         <li className="text-xs text-gray-600 px-1">Auslöser: <span className="font-medium text-gray-800">{model.trigger}</span></li>
       )}
       {model.steps.map((step, index) => {
-        const badge = KIND_BADGES[step.kind];
+        const badge = badgeOf(step);
+        const facts = [
+          step.document && `Dokument: ${step.document}`,
+          step.system && `IT-System: ${step.system}`,
+          step.duration && `Dauer/Frist: ${step.duration}`
+        ].filter(Boolean);
         const isEditing = editingId === step.id;
         return (
           <li key={step.id} className={`rounded-lg border p-3 ${step.confidence === 'low' ? 'border-amber-300 bg-amber-50' : 'border-[var(--color-vhs-blau-20)] bg-white'}`}>
@@ -291,6 +349,8 @@ const StepList = ({ model, dispatch }) => {
                   {step.role && <span className="text-xs text-gray-500">{step.role}</span>}
                 </div>
                 <p className="text-sm text-gray-900 mt-0.5 break-words">{step.label}</p>
+                {step.description && <p className="text-xs text-gray-700 mt-0.5">{step.description}</p>}
+                {facts.length > 0 && <p className="text-xs text-gray-500 mt-0.5">{facts.join(' · ')}</p>}
                 {step.kind === 'decision' && (
                   <ul className="mt-1 space-y-0.5">
                     {step.branches.map((branch, i) => (

@@ -6,6 +6,7 @@
 // verschoben (fitPaperToContent) oder gezoomt ist.
 import * as joint from 'jointjs';
 import { COLORS } from '../utils/constants';
+import { contentRect, minLaneSize } from './lane-embedding';
 
 export const LANE_MIN_WIDTH = 200;
 export const LANE_MIN_HEIGHT = 60;
@@ -24,10 +25,11 @@ export const handlePosition = (bbox) => ({
  * Neue Lane-Größe beim Ziehen des Griffs, begrenzt auf die Mindestgröße.
  * @param {{ width: number, height: number }} start  Größe zu Beginn
  * @param {{ x: number, y: number }} delta  Mausweg in Diagrammkoordinaten
+ * @param {{ width: number, height: number }} [min]  Platzbedarf des Inhalts
  */
-export const laneSizeForDrag = (start, delta) => ({
-    width: Math.max(LANE_MIN_WIDTH, start.width + delta.x),
-    height: Math.max(LANE_MIN_HEIGHT, start.height + delta.y)
+export const laneSizeForDrag = (start, delta, min = { width: 0, height: 0 }) => ({
+    width: Math.max(LANE_MIN_WIDTH, min.width, start.width + delta.x),
+    height: Math.max(LANE_MIN_HEIGHT, min.height, start.height + delta.y)
 });
 
 export class LaneResizeTool extends joint.dia.ToolView {
@@ -78,8 +80,11 @@ export class LaneResizeTool extends joint.dia.ToolView {
         this._resizing = true;
 
         const paper = this.relatedView.paper;
-        const startSize = this.relatedView.model.size();
+        const lane = this.relatedView.model;
+        const startSize = lane.size();
         const start = paper.clientToLocalPoint(evt.clientX, evt.clientY);
+        // Nicht kleiner als der Inhalt, sonst ragen Elemente heraus
+        const min = minLaneSize(lane.getBBox(), contentRect(lane));
 
         const cleanup = () => {
             window.removeEventListener('pointermove', onMove);
@@ -93,7 +98,7 @@ export class LaneResizeTool extends joint.dia.ToolView {
 
         const onMove = (e) => {
             const p = paper.clientToLocalPoint(e.clientX, e.clientY);
-            const { width, height } = laneSizeForDrag(startSize, { x: p.x - start.x, y: p.y - start.y });
+            const { width, height } = laneSizeForDrag(startSize, { x: p.x - start.x, y: p.y - start.y }, min);
             // update() -> _draw() folgt automatisch über change:size
             this.relatedView.model.resize(width, height);
         };

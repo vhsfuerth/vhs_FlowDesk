@@ -37,7 +37,7 @@ describe('providers', () => {
     expect(schema.additionalProperties).toBe(false);
     const step = schema.properties.steps.items;
     expect(Object.keys(step.properties)).toEqual(PROCESS_MODEL_SCHEMA.properties.steps.items.propertyOrdering);
-    expect(step.properties.kind).toEqual({ type: 'string', enum: ['task', 'decision', 'end'] });
+    expect(step.properties.kind).toEqual({ type: 'string', enum: ['task', 'document', 'system', 'wait', 'decision', 'end'] });
     expect(step.properties.transitions.items.additionalProperties).toBe(false);
   });
 });

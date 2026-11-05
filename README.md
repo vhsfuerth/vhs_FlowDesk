@@ -66,7 +66,8 @@ Alle Aktionen lassen sich mit `Strg + Z` rückgängig machen.
 Swimlanes gliedern das Diagramm in Zuständigkeitsbereiche verschiedener Rollen oder Abteilungen.
 
 1. Element **„Swimlane“** aus der Seitenleiste auf die Arbeitsfläche ziehen.
-2. Doppelklick öffnet den Bearbeitungsdialog: Bezeichnung und Farbakzent frei wählbar.
+2. In der Eigenschaften-Leiste (rechts, sobald die Lane ausgewählt ist) Bezeichnung und Farbe festlegen sowie die Reihenfolge der Lanes ändern.
+   Elemente, die in einer Lane abgelegt werden, gehören zu ihr und wandern beim Verschieben mit; die Lane wächst mit ihrem Inhalt.
 3. Mehrere Lanes untereinander anordnen – jede Lane steht für einen Verantwortungsbereich.
 4. Prozessschritte innerhalb der zuständigen Lane ablegen und wie gewohnt verbinden.
 5. Verbindungen, die eine Lanegrenze kreuzen, zeigen Übergaben zwischen Rollen.
@@ -130,7 +131,10 @@ Alle Diagramme liegen nur im Browser. **Werden die Browserdaten gelöscht, sind 
 | `Strg + +` / `Strg + -` | Zoom rein / raus |
 | `Strg + 0` | Zoom zurücksetzen |
 | `Esc` | Dialog schließen bzw. Auswahl aufheben |
-| Doppelklick | Text bearbeiten |
+| Doppelklick / `F2` / `Enter` | Text direkt auf der Fläche bearbeiten |
+| Lostippen | Text des ausgewählten Elements ersetzen |
+| Rechtsklick auf ein Element | Eigenschaften ein-/ausblenden |
+| `Alt` beim Ziehen | Hilfslinien/Einrasten abschalten |
 
 ### Barrierefreiheit
 

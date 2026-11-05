@@ -22,11 +22,12 @@ Version 1.3.0 (siehe [CHANGELOG.md](../CHANGELOG.md)). Editor mit Mehrfachauswah
 
 | Funktion | Technische Umsetzung |
 |----------|----------------------|
-| **Visueller Editor** | JointJS mit vhs-spezifischen Shapes (`vhs.Start`, `vhs.End`, `vhs.Process`, `vhs.Decision`, `vhs.Annotation`, `vhs.Lane`). |
+| **Visueller Editor** | JointJS mit vhs-spezifischen Shapes (`vhs.Start`, `vhs.End`, `vhs.Process`, `vhs.Decision`, `vhs.Annotation`, `vhs.Lane`, `vhs.Document`, `vhs.System`, `vhs.Subprocess`, `vhs.Wait`). Swimlanes betten ihre Elemente ein (JointJS-Embedding). |
 | **KI-Copilot** | Freitext → KI-Analyse → Prozessmodell (Schritte, Entscheidungen, Rollen, Rückfragen) → optionale Rückfragen → Prüfansicht → lokale Umwandlung inkl. Swimlanes und Layout → JointJS-Diagramm. „Direkt erzeugen“: Freitext → KI → `{ nodes, edges }`. |
 | **Manueller Modus** | Drag & Drop oder Klick in der Elementleiste, Verbindung via Ports (sichtbar bei Hover). |
 | **Bearbeiten** | Mehrfachauswahl (Strg/Umschalt + Klick, Rahmen), gemeinsames Verschieben, Kopieren/Einfügen/Duplizieren, Pfeiltasten, automatisches Anordnen (Swimlane-bewusst), Ausrichten und Verteilen. |
-| **Text-Bearbeitung** | Doppelklick auf Elemente oder Linien; automatische Größenanpassung. |
+| **Eigenschaften** | Seitenleiste für die Auswahl: Text, Erläuterung, Zuständigkeit, Dokument, IT-System, Dauer/Frist, Teilprozess-Verknüpfung; bei Verbindungen Beschriftung, Linienführung und Knickpunkte. Doppelklick fokussiert das Textfeld; automatische Größenanpassung. |
+| **Folgeschritt** | „+“-Griffe am ausgewählten Element legen einen verbundenen Schritt an (Menü für weitere Typen, Ja/Nein bei Entscheidungen). |
 | **Speicherung** | IndexedDB für Diagramme, Versionen und Autosave-Entwürfe; localStorage für Einstellungen. |
 | **Import / Backup** | Projektdatei oder Gesamt-Backup (JSON) mit Strukturprüfung und Formatmigration. |
 | **Export** | PNG, SVG, PDF und JSON mit vhs-Logo und Diagrammtitel; Qualitätsbericht als PDF; Maßnahmen als CSV; Prozessbeschreibung als Word (.docx) oder Markdown. |
@@ -64,17 +65,23 @@ Kanonisches Diagrammformat (Typen in `src/diagram/types.js`):
 {
   "id": "uuid",
   "name": "Kursplanung",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "createdAt": "2026-11-03T08:00:00.000Z",
   "updatedAt": "2026-11-03T08:10:00.000Z",
   "diagram": {
-    "nodes": [{ "id": "n1", "type": "start", "label": "Start", "position": { "x": 0, "y": 0 }, "size": { "width": 140, "height": 70 } }],
-    "edges": [{ "id": "e1", "from": "n1", "to": "n2", "label": "Ja", "sourcePort": "port-bottom", "targetPort": "port-top" }]
+    "nodes": [
+      { "id": "l1", "type": "lane", "label": "Kursverwaltung", "position": { "x": 0, "y": 0 }, "size": { "width": 800, "height": 200 } },
+      { "id": "n1", "type": "process", "label": "Anmeldung prüfen", "position": { "x": 40, "y": 60 }, "size": { "width": 160, "height": 60 },
+        "laneId": "l1", "description": "…", "document": "Anmeldeformular", "system": "Verwaltungssoftware", "duration": "2 Tage" }
+    ],
+    "edges": [{ "id": "e1", "from": "n1", "to": "n2", "label": "Ja", "sourcePort": "port-bottom", "targetPort": "port-top",
+      "vertices": [{ "x": 120, "y": 200 }], "labelPosition": { "distance": 0.3 }, "routing": "straight" }]
   },
   "metadata": { "templateId": null, "improvementItems": [], "reviewScores": {}, "reviewNotes": {} }
 }
 ```
 
+- **Format 2** (ab 1.5.0): Elementtypen zusätzlich `document`, `system`, `subprocess` (mit `subprocessId`), `wait`. Optionale Angaben je Element: `laneId`, `description`, `role` (nur ohne Swimlane), `document`, `system`, `duration`. Je Verbindung optional `vertices`, `labelPosition` (Anteil 0–1 entlang der Linie, optional `offset`) und `routing` (`orthogonal` = Standard, `straight`). Die Migration 1 → 2 ergänzt `laneId` nach Lage (Mittelpunkt in der kleinsten Lane). Fehlt `laneId` (KI-Ergebnisse, Vorlagen), ordnet der Konverter nach Lage zu.
 - **Formatversion**: `schemaVersion` wird beim Speichern gesetzt. Beim Laden hebt `migrateDiagramRecord` ältere Datensätze schrittweise auf das aktuelle Format (`src/storage/schema.js`). Daten aus einer neueren App-Version werden abgelehnt.
 - **Import**: `parseImportFile` erkennt Projektdatei, reines `{ nodes, edges }` und Backup (`format: "vhs-flowchart-backup"`), prüft Struktur, IDs, Typen und Verbindungen und meldet Fehler auf Deutsch. Importierte Einzeldiagramme erhalten immer eine neue ID.
 
