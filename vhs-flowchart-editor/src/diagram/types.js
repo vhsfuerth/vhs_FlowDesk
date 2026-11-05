@@ -4,7 +4,8 @@
 // `npm run typecheck` geprüft. Erster Schritt der schrittweisen TypeScript-Einführung.
 
 /**
- * @typedef {'start' | 'end' | 'process' | 'decision' | 'annotation' | 'lane'} NodeType
+ * @typedef {'start' | 'end' | 'process' | 'decision' | 'annotation' | 'lane'
+ *   | 'document' | 'system' | 'subprocess' | 'wait'} NodeType
  */
 
 /**
@@ -15,6 +16,13 @@
  * @property {{ x: number, y: number }} [position]
  * @property {{ width: number, height: number }} [size]
  * @property {{ header: string, body: string }} [laneColor]  Nur bei type 'lane'
+ * @property {string} [laneId]        Swimlane, in der das Element liegt (ab Format 2)
+ * @property {string} [description]   Erläuterung des Schritts
+ * @property {string} [role]          Zuständigkeit, wenn das Element in keiner Swimlane liegt
+ * @property {string} [document]      Beteiligtes Dokument oder Formular
+ * @property {string} [system]        Beteiligtes IT-System
+ * @property {string} [duration]      Dauer bzw. Frist
+ * @property {string} [subprocessId]  Nur bei type 'subprocess': ID des verknüpften Diagramms
  */
 
 /**
@@ -25,6 +33,9 @@
  * @property {string} [label]
  * @property {string} [sourcePort]
  * @property {string} [targetPort]
+ * @property {{ x: number, y: number }[]} [vertices]  Knickpunkte (ab Format 2)
+ * @property {{ distance: number, offset?: number }} [labelPosition]  Lage der Beschriftung entlang der Linie (0–1)
+ * @property {'orthogonal' | 'straight'} [routing]  Linienführung, Standard rechtwinklig
  */
 
 /**
@@ -63,4 +74,26 @@
  * @property {DiagramRecord} record
  */
 
-export const NODE_TYPES = /** @type {const} */ (['start', 'end', 'process', 'decision', 'annotation', 'lane']);
+export const NODE_TYPES = /** @type {const} */ ([
+  'start', 'end', 'process', 'decision', 'annotation', 'lane', 'document', 'system', 'subprocess', 'wait'
+]);
+
+/** Deutsche Bezeichnung je Elementtyp (Meldungen, Eigenschaften-Leiste) */
+export const NODE_TYPE_LABELS = /** @type {Record<string, string>} */ ({
+  start: 'Start',
+  end: 'Ende',
+  process: 'Prozessschritt',
+  decision: 'Entscheidung',
+  annotation: 'Kommentar',
+  lane: 'Swimlane',
+  document: 'Dokument/Formular',
+  system: 'IT-System',
+  subprocess: 'Teilprozess',
+  wait: 'Warten/Frist'
+});
+
+/** Zusatzangaben eines Elements (Eigenschaften-Leiste, Prozessbeschreibung) */
+export const NODE_DETAIL_FIELDS = /** @type {const} */ (['description', 'role', 'document', 'system', 'duration', 'subprocessId']);
+
+/** Elementtypen, die keine Ablaufschritte sind */
+export const NON_FLOW_TYPES = /** @type {const} */ (['lane', 'annotation']);

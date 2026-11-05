@@ -19,6 +19,8 @@ const MAX_ASSUMPTIONS = 8;
 export const UNASSIGNED_ROLE = 'Ohne Zuordnung';
 
 /** @typedef {'task' | 'decision' | 'end'} StepKind */
+/** Art einer Tätigkeit; bestimmt die Form im Diagramm (Prozessschritt, Dokument, IT-System, Warten/Frist) */
+/** @typedef {'process' | 'document' | 'system' | 'wait'} TaskType */
 /** @typedef {'high' | 'medium' | 'low'} Confidence */
 
 /**
@@ -33,6 +35,11 @@ export const UNASSIGNED_ROLE = 'Ohne Zuordnung';
  * @property {StepKind} kind
  * @property {string} label
  * @property {string} role       leer = keine Zuordnung
+ * @property {TaskType} taskType nur bei 'task' von Bedeutung, sonst 'process'
+ * @property {string} description  Erläuterung des Schritts (leer = keine)
+ * @property {string} document     beteiligtes Dokument/Formular
+ * @property {string} system       beteiligtes IT-System
+ * @property {string} duration     Dauer bzw. Frist
  * @property {string} next       nur bei 'task': ID oder END
  * @property {Branch[]} branches nur bei 'decision' (mindestens zwei)
  * @property {Confidence} confidence
@@ -90,6 +97,28 @@ const KIND_ALIASES = {
   end: 'end', stop: 'end', ende: 'end', finish: 'end',
   start: 'start', begin: 'start', beginn: 'start'
 };
+
+/** Tätigkeiten mit eigener Form; die KI gibt sie als eigene "kind"-Werte an */
+/** @type {Record<string, TaskType>} */
+const TASK_TYPE_ALIASES = {
+  document: 'document', dokument: 'document', formular: 'document', form: 'document',
+  system: 'system', 'it-system': 'system', datenablage: 'system', database: 'system',
+  wait: 'wait', warten: 'wait', frist: 'wait', delay: 'wait', wartezeit: 'wait'
+};
+
+/** Längen der Zusatzangaben */
+const DETAIL_LIMITS = { description: 300, document: 80, system: 80, duration: 60 };
+
+/**
+ * Zusatzangaben eines Rohschritts (leere Felder bleiben leer).
+ * @param {Record<string, any>} step
+ */
+const readDetails = (step) => ({
+  description: cleanText(step.description ?? step.details, DETAIL_LIMITS.description),
+  document: cleanText(step.document, DETAIL_LIMITS.document),
+  system: cleanText(step.system, DETAIL_LIMITS.system),
+  duration: cleanText(step.duration ?? step.deadline, DETAIL_LIMITS.duration)
+});
 
 const EXPLICIT_END = /^(end|ende|__ende__|stop)$/i;
 
@@ -194,7 +223,9 @@ export function normalizeProcessModel(raw) {
     const following = ids[index + 1] || END;
     const label = cleanText(step.label ?? step.name ?? step.text, 120) || 'Unbenannter Schritt';
     const transitions = readTransitions(step);
-    let kind = /** @type {StepKind} */ (KIND_ALIASES[cleanText(step.kind ?? step.type, 20).toLowerCase()] || 'task');
+    const rawKind = cleanText(step.kind ?? step.type, 20).toLowerCase();
+    const taskType = /** @type {TaskType} */ (TASK_TYPE_ALIASES[rawKind] || 'process');
+    let kind = /** @type {StepKind} */ (KIND_ALIASES[rawKind] || 'task');
     // Mehrere Ausgänge oder eine Frage als Beschriftung: Das ist eine Entscheidung
     if (kind === 'task' && (transitions.length > 1 || label.endsWith('?'))) kind = 'decision';
     const confidence = /** @type {Confidence} */ (['high', 'medium', 'low'].includes(step.confidence) ? step.confidence : 'high');
@@ -228,6 +259,8 @@ export function normalizeProcessModel(raw) {
       kind,
       label,
       role: cleanText(step.role ?? step.lane ?? step.owner, 60),
+      taskType: kind === 'task' ? taskType : 'process',
+      ...readDetails(step),
       next: kind === 'task' ? next : '',
       branches: kind === 'decision' ? branches : [],
       confidence,
@@ -362,20 +395,31 @@ export function collectRoles(model, preferredOrder = []) {
 
 // --- Bearbeitung in der Prüfansicht ---------------------------------------
 
+/** @typedef {{ label?: string, role?: string, taskType?: TaskType, description?: string, document?: string, system?: string, duration?: string }} StepChanges */
+
 /**
- * Ändert Beschriftung oder Rolle eines Schritts.
+ * Ändert Beschriftung, Rolle, Art oder Zusatzangaben eines Schritts.
  * @param {ProcessModel} model
  * @param {string} stepId
- * @param {{ label?: string, role?: string }} changes
+ * @param {StepChanges} changes
  * @returns {ProcessModel}
  */
 export function updateStep(model, stepId, changes) {
   const steps = model.steps.map((step) => {
     if (step.id !== stepId) return step;
+    /** @type {Record<string, string>} */
+    const details = {};
+    /** @type {(keyof typeof DETAIL_LIMITS)[]} */ (['description', 'document', 'system', 'duration']).forEach((field) => {
+      if (changes[field] !== undefined) details[field] = cleanText(changes[field], DETAIL_LIMITS[field]);
+    });
+    const taskType = changes.taskType && step.kind === 'task' && ['process', 'document', 'system', 'wait'].includes(changes.taskType)
+      ? { taskType: changes.taskType } : {};
     return {
       ...step,
       ...(changes.label !== undefined ? { label: cleanText(changes.label, 120) || step.label } : {}),
-      ...(changes.role !== undefined ? { role: cleanText(changes.role, 60) } : {})
+      ...(changes.role !== undefined ? { role: cleanText(changes.role, 60) } : {}),
+      ...taskType,
+      ...details
     };
   });
   const next = { ...model, steps };
@@ -452,8 +496,12 @@ export function toRawModel(model) {
     steps: model.steps.map((step) => ({
       id: step.id,
       label: step.label,
-      kind: step.kind,
+      kind: step.kind === 'task' && step.taskType && step.taskType !== 'process' ? step.taskType : step.kind,
       role: step.role,
+      ...(step.description ? { description: step.description } : {}),
+      ...(step.document ? { document: step.document } : {}),
+      ...(step.system ? { system: step.system } : {}),
+      ...(step.duration ? { duration: step.duration } : {}),
       transitions: step.kind === 'decision'
         ? step.branches.map((b) => ({ label: b.label, to: ref(b.next) }))
         : step.kind === 'task' ? [{ label: '', to: ref(step.next) }] : [],

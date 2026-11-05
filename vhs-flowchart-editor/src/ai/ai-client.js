@@ -1,5 +1,6 @@
 import { getAiProviderSettings, getApiKey, getCustomPrompt } from '../storage/settings';
-import { SYSTEM_PROMPT, IMPROVEMENT_PROMPT } from './prompts';
+import { IMPROVEMENT_PROMPT, DIAGRAM_SCHEMA, effectiveSystemPrompt } from './prompts';
+import { NODE_DETAIL_FIELDS, NODE_TYPES } from '../diagram/types';
 import { API_TIMEOUT_MS, MODEL_FALLBACK_DELAY_MS } from './config';
 import { resolveProvider } from './providers';
 import {
@@ -141,8 +142,8 @@ export const describeAiError = (error) => {
 };
 
 export const generateFlowchartFromText = (text) => {
-    const activePrompt = getCustomPrompt() || SYSTEM_PROMPT;
-    return generateWithFallback(activePrompt, text, validateApiResponse);
+    const activePrompt = effectiveSystemPrompt(getCustomPrompt());
+    return generateWithFallback(activePrompt, text, validateApiResponse, { responseSchema: DIAGRAM_SCHEMA });
 };
 
 const SCORE_LABELS = {
@@ -230,6 +231,22 @@ export const validateApiResponse = (json) => {
         throw new Error('INVALID_JSON_RESPONSE');
     }
 
+    // Elemente bereinigen: unbekannte Typen und Teilprozesse (ohne Verknüpfung) werden Prozessschritte,
+    // Zusatzangaben nur als Text, laneId nur auf vorhandene Lanes
+    json.nodes = json.nodes.filter((n) => n && typeof n === 'object' && n.id !== undefined && n.id !== null).map((n) => {
+        const type = String(n.type || '').toLowerCase();
+        const node = { ...n, id: String(n.id), type: NODE_TYPES.includes(type) && type !== 'subprocess' ? type : 'process', label: String(n.label ?? '') };
+        NODE_DETAIL_FIELDS.forEach((field) => {
+            if (typeof node[field] !== 'string' || !node[field].trim() || field === 'subprocessId') delete node[field];
+        });
+        return node;
+    });
+    const laneIds = new Set(json.nodes.filter((n) => n.type === 'lane').map((n) => n.id));
+    json.nodes.forEach((n) => {
+        if (n.laneId !== undefined && (n.type === 'lane' || !laneIds.has(String(n.laneId)))) delete n.laneId;
+        else if (n.laneId !== undefined) n.laneId = String(n.laneId);
+    });
+
     // Ensure minimal viable graph
     const hasStart = json.nodes.some(n => n.type === 'start');
     if (!hasStart && json.nodes.length > 0) {
@@ -238,7 +255,10 @@ export const validateApiResponse = (json) => {
 
     // Filter out bad edges
     if (Array.isArray(json.edges)) {
-        json.edges = json.edges.filter(edge => {
+        json.edges = json.edges
+            .filter((edge) => edge && typeof edge === 'object')
+            .map((edge) => ({ ...edge, from: String(edge.from), to: String(edge.to) }))
+            .filter(edge => {
             const hasSource = json.nodes.some(n => n.id === edge.from);
             const hasTarget = json.nodes.some(n => n.id === edge.to);
             return hasSource && hasTarget;

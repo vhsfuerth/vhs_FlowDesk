@@ -5,6 +5,7 @@
 /** @typedef {import('../diagram/types').DiagramData} DiagramData */
 /** @typedef {import('../diagram/types').DiagramNode} DiagramNode */
 /** @typedef {import('../diagram/types').DiagramEdge} DiagramEdge */
+import { laneOf } from '../diagram/lanes';
 
 /**
  * @typedef {Object} Transition
@@ -21,7 +22,9 @@
  * @property {string} type
  * @property {string} typeLabel
  * @property {string} label
- * @property {string | null} role       Zuständigkeit aus der Swimlane
+ * @property {string | null} role       Zuständigkeit aus der Swimlane (sonst aus der Angabe am Schritt)
+ * @property {string | null} description  Erläuterung des Schritts
+ * @property {{ label: string, value: string }[]} facts  Dokument, IT-System, Dauer/Frist
  * @property {string[]} notes           Angebundene Kommentare
  * @property {Transition[]} transitions
  * @property {boolean} unreachable      Vom Start aus nicht erreichbar
@@ -41,7 +44,11 @@ export const TYPE_LABELS = /** @type {Record<string, string>} */ ({
   process: 'Schritt',
   decision: 'Entscheidung',
   annotation: 'Kommentar',
-  lane: 'Swimlane'
+  lane: 'Swimlane',
+  document: 'Dokument/Formular',
+  system: 'IT-System',
+  subprocess: 'Teilprozess',
+  wait: 'Warten/Frist'
 });
 
 const YES = /^(ja|yes)$/i;
@@ -77,18 +84,20 @@ export function buildProcessDescription(diagram) {
   /** @type {string[]} */
   const warnings = [];
 
-  // Zuständigkeit: kleinste Lane, die den Mittelpunkt des Knotens enthält
+  // Zuständigkeit: Swimlane des Schritts (laneId, sonst nach Lage), sonst die Angabe am Schritt
   /** @param {DiagramNode} node */
   const roleOf = (node) => {
-    const r = rectOf(node);
-    const cx = r.x + r.width / 2;
-    const cy = r.y + r.height / 2;
-    const containing = lanes
-      .map((lane) => ({ lane, rect: rectOf(lane) }))
-      .filter(({ rect }) => cx >= rect.x && cx <= rect.x + rect.width && cy >= rect.y && cy <= rect.y + rect.height)
-      .sort((a, b) => a.rect.width * a.rect.height - b.rect.width * b.rect.height);
-    return containing.length ? clean(containing[0].lane.label) || 'Swimlane' : null;
+    const lane = laneOf(node, lanes);
+    if (lane) return clean(lane.label) || 'Swimlane';
+    return clean(node.role) || null;
   };
+
+  /** @param {DiagramNode} node */
+  const factsOf = (node) => /** @type {[string, string | undefined][]} */ ([
+    ['Dokument/Formular', node.document],
+    ['IT-System', node.system],
+    ['Dauer/Frist', node.duration]
+  ]).filter(([, value]) => clean(value)).map(([label, value]) => ({ label, value: clean(value) }));
 
   // Kommentare, die per Verbindung an einem Schritt hängen
   /** @type {Map<string, string[]>} */
@@ -172,6 +181,8 @@ export function buildProcessDescription(diagram) {
       typeLabel: TYPE_LABELS[node.type] || 'Schritt',
       label: clean(node.label) || UNLABELED,
       role: roleOf(node),
+      description: clean(node.description) || null,
+      facts: factsOf(node),
       notes: notesByNode.get(id) || [],
       unreachable: unreachable.has(id),
       transitions: sortedOutgoing(node).map((edge) => {
@@ -266,6 +277,8 @@ export function toMarkdown(description, { title, date = new Date() }) {
     }
     lines.push(`**${step.number}. ${escapeMarkdown(step.label)}**  `);
     lines.push(`*${step.typeLabel}${step.role ? ` · Zuständig: ${escapeMarkdown(step.role)}` : ''}*`, '');
+    if (step.description) lines.push(escapeMarkdown(step.description), '');
+    step.facts.forEach((fact) => lines.push(`- ${fact.label}: ${escapeMarkdown(fact.value)}`));
     describeTransitions(step).forEach((sentence) => lines.push(`- ${escapeMarkdown(sentence)}`));
     step.notes.forEach((note) => lines.push(`- Hinweis: ${escapeMarkdown(note)}`));
     lines.push('');

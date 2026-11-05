@@ -172,7 +172,9 @@ describe('ai-client mit anderen Anbietern', () => {
     const body = JSON.parse(options.body);
     expect(body.model).toBe(getProviderPreset('openai').models[0]);
     expect(body.messages.map((m) => m.role)).toEqual(['system', 'user']);
-    expect(body.response_format).toEqual({ type: 'json_object' });
+    // „Direkt erzeugen“ schickt das Diagramm-Schema mit (Elementtypen und Angaben aus Format 2)
+    expect(body.response_format.type).toBe('json_schema');
+    expect(body.response_format.json_schema.schema.properties.nodes.items.properties.type.enum).toContain('wait');
     // GPT-5-Modelle lehnen eigene Temperaturen ab
     expect(body.temperature).toBeUndefined();
   });
@@ -306,5 +308,51 @@ describe('validateApiResponse', () => {
 
   it('lehnt Antworten ohne Knotenliste ab', () => {
     expect(() => validateApiResponse({})).toThrow('INVALID_JSON_RESPONSE');
+  });
+});
+
+describe('validateApiResponse (Format 2)', () => {
+  it('bereinigt Typen, Zusatzangaben und Lane-Zuordnungen der KI', () => {
+    const result = validateApiResponse({
+      nodes: [
+        { id: 1, type: 'Start', label: 'Los' },
+        { id: 'l1', type: 'lane', label: 'Verwaltung', laneId: 'l1' },
+        { id: 'a', type: 'subprocess', label: 'Abrechnung', laneId: 'l1', subprocessId: 'x', duration: 5 },
+        { id: 'b', type: 'wait', label: 'Warten', laneId: 'fehlt', duration: '14 Tage', system: '  ' },
+        { id: 'c', type: 'quatsch', label: 'Etwas' },
+        null
+      ],
+      edges: [{ from: '1', to: 'a' }, { from: 'a', to: 'weg' }]
+    });
+    const byId = Object.fromEntries(result.nodes.map((n) => [n.id, n]));
+    expect(byId['1'].type).toBe('start');
+    expect(byId.l1).not.toHaveProperty('laneId');
+    expect(byId.a).toMatchObject({ type: 'process', laneId: 'l1' });
+    expect(byId.a).not.toHaveProperty('subprocessId');
+    expect(byId.a).not.toHaveProperty('duration');
+    expect(byId.b).toMatchObject({ type: 'wait', duration: '14 Tage' });
+    expect(byId.b).not.toHaveProperty('laneId');
+    expect(byId.b).not.toHaveProperty('system');
+    expect(byId.c.type).toBe('process');
+    expect(result.edges).toEqual([{ from: '1', to: 'a' }]);
+  });
+});
+
+describe('Eigener Prompt für „Direkt erzeugen“', async () => {
+  const { SYSTEM_PROMPT, LEGACY_SYSTEM_PROMPTS, effectiveSystemPrompt, isDefaultPrompt } = await import('./prompts');
+
+  it('behandelt gespeicherte Standardfassungen (auch die bisherige) nicht als eigenen Prompt', () => {
+    const legacy = 'Du bist ein erfahrener Prozess-Analyst und Flowchart-Spezialist.';
+    expect(isDefaultPrompt('')).toBe(true);
+    expect(isDefaultPrompt(`  ${SYSTEM_PROMPT}\n`)).toBe(true);
+    expect(isDefaultPrompt(legacy)).toBe(false);
+    // Die bisherige Standardfassung (gespeichert beim Klick auf „Speichern“) gilt als Standard
+    expect(LEGACY_SYSTEM_PROMPTS[0]).toMatch(/^Du bist ein erfahrener Prozess-Analyst/);
+    expect(LEGACY_SYSTEM_PROMPTS[0]).toContain('übersichtliches');
+    expect(isDefaultPrompt(LEGACY_SYSTEM_PROMPTS[0])).toBe(true);
+    expect(effectiveSystemPrompt(LEGACY_SYSTEM_PROMPTS[0])).toBe(SYSTEM_PROMPT);
+    expect(isDefaultPrompt(`${LEGACY_SYSTEM_PROMPTS[0]} Zusatz`)).toBe(false);
+    expect(effectiveSystemPrompt('Eigene Anweisung')).toBe('Eigene Anweisung');
+    expect(effectiveSystemPrompt('')).toBe(SYSTEM_PROMPT);
   });
 });

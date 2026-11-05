@@ -7,7 +7,8 @@ export const MODALS = {
   TEMPLATES: 'templates',
   GUIDE: 'guide',
   VERSIONS: 'versions',
-  COPILOT: 'copilot'
+  COPILOT: 'copilot',
+  SUBPROCESS: 'subprocess'
 };
 
 export const QUALITY_PANEL_MIN_WIDTH = 380;

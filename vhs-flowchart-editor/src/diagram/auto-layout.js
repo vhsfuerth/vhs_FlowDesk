@@ -136,12 +136,13 @@ function layoutWithLanes(flowNodes, laneNodes, edges) {
   const lanes = [...laneNodes].sort((a, b) => rectOf(a).y - rectOf(b).y);
   const laneRects = lanes.map(rectOf);
 
-  // Zuordnung Knoten → Lane über den Mittelpunkt, sonst nächstgelegene Lane
+  // Zuordnung Knoten → Lane: laneId, sonst über den Mittelpunkt, sonst nächstgelegene Lane
   /** @type {Map<string, DiagramNode[]>} */
   const members = new Map(lanes.map((lane) => [lane.id, []]));
   flowNodes.forEach((node) => {
     const c = centerOf(rectOf(node));
-    let index = laneRects.findIndex((r) => contains(c, r));
+    let index = node.laneId ? lanes.findIndex((lane) => lane.id === node.laneId) : -1;
+    if (index === -1) index = laneRects.findIndex((r) => contains(c, r));
     if (index === -1) {
       const distances = laneRects.map((r) => (c.y < r.y ? r.y - c.y : c.y > r.y + r.height ? c.y - (r.y + r.height) : 0));
       index = distances.indexOf(Math.min(...distances));

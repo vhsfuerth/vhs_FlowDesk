@@ -3,6 +3,8 @@
 import * as joint from 'jointjs';
 import { COLORS } from '../utils/constants';
 import { LaneResizeTool } from './lane-resize-tool';
+import { AddNextTool } from './add-next-tool';
+import { CAN_HAVE_NEXT } from './add-next';
 
 /** Strg, Cmd oder Umschalt: Auswahl ergänzen statt ersetzen */
 export const isAdditiveEvent = (evt) => !!(evt?.ctrlKey || evt?.metaKey || evt?.shiftKey);
@@ -22,22 +24,32 @@ export function toggleSelection(selection, cell, additive) {
  */
 export function startGroupDrag(selection, anchor) {
     if (!selection.includes(anchor) || selection.length < 2) return null;
+    // Liegt das gezogene Element in einer mit ausgewählten Lane, bewegt sich die Lane nicht mit
+    if (hasSelectedAncestor(anchor, selection)) return null;
     return {
         anchor,
         start: anchor.position(),
+        // Elemente in einer mit ausgewählten Lane wandern mit ihr (JointJS) und nicht doppelt
         others: selection
-            .filter((c) => c !== anchor && c.isElement())
+            .filter((c) => c !== anchor && c.isElement() && !hasSelectedAncestor(c, [...selection, anchor]))
             .map((cell) => ({ cell, start: cell.position() }))
     };
 }
+
+/** Liegt die Zelle in einer Lane (bzw. einem Elternelement), die ebenfalls in `cells` ist? */
+export const hasSelectedAncestor = (cell, cells) => (cell.getAncestors?.() || []).some((ancestor) => cells.includes(ancestor));
 
 /** Verschiebt die übrigen Elemente um denselben Weg wie das gezogene. */
 export function applyGroupDrag(groupDrag) {
     const position = groupDrag.anchor.position();
     const dx = position.x - groupDrag.start.x;
     const dy = position.y - groupDrag.start.y;
-    groupDrag.others.forEach(({ cell, start }) => cell.position(start.x + dx, start.y + dy));
+    // deep: mitgezogene Lanes nehmen ihren Inhalt mit
+    groupDrag.others.forEach(({ cell, start }) => cell.position(start.x + dx, start.y + dy, { deep: true }));
 }
+
+/** Typ ohne Präfix, z. B. 'process' */
+const nodeType = (cell) => String(cell.get('type')).replace('vhs.', '').toLowerCase();
 
 const boundaryAttrs = {
     rect: { fill: 'none', stroke: COLORS.vhsBlue, 'stroke-width': 2, 'stroke-dasharray': '5,5' }
@@ -56,11 +68,15 @@ export function renderSelectionTools(paper, selection) {
         const tools = cell.isElement()
             ? [
                 new joint.elementTools.Boundary({ padding: 10, useModelGeometry: true, attrs: boundaryAttrs }),
-                new joint.elementTools.Remove({ offset: { x: 10, y: 10 } }),
-                ...(cell.get('type') === 'vhs.Lane' ? [new LaneResizeTool()] : [])
+                // Löschen über die App (Angebot „Ablauf erhalten“), nicht direkt
+                new joint.elementTools.Remove({ offset: { x: 10, y: 10 }, action: (evt, view) => view.paper.trigger('element:remove-request', view) }),
+                ...(cell.get('type') === 'vhs.Lane' ? [new LaneResizeTool()] : []),
+                ...(CAN_HAVE_NEXT.includes(nodeType(cell)) ? [new AddNextTool()] : [])
             ]
             : [
                 new joint.linkTools.Boundary({ attrs: boundaryAttrs }),
+                // Vorhandene Knickpunkte verschieben, Doppelklick entfernt sie (neue: vertex-drag.js)
+                new joint.linkTools.Vertices({ vertexAdding: false, redundancyRemoval: true }),
                 new joint.linkTools.Remove({ distance: '10%' }),
                 new joint.linkTools.SourceArrowhead(),
                 new joint.linkTools.TargetArrowhead()

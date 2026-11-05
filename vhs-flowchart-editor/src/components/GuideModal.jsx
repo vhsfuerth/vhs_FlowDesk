@@ -1,11 +1,12 @@
-import React, { useId } from 'react';
+import React, { useId, useMemo, useState } from 'react';
 import {
   X, BookOpen, Sparkles, Square, Maximize, ArrowRight,
   Undo2, CheckSquare, Printer, AlertTriangle,
   LayoutTemplate, Settings, ClipboardList, FileText, KeyRound, Rows3, Clock,
-  ShieldCheck, Keyboard, HardDriveDownload, LayoutGrid, GitCompare
+  ShieldCheck, Keyboard, HardDriveDownload, LayoutGrid, GitCompare, PanelRight, Search
 } from 'lucide-react';
 import { useDialogA11y } from '../hooks/useDialogA11y';
+import { matchesQuery, splitMatches } from '../utils/text-search';
 
 const SHORTCUTS = [
   ['Strg + S', 'Speichern'],
@@ -21,7 +22,10 @@ const SHORTCUTS = [
   ['Strg + Mausrad', 'Zoom'],
   ['Strg + + / Strg + -', 'Zoom rein / raus'],
   ['Strg + 0', 'Zoom zurücksetzen'],
-  ['Doppelklick', 'Text bearbeiten'],
+  ['Doppelklick / F2 / Enter', 'Text direkt auf der Fläche bearbeiten (Enter übernimmt, Esc bricht ab)'],
+  ['Lostippen (Element ausgewählt)', 'Text des Elements ersetzen'],
+  ['Rechtsklick auf ein Element', 'Eigenschaften ein- bzw. ausblenden'],
+  ['Alt beim Ziehen', 'Hilfslinien und Einrasten abschalten'],
   ['Esc', 'Dialog schließen bzw. Auswahl aufheben'],
   ['Tab / Umschalt + Tab', 'Zwischen Bedienelementen wechseln']
 ];
@@ -136,22 +140,36 @@ const sections = [
     text: 'Im Prozess-Check kannst du einen professionellen Qualitätsbericht als PDF exportieren. Seite 1 enthält Deckblatt, Status, Durchschnittswert und das Flowchart. Seite 2 listet alle Befunde, Selbstbewertungs-Scores mit Notizen und die erfassten Maßnahmen im vhs-Layout.'
   },
   {
+    icon: PanelRight,
+    title: 'Elemente bearbeiten',
+    steps: [
+      'Ein ausgewähltes Element zeigt rechts die Eigenschaften-Leiste: Text, Erläuterung, Zuständigkeit, Dokument/Formular, IT-System und Dauer/Frist. Diese Angaben erscheinen in der Prozessbeschreibung.',
+      'Die „+“-Griffe rechts und unten am ausgewählten Element hängen direkt einen verbundenen Prozessschritt an. Der kleine Pfeil daneben bietet weitere Typen an. Bei Entscheidungen wird der erste Ausgang „Ja“, der zweite „Nein“.',
+      'Weitere Elementtypen: Dokument/Formular, IT-System, Warten/Frist und Teilprozess. Ein Teilprozess wird in der Eigenschaften-Leiste mit einem gespeicherten Diagramm verknüpft. Das Symbol im Element zeigt ihn hier an oder wechselt zu ihm.',
+      'Verbindungen: Auf der Linie ziehen setzt Knickpunkte (Doppelklick auf einen Knickpunkt entfernt ihn). Beschriftungen lassen sich entlang der Linie verschieben. Zum Umhängen die Verbindung anklicken und ihr Ende auf ein anderes Element ziehen.',
+      'Beim Verschieben zeigen orange Hilfslinien, wann ein Element mit Kante oder Mitte eines anderen fluchtet; es rastet dort ein.',
+      'Beim Löschen eines Schritts mitten im Ablauf fragt der Editor, ob Vorgänger und Nachfolger direkt verbunden werden sollen.',
+      'Unter der Arbeitsfläche zeigt „Ablauf als Text“ das Diagramm als nummerierte Liste – auch für Screenreader.'
+    ],
+    note: 'Über das X blendest du die Eigenschaften-Leiste aus, über „Eigenschaften“ oder einen Rechtsklick auf das Element wieder ein.'
+  },
+  {
     icon: Rows3,
     title: 'Swimlanes (Verantwortungsbereiche)',
     steps: [
       'Ziehe „Swimlane" aus der Elementleiste auf die Arbeitsfläche.',
-      'Doppelklick öffnet den Bearbeitungsdialog: Bezeichnung und Farbakzent (7 Farben) frei wählbar.',
-      'Klicke auf eine Lane → blauer Resize-Pfeil (▪) erscheint unten rechts. Ziehen verändert Breite und Höhe.',
-      'Ordne mehrere Lanes untereinander an – jede Lane repräsentiert einen Verantwortungsbereich.',
-      'Lege Prozessschritte innerhalb der zuständigen Lane ab und verbinde sie wie gewohnt.',
+      'In der Eigenschaften-Leiste legst du Bezeichnung und Farbe fest und sortierst Lanes nach oben oder unten.',
+      'Elemente, die du in einer Lane ablegst, gehören zu ihr: Sie wandern mit, wenn du die Lane verschiebst, und die Lane wächst mit ihrem Inhalt.',
+      'Der Griff (▪) unten rechts an einer ausgewählten Lane ändert Breite und Höhe – kleiner als ihr Inhalt geht nicht.',
+      'Beim Löschen einer Lane bleiben ihre Elemente erhalten.',
       'Verbindungen, die eine Lanegrenze kreuzen, zeigen Übergaben und Schnittstellen zwischen Rollen.',
     ],
-    note: 'Swimlanes werden beim Export wie alle anderen Elemente dargestellt. Zwei fertige Swimlane-Vorlagen findest du unter „Vorlagen".'
+    note: 'Swimlanes werden beim Export wie alle anderen Elemente dargestellt. Fertige Swimlane-Vorlagen findest du unter „Vorlagen".'
   },
   {
     icon: LayoutTemplate,
     title: 'Vorlagen',
-    text: 'Starte schneller mit vorgefertigten Templates für häufige vhs-Prozesse wie Kursplanung, Anmeldung oder Dozentenverwaltung. Zwei Vorlagen demonstrieren den Einsatz von Swimlanes.'
+    text: 'Starte schneller mit vorgefertigten Templates für häufige vhs-Prozesse wie Kursplanung, Anmeldung oder Dozentenverwaltung. Mehrere Vorlagen zeigen Swimlanes; „Rechnungseingang“ und „Kursanmeldung mit Warteliste“ zeigen außerdem Dokumente, IT-Systeme, Fristen und Teilprozesse samt Erläuterungen.'
   },
   {
     icon: Settings,
@@ -160,10 +178,26 @@ const sections = [
   }
 ];
 
+// Hebt die Suchbegriffe in einem Text hervor
+const Highlight = ({ text, query }) => splitMatches(text, query).map((part, i) => (part.match
+  ? <mark key={i} className="bg-[var(--color-vhs-gelb)]/40 text-inherit rounded-sm">{part.text}</mark>
+  : <React.Fragment key={i}>{part.text}</React.Fragment>));
+
+const sectionTexts = (section) => [section.title, section.text, section.note, ...(section.steps || [])];
+
 // Wird nur gerendert, solange der Dialog offen ist
 const GuideModal = ({ onClose }) => {
   const dialogRef = useDialogA11y(true, onClose);
   const titleId = useId();
+  const searchId = useId();
+  const [query, setQuery] = useState('');
+
+  const visibleSections = useMemo(() => sections.filter((section) => matchesQuery(sectionTexts(section), query)), [query]);
+  const visibleShortcuts = useMemo(
+    () => (matchesQuery(['Tastenkürzel'], query) ? SHORTCUTS : SHORTCUTS.filter((row) => matchesQuery(row, query))),
+    [query]
+  );
+  const resultCount = visibleSections.length + (visibleShortcuts.length ? 1 : 0);
 
   return (
     <div
@@ -182,14 +216,42 @@ const GuideModal = ({ onClose }) => {
             </h2>
             <p className="text-sm text-gray-500 mt-1">So funktioniert der vhs Workflow Editor.</p>
           </div>
+          <div role="search" className="ml-auto mr-3 flex items-center gap-2 rounded-md border border-[var(--color-vhs-blau-20)] bg-white px-2 py-1.5 focus-within:ring-2 focus-within:ring-[var(--color-vhs-orange-hell)]">
+            <Search className="w-4 h-4 text-gray-400 shrink-0" aria-hidden="true" />
+            <label htmlFor={searchId} className="sr-only">Anleitung durchsuchen</label>
+            <input
+              id={searchId}
+              data-autofocus
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                // Esc leert zuerst die Suche, erst danach schließt es den Dialog
+                if (e.key === 'Escape' && query) {
+                  e.stopPropagation();
+                  setQuery('');
+                }
+              }}
+              placeholder="Anleitung durchsuchen …"
+              className="w-40 sm:w-56 text-sm outline-none"
+            />
+          </div>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700 p-1 hover:bg-gray-200 rounded-full transition-colors" aria-label="Anleitung schließen">
             <X className="w-6 h-6" />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5">
+          <p className="sr-only" role="status" aria-live="polite">
+            {query ? (resultCount ? `${resultCount} ${resultCount === 1 ? 'Abschnitt' : 'Abschnitte'} gefunden` : 'Keine Treffer') : ''}
+          </p>
+          {query && resultCount === 0 && (
+            <p className="text-sm text-gray-500 text-center py-8">
+              Keine Treffer für „{query}“. Versuche einen anderen Begriff, z. B. „Swimlane“, „Teilprozess“ oder „Export“.
+            </p>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {sections.map((section) => {
+            {visibleSections.map((section) => {
               const Icon = section.icon;
               return (
                 <div
@@ -200,24 +262,25 @@ const GuideModal = ({ onClose }) => {
                     <div className="p-2 rounded-lg bg-[var(--color-vhs-blau-10)]" aria-hidden="true">
                       <Icon className="w-5 h-5 text-[var(--color-vhs-blau)]" />
                     </div>
-                    <h3 className="text-sm font-bold text-[var(--color-vhs-blau)]">{section.title}</h3>
+                    <h3 className="text-sm font-bold text-[var(--color-vhs-blau)]"><Highlight text={section.title} query={query} /></h3>
                   </div>
                   {section.text && (
-                    <p className="text-sm text-gray-600 leading-relaxed">{section.text}</p>
+                    <p className="text-sm text-gray-600 leading-relaxed"><Highlight text={section.text} query={query} /></p>
                   )}
                   {section.steps && (
                     <ol className="text-sm text-gray-600 leading-relaxed mt-1 space-y-1 list-decimal list-inside">
                       {section.steps.map((step, i) => (
-                        <li key={i}>{step}</li>
+                        <li key={i}><Highlight text={step} query={query} /></li>
                       ))}
                     </ol>
                   )}
                   {section.note && (
-                    <p className="text-xs text-gray-500 mt-2 italic">{section.note}</p>
+                    <p className="text-xs text-gray-500 mt-2 italic"><Highlight text={section.note} query={query} /></p>
                   )}
                 </div>
               );
             })}
+            {visibleShortcuts.length > 0 && (
             <div className="border border-[var(--color-vhs-blau-20)] rounded-xl p-4 bg-white md:col-span-2">
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 rounded-lg bg-[var(--color-vhs-blau-10)]" aria-hidden="true">
@@ -234,10 +297,10 @@ const GuideModal = ({ onClose }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {SHORTCUTS.map(([keys, action]) => (
+                  {visibleShortcuts.map(([keys, action]) => (
                     <tr key={keys} className="border-t border-gray-100">
-                      <td className="py-1 pr-4"><kbd className="font-mono text-xs bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5">{keys}</kbd></td>
-                      <td className="py-1">{action}</td>
+                      <td className="py-1 pr-4"><kbd className="font-mono text-xs bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5"><Highlight text={keys} query={query} /></kbd></td>
+                      <td className="py-1"><Highlight text={action} query={query} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -246,6 +309,7 @@ const GuideModal = ({ onClose }) => {
                 Hinweis: Das Verbinden von Elementen auf der Arbeitsfläche ist nur mit der Maus möglich.
               </p>
             </div>
+            )}
           </div>
         </div>
 

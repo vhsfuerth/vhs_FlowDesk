@@ -118,3 +118,38 @@ describe('toMarkdown', () => {
     expect(toMarkdown(buildProcessDescription(diagram), { title: 'T' })).toContain('Start \\*wichtig\\* \\| A\\_B');
   });
 });
+
+describe('Zusatzangaben (Format 2)', () => {
+  const diagram = {
+    nodes: [
+      { id: 'l', type: 'lane', label: 'Kursverwaltung', position: { x: 0, y: 0 }, size: { width: 800, height: 200 } },
+      { id: 's', type: 'start', label: 'Start', position: { x: 2000, y: 0 }, laneId: 'l' },
+      { id: 'a', type: 'document', label: 'Anmeldung erfassen', position: { x: 2000, y: 100 }, description: 'Daten aus dem Formular übernehmen', document: 'Anmeldeformular', system: 'Kufer', duration: '2 Tage' },
+      { id: 'b', type: 'end', label: 'Fertig', position: { x: 2000, y: 200 }, role: 'Teamleitung' }
+    ],
+    edges: [{ id: 'e1', from: 's', to: 'a' }, { id: 'e2', from: 'a', to: 'b' }]
+  };
+
+  it('nimmt Erläuterung, Dokument, IT-System und Frist auf und nutzt laneId bzw. die eigene Zuständigkeit', () => {
+    const { steps, roles } = buildProcessDescription(diagram);
+    const [start, doc, end] = steps;
+    expect(start.role).toBe('Kursverwaltung');
+    expect(doc.role).toBeNull();
+    expect(doc.typeLabel).toBe('Dokument/Formular');
+    expect(doc.description).toBe('Daten aus dem Formular übernehmen');
+    expect(doc.facts).toEqual([
+      { label: 'Dokument/Formular', value: 'Anmeldeformular' },
+      { label: 'IT-System', value: 'Kufer' },
+      { label: 'Dauer/Frist', value: '2 Tage' }
+    ]);
+    expect(end.role).toBe('Teamleitung');
+    expect(roles.map((r) => r.name)).toEqual(['Kursverwaltung', 'Teamleitung']);
+  });
+
+  it('schreibt die Angaben in die Markdown-Fassung', () => {
+    const markdown = toMarkdown(buildProcessDescription(diagram), { title: 'Anmeldung', date: new Date(2026, 10, 5) });
+    expect(markdown).toContain('Daten aus dem Formular übernehmen');
+    expect(markdown).toContain('- IT-System: Kufer');
+    expect(markdown).toContain('- Dauer/Frist: 2 Tage');
+  });
+});

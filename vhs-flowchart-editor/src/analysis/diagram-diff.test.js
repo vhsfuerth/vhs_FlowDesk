@@ -92,3 +92,13 @@ describe('buildComparisonView', () => {
     expect(view.edgeMarks).toEqual({ e4: 'added', e5: 'added', e2: 'removed', e3: 'removed' });
   });
 });
+
+describe('Zusatzangaben im Versionsvergleich', () => {
+  it('meldet geänderte Angaben und Lane-Wechsel', () => {
+    const before = { nodes: [{ id: 'a', type: 'process', label: 'Prüfen', laneId: 'l1' }], edges: [] };
+    const after = { nodes: [{ id: 'a', type: 'process', label: 'Prüfen', laneId: 'l2', duration: '2 Tage' }], edges: [] };
+    const texts = diffDiagrams(before, after).summary.map((s) => s.text);
+    expect(texts).toContain('Angaben zu „Prüfen“ geändert (Erläuterung, Zuständigkeit o. Ä.)');
+    expect(texts).toContain('„Prüfen“ liegt jetzt in einer anderen Swimlane');
+  });
+});

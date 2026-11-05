@@ -1,31 +1,57 @@
-import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 import * as joint from 'jointjs';
+import { PanelRightOpen } from 'lucide-react';
 import { HistoryManager } from '../diagram/history';
-import { JSONConverter } from '../diagram/converter';
+import { JSONConverter, setElementLane } from '../diagram/converter';
 import { DiagramLayout } from '../diagram/layout';
-import { createNodeAt } from '../diagram/shapes';
+import { createLink, createNode, createNodeAt } from '../diagram/shapes';
 import { exportToPNG, exportToSVG, exportToPDF, exportToJSON, getDiagramJpegForPdf } from '../export/file-export';
 import { extractFragment, instantiateFragment, readClipboard, writeClipboard } from '../diagram/clipboard';
 import { alignBoxes, distributeBoxes } from '../diagram/arrange';
 import { generateUUID } from '../utils/uuid';
-import { COLORS } from '../utils/constants';
 import { addFocusHighlight, clearFocusHighlight, setPresentationDim } from '../diagram/highlight';
 import { attachWheelZoom, createAutoFit, pasteOffset, scrollToLocalRect, trackPointer, visibleCenterLocal, zoomAroundPoint } from '../diagram/viewport';
 import { attachPortHover, createPaper } from '../diagram/paper';
-import { createSelectionController } from '../diagram/selection';
+import { createSelectionController, hasSelectedAncestor } from '../diagram/selection';
 import { attachPanAndRubberBand } from '../diagram/pan-select';
-import { decisionLabelSuggestions, getLinkLabelText, setLaneLabelAndColor, setLinkLabelText, setNodeText } from '../diagram/text-editing';
+import { attachVertexDrag } from '../diagram/vertex-drag';
+import { assignLane, attachLaneEmbedding, growLaneToFit, isLane, moveLane } from '../diagram/lane-embedding';
+import { nextDecisionLabel, nextEdgePorts, placeNextNode } from '../diagram/add-next';
+import { getLinkLabelText, setLinkLabelText, setNodeText } from '../diagram/text-editing';
+import { attachSnaplines } from '../diagram/snapline-drag';
+import { bridgeEdges } from '../diagram/bridge';
+import { getNodeDetails } from '../diagram/converter';
 import { useDiagramSearch } from '../hooks/useDiagramSearch';
 import DiagramSearch from './DiagramSearch';
-import EditTextModal from './EditTextModal';
-import EditLaneModal from './EditLaneModal';
+import PropertiesPanel from './PropertiesPanel';
+import AddNextMenu from './AddNextMenu';
+import InlineTextEditor from './InlineTextEditor';
 
 // Versatz beim Einfügen und Duplizieren, damit Kopien nicht verdeckt sind
 const PASTE_OFFSET = 30;
 // Dauer der roten Markierung beim Springen zu einem Element
 const FOCUS_HIGHLIGHT_MS = 1800;
+// Eigenschaften-Leiste ausgeblendet (pro Browser gemerkt)
+const PANEL_HIDDEN_KEY = 'vhs-properties-panel-hidden';
 
-const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryChange, onSelectionChange, zoomLevel, onZoomSet }, ref) => {
+const readPanelHidden = () => {
+  try {
+    return localStorage.getItem(PANEL_HIDDEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+
+// Offenes Textfeld auf der Fläche übernehmen (es übernimmt beim Verlassen des Fokus)
+const commitOpenInlineEditor = () => {
+  const active = document.activeElement;
+  if (active?.dataset?.inlineEditor) active.blur();
+};
+
+const DiagramCanvas = forwardRef(({
+  onGraphChange, onDiagramLoaded, onHistoryChange, onSelectionChange, zoomLevel, onZoomSet,
+  currentDiagramId, onOpenSubprocess, onNotify, onDeleteRequest
+}, ref) => {
   const canvasRef = useRef(null);
   const graphRef = useRef(null);
   const paperRef = useRef(null);
@@ -57,8 +83,12 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
     onSelectionChangeRef.current = onSelectionChange;
   }, [onZoomSet, zoomLevel, onGraphChange, onHistoryChange, onSelectionChange]);
 
-  const [editModal, setEditModal] = useState({ isOpen: false, title: '', value: '', onSave: null });
-  const [laneEditModal, setLaneEditModal] = useState({ isOpen: false, label: '', headerColor: COLORS.vhsBlue, onSave: null });
+  // Eigenschaften-Leiste: genau eine ausgewählte Zelle
+  const [selectedCell, setSelectedCell] = useState(null);
+  const [panelHidden, setPanelHidden] = useState(readPanelHidden);
+  // Menü am „+“-Griff: { x, y, sourceId, direction } in Koordinaten des Wrappers
+  const [addMenu, setAddMenu] = useState(null);
+  const wrapperRef = useRef(null);
 
   const scrollContainer = () => canvasRef.current.parentNode;
   const getSelection = () => selectionRef.current?.get() || [];
@@ -67,51 +97,144 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
 
   const searchApi = useDiagramSearch({ paperRef, graphRef, converterRef, getContainer: scrollContainer });
 
-  // Doppelklick: Text bzw. Lane bearbeiten (Dialog)
-  const openNodeEditor = (node) => {
-    if (node.get('type') === 'vhs.Lane') {
-      setLaneEditModal({
-        isOpen: true,
-        label: node.attr('label/text') || '',
-        headerColor: node.attr('header/fill') || COLORS.vhsBlue,
-        onSave: (value) => {
-          setLaneLabelAndColor(node, value);
-          onGraphChangeRef.current?.();
-          setLaneEditModal((prev) => ({ ...prev, isOpen: false }));
-        }
-      });
-      return;
+  const showPanel = useCallback((hidden) => {
+    setPanelHidden(hidden);
+    try {
+      localStorage.setItem(PANEL_HIDDEN_KEY, hidden ? '1' : '0');
+    } catch {
+      // Ohne Speicher gilt die Einstellung nur bis zum Neuladen
     }
-    setEditModal({
-      isOpen: true,
-      title: 'Text bearbeiten',
-      value: node.attr('label/text') || '',
-      onSave: (text) => {
-        setNodeText(node, text);
-        onGraphChangeRef.current?.();
-        setEditModal((prev) => ({ ...prev, isOpen: false }));
-      }
-    });
+  }, []);
+
+  // --- Text direkt auf der Fläche bearbeiten (Doppelklick, F2/Enter, Lostippen) ---
+  // { cellId, initialValue, selectAll, rect, fontSize, label }
+  const [inlineEdit, setInlineEdit] = useState(null);
+  const typeName = (cell) => String(cell.get('type')).replace('vhs.', '').toLowerCase();
+
+  // Lage des Textfelds (Diagrammkoordinaten): Element, Kopfzeile einer Lane bzw. Beschriftung der Verbindung
+  const editRectFor = (cell) => {
+    if (cell.isLink()) {
+      const view = paperRef.current.findViewByModel(cell);
+      const distance = cell.labels()[0]?.position?.distance ?? 0.5;
+      const point = view?.getPointAtRatio(distance) || cell.getBBox().center();
+      return { x: point.x - 80, y: point.y - 16, width: 160, height: 32 };
+    }
+    const box = cell.getBBox();
+    return typeName(cell) === 'lane' ? { ...box, height: 40 } : box;
   };
 
-  const openLinkEditor = (link) => {
-    setEditModal({
-      isOpen: true,
-      title: 'Verbindungstext bearbeiten (z.B. Ja/Nein)',
-      value: getLinkLabelText(link),
-      suggestions: decisionLabelSuggestions(graphRef.current, link),
-      onSave: (text) => {
-        setLinkLabelText(link, text);
-        onGraphChangeRef.current?.();
-        setEditModal((prev) => ({ ...prev, isOpen: false }));
-      }
+  /**
+   * Startet die Bearbeitung. `initialText`: ersetzt den Text (Lostippen), sonst wird er markiert.
+   * @returns {boolean}
+   */
+  const startInlineEdit = (cell, initialText = null) => {
+    const paper = paperRef.current;
+    if (!cell?.graph || !paper || !wrapperRef.current) return false;
+    const local = editRectFor(cell);
+    const client = paper.localToClientRect(local);
+    const bounds = wrapperRef.current.getBoundingClientRect();
+    const current = cell.isLink() ? getLinkLabelText(cell) : (cell.attr('label/text') || '');
+    setSelection([cell]);
+    setInlineEdit({
+      cellId: cell.id,
+      initialValue: initialText ?? current,
+      selectAll: initialText === null,
+      rect: { left: client.x - bounds.left, top: client.y - bounds.top, width: client.width, height: client.height },
+      fontSize: Math.max(10, Math.round(13 * (zoomRef.current || 1))),
+      label: cell.isLink() ? 'Beschriftung der Verbindung' : 'Text des Elements'
     });
+    return true;
   };
 
-  // Die Ereignisbehandlung wird nur einmal angemeldet; sie ruft die jeweils aktuellen Editor-Funktionen auf
-  const editorsRef = useRef({ openNodeEditor, openLinkEditor });
+  // Nach dem Bearbeiten zurück auf die Fläche, damit Tastenkürzel wieder dort wirken
+  const refocusCanvas = () => {
+    const active = document.activeElement;
+    if (!active || active === document.body || active.dataset?.inlineEditor) canvasRef.current?.focus({ preventScroll: true });
+  };
+
+  const commitInlineEdit = (text) => {
+    const cell = inlineEdit && graphRef.current?.getCell(inlineEdit.cellId);
+    setInlineEdit(null);
+    refocusCanvas();
+    if (!cell) return;
+    if (cell.isLink()) {
+      if (text !== getLinkLabelText(cell)) setLinkLabelText(cell, text);
+    } else if (text !== (cell.attr('label/text') || '')) {
+      setNodeText(cell, text);
+    }
+  };
+
+  // Doppelklick: direkt auf der Fläche bearbeiten
+  const editCell = (cell) => startInlineEdit(cell);
+
+  // Rechtsklick: Eigenschaften der Zelle ein- bzw. ausblenden. Ist die Zelle noch nicht
+  // (allein) ausgewählt, wird sie ausgewählt und die Leiste eingeblendet.
+  const togglePropertiesFor = (cell) => {
+    const selection = getSelection();
+    if (selection.length === 1 && selection[0] === cell) {
+      showPanel(!panelHiddenRef.current);
+    } else {
+      setSelection([cell]);
+      showPanel(false);
+    }
+  };
+
+  // Entfernen über das X am Element: wie die Entf-Taste (mit Angebot, den Ablauf zu erhalten)
+  const requestDelete = (cell) => {
+    setSelection([cell]);
+    if (onDeleteRequest) onDeleteRequest();
+    else cell.remove();
+  };
+
+  // Folgeschritt anhängen („+“-Griff, Menü oder Eigenschaften-Leiste)
+  const addNextStep = (source, direction, type = 'process') => {
+    const graph = graphRef.current;
+    if (!graph || !source) return null;
+    const node = createNode(type, 0, 0);
+    const obstacles = graph.getElements().filter((cell) => !isLane(cell)).map((cell) => cell.getBBox());
+    const { x, y } = placeNextNode(source.getBBox(), node.size(), direction, obstacles);
+    node.position(x, y);
+
+    const sourceType = String(source.get('type'));
+    const label = sourceType === 'vhs.Decision'
+      ? nextDecisionLabel(graph.getConnectedLinks(source, { outbound: true }).map(getLinkLabelText))
+      : '';
+    const ports = nextEdgePorts(direction);
+    const link = createLink(source.id, node.id, label);
+    link.source({ id: source.id, port: ports.sourcePort });
+    link.target({ id: node.id, port: ports.targetPort });
+
+    graph.startBatch('add-next');
+    graph.addCell(node);
+    // Gleiche Lane wie die Quelle, auch wenn der neue Schritt über ihren Rand hinausragt
+    const lane = source.getParentCell();
+    if (isLane(lane)) {
+      setElementLane(node, lane);
+      growLaneToFit(lane);
+    }
+    graph.addCell(link);
+    graph.stopBatch('add-next');
+    setSelection([node]);
+    return node;
+  };
+
+  const openSubprocess = (element) => {
+    const id = getNodeDetails(element).subprocessId;
+    if (id) {
+      onOpenSubprocess?.(id, 'ask');
+    } else {
+      setSelection([element]);
+      showPanel(false);
+      onNotify?.('Dieser Teilprozess ist noch mit keinem Diagramm verknüpft. Bitte in den Eigenschaften auswählen.', 'info');
+    }
+  };
+
+  // Die Ereignisbehandlung wird nur einmal angemeldet; sie ruft die jeweils aktuellen Funktionen auf
+  const handlersRef = useRef({});
+  const panelHiddenRef = useRef(false);
   useEffect(() => {
-    editorsRef.current = { openNodeEditor, openLinkEditor };
+    handlersRef.current = { editCell, addNextStep, openSubprocess, requestDelete, togglePropertiesFor };
+    panelHiddenRef.current = panelHidden;
   });
 
   useEffect(() => {
@@ -139,7 +262,11 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
     selectionRef.current = createSelectionController({
       graph,
       paper,
-      onChange: (count) => onSelectionChangeRef.current?.(count)
+      onChange: (count) => {
+        onSelectionChangeRef.current?.(count);
+        setSelectedCell(count === 1 ? selectionRef.current.get()[0] : null);
+        setAddMenu(null);
+      }
     });
 
     graph.on('all', (eventName) => {
@@ -151,6 +278,9 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
 
     const detachPan = attachPanAndRubberBand({ paper, graph, container, getSelection, setSelection });
     const detachPortHover = attachPortHover(paper);
+    const detachLanes = attachLaneEmbedding({ graph, paper, getSelection });
+    const detachVertexDrag = attachVertexDrag({ paper });
+    const detachSnaplines = attachSnaplines({ paper, graph, getSelection });
     const detachWheelZoom = attachWheelZoom(container, {
       getZoom: () => zoomRef.current,
       setZoom: (zoom, anchor) => {
@@ -159,13 +289,41 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
       }
     });
 
-    paper.on('element:pointerdblclick', (view) => editorsRef.current.openNodeEditor(view.model));
-    paper.on('link:pointerdblclick', (view) => editorsRef.current.openLinkEditor(view.model));
+    paper.on('element:pointerdblclick', (view) => handlersRef.current.editCell(view.model));
+    paper.on('link:pointerdblclick', (view) => handlersRef.current.editCell(view.model));
+    paper.on('element:remove-request', (view) => handlersRef.current.requestDelete(view.model));
+    // Rechtsklick auf Element oder Verbindung: Eigenschaften ein-/ausblenden statt Browser-Kontextmenü
+    const onCellContextMenu = (view, evt) => {
+      evt.preventDefault();
+      handlersRef.current.togglePropertiesFor(view.model);
+    };
+    paper.on('element:contextmenu', onCellContextMenu);
+    paper.on('link:contextmenu', onCellContextMenu);
+    // Beim Scrollen passt die Lage des Textfelds nicht mehr: Text übernehmen
+    container.addEventListener('scroll', commitOpenInlineEditor, { passive: true });
+    // Klick auf die Fläche: Fokus dorthin holen. JointJS verhindert den Fokuswechsel beim Klicken,
+    // sonst bliebe er z. B. auf einer Schaltfläche, und Tab/Enter/Lostippen gingen an diese.
+    const focusCanvas = () => canvasRef.current?.focus({ preventScroll: true });
+    container.addEventListener('pointerdown', focusCanvas);
+    paper.on('element:add-next', (view, direction) => handlersRef.current.addNextStep(view.model, direction));
+    paper.on('element:add-next-menu', (view, direction, { clientX, clientY }) => {
+      const bounds = wrapperRef.current.getBoundingClientRect();
+      setAddMenu({ x: clientX - bounds.left + 8, y: clientY - bounds.top + 8, sourceId: view.model.id, direction });
+    });
+    paper.on('element:subprocess:open', (view, evt) => {
+      evt.stopPropagation();
+      handlersRef.current.openSubprocess(view.model);
+    });
 
     return () => {
       if (highlightTimeoutRef.current) window.clearTimeout(highlightTimeoutRef.current);
       detachPan();
       detachPortHover();
+      detachLanes();
+      detachVertexDrag();
+      detachSnaplines();
+      container.removeEventListener('scroll', commitOpenInlineEditor);
+      container.removeEventListener('pointerdown', focusCanvas);
       detachWheelZoom();
       autoFitRef.current?.detach();
       pointerRef.current?.detach();
@@ -175,6 +333,7 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
 
   // Zoom um die Mausposition (Mausrad) bzw. die Bildmitte (Tasten, Schaltflächen)
   useEffect(() => {
+    commitOpenInlineEditor();
     const paper = paperRef.current;
     if (!paper) return;
     const anchor = zoomAnchorRef.current;
@@ -238,16 +397,26 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
 
   // Fügt einen Diagrammausschnitt mit neuen IDs ein und wählt ihn aus
   const insertFragment = (fragment, offset) => {
+    const graph = graphRef.current;
     const { nodes, edges } = instantiateFragment(fragment, { offset, createId: generateUUID });
     converterRef.current.fromJson({ nodes, edges });
-    setSelection(nodes.map((node) => graphRef.current.getCell(node.id)));
+    const cells = nodes.map((node) => graph.getCell(node.id)).filter(Boolean);
+    // Elemente ohne mitkopierte Lane landen in der Lane, über der sie eingefügt wurden
+    cells.filter((cell) => !cell.getParentCell()).forEach((cell) => assignLane(graph, cell));
+    setSelection(cells);
     return nodes.length;
   };
 
+  // Ausgewählte Elemente; bei Lanes samt ihrem Inhalt
   const selectedFragment = () => {
-    const ids = selectedElements().map((cell) => cell.id);
+    const elements = selectedElements();
+    const withContent = elements.flatMap((cell) => (isLane(cell) ? [cell, ...cell.getEmbeddedCells({ deep: true })] : [cell]));
+    const ids = [...new Set(withContent.filter((cell) => cell.isElement()).map((cell) => cell.id))];
     return ids.length ? extractFragment(converterRef.current.toJson(), ids) : null;
   };
+
+  // Nach dem Verschieben per Tastatur oder Ausrichten: Lanes neu zuordnen
+  const reassignLanes = (cells) => cells.forEach((cell) => assignLane(graphRef.current, cell));
 
   const selectedBoxes = () => selectedElements().map((cell) => ({ id: cell.id, ...cell.position(), ...cell.size() }));
 
@@ -255,7 +424,8 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
     const entries = Object.entries(positions);
     if (!entries.length) return false;
     graphRef.current.startBatch('arrange');
-    entries.forEach(([id, { x, y }]) => graphRef.current.getCell(id)?.position(x, y));
+    entries.forEach(([id, { x, y }]) => graphRef.current.getCell(id)?.position(x, y, { deep: true }));
+    reassignLanes(entries.map(([id]) => graphRef.current.getCell(id)).filter(Boolean));
     graphRef.current.stopBatch('arrange');
     return true;
   };
@@ -291,15 +461,41 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
     canUndo: () => historyRef.current?.canUndo() || false,
     canRedo: () => historyRef.current?.canRedo() || false,
 
-    deleteSelected: () => {
+    // Löscht die Auswahl. `bridge`: bei einem einzelnen Schritt Vorgänger und Nachfolger verbinden
+    deleteSelected: ({ bridge = false } = {}) => {
+      const graph = graphRef.current;
       const selection = getSelection();
       if (!selection.length) return 0;
-      graphRef.current.startBatch('delete');
-      graphRef.current.removeCells(selection);
-      graphRef.current.stopBatch('delete');
+      const bridges = bridge && selection.length === 1 ? bridgeEdges(converterRef.current.toJson(), String(selection[0].id)) || [] : [];
+      graph.startBatch('delete');
+      graph.removeCells(selection);
+      bridges.forEach((edge) => {
+        const link = createLink(edge.from, edge.to, edge.label);
+        if (edge.sourcePort) link.source({ id: edge.from, port: edge.sourcePort });
+        if (edge.targetPort) link.target({ id: edge.to, port: edge.targetPort });
+        graph.addCell(link);
+      });
+      graph.stopBatch('delete');
       setSelection([]);
       return selection.length;
     },
+
+    // Liegt der einzeln ausgewählte Schritt im Ablauf (Vorgänger und genau ein Nachfolger)?
+    getBridgeInfo: () => {
+      const selection = getSelection();
+      if (selection.length !== 1 || !selection[0].isElement()) return null;
+      const edges = bridgeEdges(converterRef.current.toJson(), String(selection[0].id));
+      return edges ? { label: selection[0].attr('label/text') || '', count: edges.length } : null;
+    },
+
+    // F2/Enter bzw. Lostippen: Text der einzeln ausgewählten Zelle bearbeiten
+    editSelection: (initialText = null) => {
+      const selection = getSelection();
+      if (selection.length !== 1) return false;
+      return startInlineEdit(selection[0], initialText);
+    },
+
+    isEditingText: () => Boolean(inlineEdit),
 
     // --- Auswahl und Bearbeitung mehrerer Elemente ---
 
@@ -341,8 +537,11 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
     moveSelection: (dx, dy) => {
       const elements = selectedElements();
       if (!elements.length) return false;
+      // Elemente in einer mit ausgewählten Lane wandern mit ihr
+      const movable = elements.filter((cell) => !hasSelectedAncestor(cell, elements));
       graphRef.current.startBatch('move');
-      elements.forEach((cell) => cell.translate(dx, dy));
+      movable.forEach((cell) => cell.translate(dx, dy));
+      reassignLanes(movable);
       graphRef.current.stopBatch('move');
       return true;
     },
@@ -354,6 +553,8 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
     autoLayout: (direction = 'TB') => {
       if (!layoutRef.current || !graphRef.current.getElements().length) return null;
       const result = layoutRef.current.applyLayout(direction);
+      // Zuordnung zu den (neu angeordneten) Lanes nach Lage
+      reassignLanes(graphRef.current.getElements().filter((cell) => !isLane(cell)));
       // Auswahlrahmen an die neuen Positionen anpassen
       setSelection(getSelection());
       // An den Anfang des Diagramms scrollen, damit Start und Lane-Titel sichtbar sind
@@ -375,6 +576,9 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
     },
 
     center: () => centerContent(),
+
+    // Lane mit der Nachbarin oben/unten tauschen (Eigenschaften-Leiste)
+    moveLane: (lane, direction) => moveLane(graphRef.current, lane, direction),
 
     // Strg+F: Suche öffnen bzw. wieder ins Suchfeld springen
     openSearch: searchApi.open,
@@ -416,10 +620,13 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
   };
 
   const { search } = searchApi;
+  // Gelöschte Zellen haben keinen Graphen mehr
+  const panelCell = selectedCell?.graph ? selectedCell : null;
+  const panelTop = search.isOpen ? 'top-16' : 'top-3';
 
   return (
-    <div className="flex-grow h-full relative min-w-0">
-      <div className="absolute inset-0 overflow-auto bg-[var(--color-vhs-blau-10)] rounded-tl-lg border-l border-t border-[var(--color-vhs-blau-20)]" style={{ scrollBehavior: 'auto' }}>
+    <div ref={wrapperRef} className="flex-grow h-full relative min-w-0">
+      <div id="vhs-canvas-scroll" className="absolute inset-0 overflow-auto bg-[var(--color-vhs-blau-10)] rounded-tl-lg border-l border-t border-[var(--color-vhs-blau-20)]" style={{ scrollBehavior: 'auto' }}>
         <div
           ref={canvasRef}
           onDragOver={handleDragOver}
@@ -443,21 +650,53 @@ const DiagramCanvas = forwardRef(({ onGraphChange, onDiagramLoaded, onHistoryCha
           onClose={searchApi.close}
         />
       )}
-      {editModal.isOpen && (
-        <EditTextModal
-          title={editModal.title}
-          initialValue={editModal.value}
-          suggestions={editModal.suggestions}
-          onSave={editModal.onSave || (() => {})}
-          onCancel={() => setEditModal((prev) => ({ ...prev, isOpen: false }))}
+      {panelCell && !panelHidden && (
+        <PropertiesPanel
+          cell={panelCell}
+          currentDiagramId={currentDiagramId}
+          className={`${panelTop} max-h-[calc(100%-5rem)]`}
+          onClose={() => showPanel(true)}
+          onOpenSubprocess={onOpenSubprocess}
+          onAddNext={(cell, direction, type) => addNextStep(cell, direction, type)}
+          onMoveLane={(lane, direction) => {
+            if (!moveLane(graphRef.current, lane, direction)) {
+              onNotify?.(direction === 'up' ? 'Darüber liegt keine Swimlane.' : 'Darunter liegt keine Swimlane.', 'info');
+            }
+          }}
         />
       )}
-      {laneEditModal.isOpen && (
-        <EditLaneModal
-          initialLabel={laneEditModal.label}
-          initialHeaderColor={laneEditModal.headerColor}
-          onSave={laneEditModal.onSave || (() => {})}
-          onCancel={() => setLaneEditModal((prev) => ({ ...prev, isOpen: false }))}
+      {panelCell && panelHidden && (
+        <button
+          type="button"
+          onClick={() => showPanel(false)}
+          className={`absolute right-3 ${panelTop} z-10 inline-flex items-center gap-1.5 rounded-md bg-[var(--color-vhs-blau)] px-3 py-1.5 text-xs font-bold text-white shadow-md hover:bg-[var(--color-vhs-blau-80)] focus:outline-none focus:ring-2 focus:ring-[var(--color-vhs-orange-hell)]`}
+        >
+          <PanelRightOpen className="w-4 h-4" aria-hidden="true" />
+          Eigenschaften
+        </button>
+      )}
+      {inlineEdit && (
+        <InlineTextEditor
+          key={inlineEdit.cellId}
+          rect={inlineEdit.rect}
+          initialValue={inlineEdit.initialValue}
+          selectAll={inlineEdit.selectAll}
+          fontSize={inlineEdit.fontSize}
+          label={inlineEdit.label}
+          onCommit={commitInlineEdit}
+          onCancel={() => { setInlineEdit(null); refocusCanvas(); }}
+        />
+      )}
+      {addMenu && (
+        <AddNextMenu
+          x={addMenu.x}
+          y={addMenu.y}
+          onClose={() => setAddMenu(null)}
+          onSelect={(type) => {
+            const source = graphRef.current?.getCell(addMenu.sourceId);
+            setAddMenu(null);
+            addNextStep(source, addMenu.direction, type);
+          }}
         />
       )}
     </div>

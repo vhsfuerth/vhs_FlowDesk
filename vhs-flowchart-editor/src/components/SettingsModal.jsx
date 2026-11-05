@@ -3,7 +3,7 @@ import {
   getApiKeys, setApiKey, getAiProviderSettings, setAiProviderSettings,
   getCustomPrompt, setCustomPrompt, getCopilotHints, setCopilotHints, getAiConsent, revokeAiConsent
 } from '../storage/settings';
-import { SYSTEM_PROMPT } from '../ai/prompts';
+import { SYSTEM_PROMPT, effectiveSystemPrompt, isDefaultPrompt } from '../ai/prompts';
 import { PROVIDERS, getProviderPreset, resolveProvider } from '../ai/providers';
 import { Settings, X, Key, Sparkles, RotateCcw, Activity, Loader2, CheckCircle2, AlertCircle, Info, Scale, ShieldCheck, Server } from 'lucide-react';
 import { checkApiStatus, listAvailableModels } from '../ai/ai-client';
@@ -22,7 +22,7 @@ const SettingsModal = ({ onClose }) => {
   const [models, setModels] = useState(savedProvider.models);
   const [keys, setKeys] = useState(getApiKeys);
   const [formError, setFormError] = useState(null);
-  const [customPrompt, setCustomPromptValue] = useState(getCustomPrompt() || SYSTEM_PROMPT);
+  const [customPrompt, setCustomPromptValue] = useState(() => effectiveSystemPrompt(getCustomPrompt()));
   const [copilotHints, setCopilotHintsValue] = useState(getCopilotHints());
   const [apiStatus, setApiStatus] = useState(null); // { status, message }
   const [isChecking, setIsChecking] = useState(false);
@@ -64,7 +64,8 @@ const SettingsModal = ({ onClose }) => {
     }
     setAiProviderSettings({ providerId, baseUrl, models });
     Object.entries(keys).forEach(([id, key]) => setApiKey(String(key || ''), id));
-    setCustomPrompt(customPrompt);
+    // Unveränderter Standard wird nicht gespeichert, damit künftige Standardfassungen automatisch gelten
+    setCustomPrompt(isDefaultPrompt(customPrompt) ? '' : customPrompt);
     setCopilotHints(copilotHints.trim());
     onClose();
   };
@@ -339,6 +340,11 @@ const SettingsModal = ({ onClose }) => {
             <p className="text-xs text-gray-500 mt-1">
               Diese Anweisungen gelten für „Direkt erzeugen“ (nicht für den KI-Copilot). Änderungen können das Ergebnis stark beeinflussen.
             </p>
+            {!isDefaultPrompt(customPrompt) && (
+              <p className="text-xs text-[var(--color-vhs-orange-b)] mt-1">
+                Sie verwenden einen eigenen Prompt. Neue Elementtypen und Angaben des Editors kennt er eventuell nicht – „Zurücksetzen“ übernimmt die aktuelle Standardfassung.
+              </p>
+            )}
           </div>
 
           <div className="pt-4 border-t border-gray-100">

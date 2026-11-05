@@ -158,3 +158,17 @@ describe('Ausrichten und Verteilen', () => {
     expect(distributeBoxes(boxes.slice(0, 2), 'vertical')).toEqual({});
   });
 });
+
+describe('computeAutoLayout mit laneId', () => {
+  it('folgt der festen Zuordnung statt der Lage', () => {
+    const lanes = [
+      { id: 'l1', type: 'lane', label: 'A', position: { x: 0, y: 0 }, size: { width: 600, height: 200 } },
+      { id: 'l2', type: 'lane', label: 'B', position: { x: 0, y: 210 }, size: { width: 600, height: 200 } }
+    ];
+    const diagram = { nodes: [...lanes, { ...node('x', 'process', 50, 60), laneId: 'l2' }], edges: [] };
+    const result = computeAutoLayout(diagram, { direction: 'TB' });
+    const lane2 = result.lanes.l2;
+    expect(result.positions.x.y).toBeGreaterThanOrEqual(lane2.y);
+    expect(result.positions.x.y).toBeLessThan(lane2.y + lane2.height);
+  });
+});

@@ -54,7 +54,8 @@ const QualityPanel = ({
   width,
   onToggleCollapsed,
   onResizeStart,
-  title
+  title,
+  validation: validationFromApp
 }) => {
   const [activeTab, setActiveTab] = useState('check');
   const [isEvaluationCollapsed, setIsEvaluationCollapsed] = useState(false);
@@ -64,7 +65,12 @@ const QualityPanel = ({
   const [aiAnalysisError, setAiAnalysisError] = useState('');
   const ensureAiConsent = useAiConsent();
 
-  const validation = useMemo(() => validateDiagram(diagramData, metadata.improvementItems), [diagramData, metadata.improvementItems]);
+  // Die App reicht die Prüfung mit Kontext (gespeicherte Diagramme für Teilprozesse) herein
+  const ownValidation = useMemo(
+    () => (validationFromApp ? null : validateDiagram(diagramData, metadata.improvementItems)),
+    [validationFromApp, diagramData, metadata.improvementItems]
+  );
+  const validation = validationFromApp || ownValidation;
   const reviewSummary = useMemo(() => getReviewScoreSummary(metadata.reviewScores), [metadata.reviewScores]);
   const nodes = useMemo(
     () => (Array.isArray(diagramData?.nodes) ? diagramData.nodes.filter((node) => node.type !== 'annotation') : []),
@@ -187,11 +193,6 @@ const QualityPanel = ({
     return (
       <aside className="w-12 bg-white border-l border-[var(--color-vhs-blau-20)] flex flex-col items-center shadow-sm relative shrink-0">
         <button
-          onMouseDown={onResizeStart}
-          className="absolute left-0 top-0 h-full w-1 cursor-col-resize hover:bg-[var(--color-vhs-blau-20)]"
-          title="Breite anpassen"
-        />
-        <button
           onClick={onToggleCollapsed}
           className="mt-4 flex h-10 w-10 items-center justify-center rounded-full border border-[var(--color-vhs-blau-20)] text-[var(--color-vhs-blau)] hover:bg-[var(--color-vhs-blau-10)]"
           title="Seitenleiste einblenden"
@@ -211,9 +212,11 @@ const QualityPanel = ({
       className="bg-white border-l border-[var(--color-vhs-blau-20)] flex flex-col shadow-sm relative shrink-0"
       style={{ width: `${width}px` }}
     >
-      <button
+      {/* Nur mit der Maus: nicht in der Tab-Reihenfolge */}
+      <div
+        aria-hidden="true"
         onMouseDown={onResizeStart}
-        className="absolute left-0 top-0 h-full w-1 cursor-col-resize hover:bg-[var(--color-vhs-blau-20)]"
+        className="absolute left-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-[var(--color-vhs-blau-20)]"
         title="Breite anpassen"
       />
 

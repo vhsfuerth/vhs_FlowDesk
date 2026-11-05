@@ -148,3 +148,69 @@ describe('normalizeMetadata', () => {
     expect(Object.keys(metadata.reviewNotes)).toHaveLength(5);
   });
 });
+
+describe('Format 2 im Struktur-Check', () => {
+  const lane = { id: 'l1', type: 'lane', label: 'Lane', position: { x: 0, y: 0 }, size: { width: 400, height: 200 } };
+  const base = (extra = []) => ({
+    nodes: [
+      { id: 's', type: 'start', label: 'Start', position: { x: 10, y: 50 }, size: { width: 140, height: 70 }, laneId: 'l1' },
+      { id: 'e', type: 'end', label: 'Ende', position: { x: 200, y: 50 }, size: { width: 140, height: 70 }, laneId: 'l1' },
+      lane,
+      ...extra
+    ],
+    edges: [{ id: 'x', from: 's', to: 'e' }]
+  });
+
+  it('weist auf Teilprozesse ohne Verknüpfung hin', () => {
+    const sub = { id: 't', type: 'subprocess', label: 'Abrechnung', position: { x: 100, y: 100 }, size: { width: 180, height: 70 }, laneId: 'l1' };
+    const codes = validateDiagram(base([sub])).findings.map((f) => f.code);
+    expect(codes).toContain('subprocess_unlinked');
+    const linked = validateDiagram(base([{ ...sub, subprocessId: 'd2' }])).findings.map((f) => f.code);
+    expect(linked).not.toContain('subprocess_unlinked');
+  });
+
+  it('wertet eine Lane-Zuordnung auch bei abweichender Lage als „in einer Swimlane“', () => {
+    const far = { id: 'w', type: 'wait', label: 'Warten', position: { x: 900, y: 900 }, size: { width: 170, height: 60 }, laneId: 'l1' };
+    const codes = validateDiagram(base([far])).findings.filter((f) => f.code === 'outside_lane');
+    expect(codes).toEqual([]);
+  });
+});
+
+describe('Neue Elementtypen im Struktur-Check', () => {
+  const flow = (extra, extraEdges = []) => ({
+    nodes: [
+      { id: 's', type: 'start', label: 'Start' },
+      { id: 'p', type: 'process', label: 'Prüfen' },
+      { id: 'e', type: 'end', label: 'Ende' },
+      ...extra
+    ],
+    edges: [{ id: 'a', from: 's', to: 'p' }, { id: 'b', from: 'p', to: 'e' }, ...extraEdges]
+  });
+  const codes = (diagram, context) => validateDiagram(diagram, [], context).findings.map((f) => f.code);
+
+  it('prüft Verknüpfungen von Teilprozessen gegen die gespeicherten Diagramme', () => {
+    const sub = (subprocessId) => [{ id: 't', type: 'subprocess', label: 'Abrechnung', subprocessId }];
+    const edges = [{ id: 'c', from: 'p', to: 't' }, { id: 'd', from: 't', to: 'e' }];
+    expect(codes(flow(sub('d2'), edges), { diagramIds: ['d1', 'd2'], currentDiagramId: 'd1' })).not.toContain('subprocess_missing');
+    expect(codes(flow(sub('weg'), edges), { diagramIds: ['d1'], currentDiagramId: 'd1' })).toContain('subprocess_missing');
+    expect(codes(flow(sub('d1'), edges), { diagramIds: ['d1'], currentDiagramId: 'd1' })).toContain('subprocess_self');
+    // Ohne Liste der Diagramme (z. B. Datenbank nicht erreichbar) keine Vermutung
+    expect(codes(flow(sub('weg'), edges))).not.toContain('subprocess_missing');
+  });
+
+  it('weist bei Warten/Frist ohne Dauer darauf hin', () => {
+    const edges = [{ id: 'c', from: 'p', to: 'w' }, { id: 'd', from: 'w', to: 'e' }];
+    expect(codes(flow([{ id: 'w', type: 'wait', label: 'Warten' }], edges))).toContain('wait_without_duration');
+    expect(codes(flow([{ id: 'w', type: 'wait', label: 'Warten', duration: '14 Tage' }], edges))).not.toContain('wait_without_duration');
+  });
+
+  it('lässt Dokumente und IT-Systeme als angehängte Ablage enden', () => {
+    const storage = [{ id: 'x', type: 'system', label: 'Kufer' }, { id: 'y', type: 'document', label: 'Akte' }];
+    const edges = [{ id: 'c', from: 'p', to: 'x' }, { id: 'd', from: 'p', to: 'y' }];
+    const result = validateDiagram(flow(storage, edges)).findings;
+    expect(result.filter((f) => f.code === 'dead_end')).toEqual([]);
+    // Ein Prozessschritt ohne Ausgang bleibt ein Hinweis
+    const dead = validateDiagram(flow([{ id: 'q', type: 'process', label: 'Offen' }], [{ id: 'c', from: 'p', to: 'q' }])).findings;
+    expect(dead.map((f) => f.code)).toContain('dead_end');
+  });
+});

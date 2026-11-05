@@ -2,6 +2,68 @@
 
 Alle nennenswerten Änderungen am vhs Workflow-Algorithm Editor. Die Versionsnummern folgen [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.5.0] – 2026-11-05
+
+Stufe 3 aus `improvement.md`: neues Datenformat (Format 2) mit Swimlane-Zuordnung, Zusatzangaben und eigener Linienführung. Dazu die Punkte 2.2, 2.4, 2.6 und 4.2.
+
+### Datenformat
+
+- Format 2 (`schemaVersion` 2). Gespeicherte Diagramme, Versionen, Entwürfe und importierte Dateien werden beim Laden automatisch umgestellt. Dabei werden Elemente der Swimlane zugeordnet, in der sie liegen.
+- Neu je Element: Swimlane-Zuordnung, Erläuterung, Zuständigkeit (ohne Swimlane), Dokument/Formular, IT-System, Dauer/Frist und bei Teilprozessen das verknüpfte Diagramm.
+- Neu je Verbindung: Knickpunkte, Lage der Beschriftung und Linienführung (rechtwinklig oder gerade).
+- Ältere Versionen des Editors können Diagramme im Format 2 nicht öffnen.
+
+### Swimlanes
+
+- Elemente, die in einer Swimlane abgelegt werden, gehören zu ihr: Sie wandern mit, wenn die Lane verschoben wird, und die Lane wächst mit ihrem Inhalt.
+- Eine Lane lässt sich nicht mehr kleiner ziehen als ihr Inhalt. Beim Löschen einer Lane bleiben ihre Elemente erhalten.
+- Lanes lassen sich in der Eigenschaften-Leiste nach oben oder unten umsortieren; beim Kopieren einer Lane wird ihr Inhalt mitkopiert.
+
+### Bearbeiten
+
+- Neue Eigenschaften-Leiste rechts für das ausgewählte Element bzw. die ausgewählte Verbindung. Sie zeigt je Elementtyp nur passende Felder (z. B. bei Warten/Frist die Dauer, aber keine Zuständigkeit), seltene Angaben unter „Weitere Angaben“. Sie ersetzt die Bearbeitungsdialoge; ein Doppelklick springt in ihr Textfeld. Ausblenden über das X, Einblenden über „Eigenschaften“; ein Rechtsklick auf ein Element blendet sie ein bzw. aus.
+- „+“-Griffe am ausgewählten Element hängen einen verbundenen Folgeschritt an (rechts oder unten), der Pfeil daneben bietet weitere Typen an. Bei Entscheidungen wird der erste Ausgang „Ja“, der zweite „Nein“. Auch über die Eigenschaften-Leiste per Tastatur möglich.
+- Knickpunkte: Ziehen auf der Linie einer bestehenden Verbindung setzt einen Knickpunkt, die Punkte der ausgewählten Verbindung lassen sich verschieben, ein Doppelklick entfernt sie. Neue Verbindungen und einfache Klicks erzeugen keine Knickpunkte.
+- Beschriftungen von Verbindungen lassen sich entlang der Linie verschieben und wieder mittig setzen.
+- Text direkt auf der Fläche bearbeiten: Doppelklick, `F2` oder `Enter` öffnet ein Textfeld über dem Element bzw. der Beschriftung (Enter übernimmt, Esc bricht ab). Lostippen ersetzt den Text des ausgewählten Elements.
+- Hilfslinien beim Verschieben: Fluchtet ein Element mit Kante oder Mitte eines anderen, rastet es ein und eine orange Linie zeigt die Flucht. `Alt` gedrückt halten schaltet das ab.
+- Beim Löschen eines Schritts mitten im Ablauf (Vorgänger und genau ein Nachfolger) fragt der Editor, ob Vorgänger und Nachfolger direkt verbunden werden sollen; die Beschriftung (z. B. „Ja“) bleibt erhalten. Gilt für Entf und das X am Element.
+- Hinweis in der Elementleiste, wie Verbindungen umgehängt werden.
+- Der Anfasser zum Verbreitern des Qualitätspanels ist nicht mehr in der Tab-Reihenfolge (war ein unbeschrifteter Button ohne Tastaturfunktion).
+
+### Neue Elementtypen
+
+- Dokument/Formular, IT-System, Warten/Frist und Teilprozess. Ein Teilprozess (weiß mit doppeltem Rahmen) wird mit einem gespeicherten Diagramm verknüpft. Ein Klick auf sein Symbol fragt, ob er hier angezeigt (schreibgeschützte Ansicht im aktuellen Diagramm) oder zu ihm gewechselt werden soll; beides gibt es auch in der Eigenschaften-Leiste.
+- Struktur-Check: Hinweise auf Teilprozesse ohne Verknüpfung, mit gelöschtem Ziel oder mit Verweis auf sich selbst sowie auf Warten/Frist ohne Dauer. Dokumente und IT-Systeme dürfen als angehängte Ablage ohne Ausgang enden.
+
+### Vorlagen und Anleitung
+
+- Zwei neue Vorlagen mit den neuen Elementen: „Rechnungseingang (Swimlane)“ (Dokumente, IT-Systeme, Frist, Freigabe durch die Leitung) und „Kursanmeldung mit Warteliste“ (IT-System, Dokumente, Wartezeit, Zahlung als Teilprozess), jeweils mit Erläuterungen und Angaben.
+- Die Anleitung lässt sich durchsuchen: Abschnitte und Tastenkürzel werden gefiltert, Treffer hervorgehoben; Esc leert die Suche.
+
+### Barrierefreiheit
+
+- Neu unter der Arbeitsfläche: „Ablauf als Text“, eine ausblendbare, nummerierte Textfassung des Diagramms mit Zuständigkeiten, Verzweigungen und Angaben. Ein Klick auf einen Schritt springt zum Element. Erreichbar auch über einen Sprunglink am Seitenanfang.
+
+### KI
+
+- Alle Prompts überarbeitet (KI-Copilot, „Direkt erzeugen“, Verbesserungsvorschläge): klarer Aufbau mit Kontext, Begründungen statt Großbuchstaben, Beispiel, Selbstprüfung und Ausgabeformat am Ende; Hinweise der Einrichtung werden abgegrenzt eingebettet.
+- Der KI-Copilot kennt die neuen Elementtypen: Er legt Dokument-, IT-System- und Warte-Schritte an und füllt Erläuterung, Dokument, IT-System und Dauer/Frist, wenn die Beschreibung sie nennt. In der Prüfansicht lassen sich Art und Angaben ändern. Mit Swimlanes setzt er die feste Lane-Zuordnung, ohne Swimlanes steht die Rolle als Zuständigkeit am Schritt. Die Variante „Schulung“ schreibt Erläuterungen jetzt in das Erläuterungsfeld statt in Kommentare.
+- „Direkt erzeugen“ kennt die neuen Elementtypen, Angaben und Swimlanes und schickt ein Antwortschema mit; die Antwort wird bereinigt (unbekannte Typen, ungültige Lane-Zuordnungen).
+- Verbesserungsvorschläge berücksichtigen Dokumente, IT-Systeme, Fristen und Swimlanes (Medienbrüche, Wartezeiten, Übergaben).
+- Behoben: Die Einstellungen speicherten beim Speichern auch den unveränderten Standard-Prompt als eigenen Prompt; neue Standardfassungen kamen dann nie an. Gespeicherte Standardtexte gelten jetzt als „kein eigener Prompt“, ein echter eigener Prompt bleibt erhalten und wird in den Einstellungen mit einem Hinweis auf „Zurücksetzen“ markiert.
+
+### Prozessbeschreibung und Vergleich
+
+- Die Prozessbeschreibung (Word/Markdown) enthält Erläuterung, Dokument, IT-System und Dauer/Frist je Schritt. Zuständigkeit kommt aus der Swimlane, sonst aus der Angabe am Schritt.
+- Der Versionsvergleich meldet geänderte Angaben und Wechsel der Swimlane.
+
+### Code
+
+- Neues Feld `taskType` im Copilot-Prozessmodell (`process-model.js`), Antwortschema `DIAGRAM_SCHEMA` für „Direkt erzeugen“ (`ai/prompts.js`).
+- Neue Module `diagram/lanes.js`, `lane-embedding.js`, `add-next.js`, `add-next-tool.js`, `vertex-drag.js`, `snaplines.js`, `snapline-drag.js`, `bridge.js`, Komponenten `PropertiesPanel.jsx`, `AddNextMenu.jsx`, `SubprocessDialog.jsx`, `InlineTextEditor.jsx` und `DiagramTextAlternative.jsx`. `EditTextModal` und `EditLaneModal` entfallen.
+- 35 neue Tests (Format 2, Migration, Lanes, Folgeschritt, Knickpunkte, Eigenschaften-Leiste).
+
 ## [1.4.1] – 2026-11-04
 
 Interner Umbau der Arbeitsfläche (Punkt 5.1 aus `improvement.md`) und eine Fehlerbehebung.
