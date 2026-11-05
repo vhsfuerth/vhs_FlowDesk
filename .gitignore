@@ -2,7 +2,7 @@
 *.bat
 
 # Screenshots & Debugging-Bilder im Projektstamm
-*.png
+/*.png
 
 # Claude Code Konfiguration
 .claude/
