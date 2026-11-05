@@ -28,6 +28,8 @@
     "src/diagram/lanes.js",
     "src/diagram/add-next.js",
     "src/diagram/snaplines.js",
+    "src/diagram/partial-layout.js",
+    "src/diagram/overview.js",
     "src/diagram/bridge.js",
     "src/utils/text-search.js",
     "src/ai/providers.js",

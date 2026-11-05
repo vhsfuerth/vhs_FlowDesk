@@ -1,4 +1,4 @@
-# Technische Spezifikationen – vhs Workflow-Algorithm Editor
+# Technische Spezifikationen – vhs FlowDesk
 
 ---
 
@@ -181,7 +181,7 @@ Nutzer können den Ordner lokal nutzen und über `start.bat` starten (erfordert 
 1. `npm run build` (oder `build.bat`) ausführen.
 2. Inhalt des `dist/`-Ordners auf den Server kopieren.
 3. Sicherheits-Header aus `vercel.json` im Webserver übernehmen.
-4. Nutzer erreichen das Tool über eine interne URL (z. B. `http://workflow.vhs.local`).
+4. Nutzer erreichen das Tool über eine interne URL (z. B. `http://flowdesk.vhs.local`).
 
 ### Vercel
 

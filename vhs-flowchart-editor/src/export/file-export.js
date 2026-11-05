@@ -177,13 +177,13 @@ export const getDiagramJpegForPdf = async (paper, maxPx = 1100, quality = 0.75) 
     }
 };
 
-export const exportToSVG = async (paper, filename = 'vhs-flowchart.svg', title = '') => {
+export const exportToSVG = async (paper, filename = 'vhs-flowdesk.svg', title = '') => {
     const { svgString } = await getSvgString(paper, title);
     const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
     downloadBlob(blob, filename);
 };
 
-export const exportToPNG = async (paper, filename = 'vhs-flowchart.png', title = '') => {
+export const exportToPNG = async (paper, filename = 'vhs-flowdesk.png', title = '') => {
     const { svgString, width, height } = await getSvgString(paper, title);
 
     const canvas = document.createElement('canvas');
@@ -227,7 +227,7 @@ export const exportToPNG = async (paper, filename = 'vhs-flowchart.png', title =
     });
 };
 
-export const exportToPDF = async (paper, filename = 'vhs-flowchart.pdf', title = '') => {
+export const exportToPDF = async (paper, filename = 'vhs-flowdesk.pdf', title = '') => {
     const { svgString, width, height } = await getSvgString(paper, title);
 
     const canvas = document.createElement('canvas');
@@ -274,7 +274,7 @@ export const exportToPDF = async (paper, filename = 'vhs-flowchart.pdf', title =
     });
 };
 
-export const exportToJSON = (jsonObj, filename = 'vhs-flowchart.json') => {
+export const exportToJSON = (jsonObj, filename = 'vhs-flowdesk.json') => {
     const dataStr = JSON.stringify(jsonObj, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
     downloadBlob(blob, filename);

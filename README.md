@@ -1,4 +1,4 @@
-# vhs Workflow-Algorithm Editor
+# vhs FlowDesk
 
 Browserbasiertes PWA-Tool (Progressive Web App) zur Erstellung algorithmischer Ablaufpläne, Flowcharts und Entscheidungsbäume im vhs Corporate Design. Alle Diagramme bleiben lokal im Browser; nur für die KI-Funktionen werden Daten an den gewählten KI-Anbieter übertragen (Google Gemini, OpenAI, Mistral AI, Anthropic Claude oder ein eigener OpenAI-kompatibler Server).
 
@@ -56,6 +56,7 @@ Der API-Key wird nur lokal im Browser gespeichert und ausschließlich im Request
 - **Kopieren & Einfügen**: `Strg + C` / `Strg + V` (funktioniert auch zwischen zwei Diagrammen), `Strg + D` dupliziert die Auswahl. Verbindungen zwischen den ausgewählten Elementen werden mitkopiert.
 - **Menü „Anordnen“** in der unteren Leiste:
   - *Automatisch anordnen* räumt das ganze Diagramm auf (von oben nach unten oder von links nach rechts). Bei Swimlanes bleibt jeder Schritt in seiner Lane.
+  - *Nur Auswahl anordnen* ab zwei ausgewählten Elementen: ordnet nur diese neu, Handanpassungen im übrigen Diagramm bleiben erhalten.
   - *Ausrichten* (links, mittig, rechts, oben, unten) ab zwei ausgewählten Elementen.
   - *Gleichmäßig verteilen* ab drei ausgewählten Elementen.
 
@@ -130,6 +131,7 @@ Alle Diagramme liegen nur im Browser. **Werden die Browserdaten gelöscht, sind 
 | `Strg + Mausrad` | Zoom |
 | `Strg + +` / `Strg + -` | Zoom rein / raus |
 | `Strg + 0` | Zoom zurücksetzen |
+| `Strg + Umschalt + 1` | Alles einpassen (ganzes Diagramm sichtbar) |
 | `Esc` | Dialog schließen bzw. Auswahl aufheben |
 | Doppelklick / `F2` / `Enter` | Text direkt auf der Fläche bearbeiten |
 | Lostippen | Text des ausgewählten Elements ersetzen |
@@ -232,14 +234,14 @@ Jeder `git push` auf den `master`-Branch löst einen neuen Build aus. Der Build 
 ### Beispiel für Ubuntu/Nginx
 
 1. Build lokal erstellen.
-2. Inhalt von `dist/` nach `/var/www/workflow-editor` kopieren.
+2. Inhalt von `dist/` nach `/var/www/flowdesk` kopieren.
 3. Nginx für den Ordner konfigurieren:
 
 ```nginx
 server {
     listen 80;
     server_name workflow.vhs.local;
-    root /var/www/workflow-editor;
+    root /var/www/flowdesk;
     index index.html;
     location / {
         try_files $uri $uri/ /index.html;

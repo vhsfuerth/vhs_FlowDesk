@@ -39,7 +39,7 @@ export const exportProcessDescriptionDocx = async (diagram, title, diagramImage,
   children.push(new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun(title || 'Prozessbeschreibung')] }));
   children.push(new Paragraph({
     spacing: { after: 240 },
-    children: [new TextRun({ text: `Prozessbeschreibung · erstellt am ${formatDate(new Date())} mit dem vhs Workflow Editor`, italics: true, color: VHS_BLUE_60 })]
+    children: [new TextRun({ text: `Prozessbeschreibung · erstellt am ${formatDate(new Date())} mit vhs FlowDesk`, italics: true, color: VHS_BLUE_60 })]
   }));
 
   description.warnings.forEach((warning) => {
@@ -119,7 +119,7 @@ export const exportProcessDescriptionDocx = async (diagram, title, diagramImage,
   }
 
   const doc = new Document({
-    creator: 'vhs Workflow Editor',
+    creator: 'vhs FlowDesk',
     title: title || 'Prozessbeschreibung',
     styles: {
       default: {

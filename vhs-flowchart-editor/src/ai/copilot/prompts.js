@@ -76,7 +76,7 @@ export const PROCESS_MODEL_SCHEMA = {
 };
 
 const CONTEXT = `## Kontext
-Der vhs Workflow Editor ist ein Werkzeug, mit dem Mitarbeitende von Volkshochschulen ihre Verwaltungsabläufe (z. B. Kursanmeldung, Dozentenverträge, Rechnungsprüfung) als Ablaufdiagramm dokumentieren. Aus deinem Prozessmodell baut die Anwendung das Diagramm selbst: Start, Ende, Swimlanes und Layout entstehen dort. Deine Aufgabe ist allein die fachlich richtige Struktur des Ablaufs. Die Nutzenden prüfen dein Modell anschließend in einer Vorschau, bevor es übernommen wird.`;
+vhs FlowDesk ist ein Werkzeug, mit dem Mitarbeitende von Volkshochschulen ihre Verwaltungsabläufe (z. B. Kursanmeldung, Dozentenverträge, Rechnungsprüfung) als Ablaufdiagramm dokumentieren. Aus deinem Prozessmodell baut die Anwendung das Diagramm selbst: Start, Ende, Swimlanes und Layout entstehen dort. Deine Aufgabe ist allein die fachlich richtige Struktur des Ablaufs. Die Nutzenden prüfen dein Modell anschließend in einer Vorschau, bevor es übernommen wird.`;
 
 const MODEL_RULES = `## Aufbau des Prozessmodells
 

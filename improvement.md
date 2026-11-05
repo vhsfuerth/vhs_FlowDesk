@@ -13,7 +13,14 @@ Status: ✅ erledigt (mit Version), 🔶 teilweise erledigt, offen = ohne Markie
 | 2. Nächstes Release | 1.2, 1.3, 2.3, 2.5, 3.3, 3.6 | ✅ 1.4.0 (2.3 ohne verschiebbare Beschriftungen; Browsertest teilweise offen) |
 | 3. Mit `schemaVersion` 2 | 1.4, 1.5, 2.1, 3.1, 3.2 + verschiebbare Beschriftungen aus 2.3 | ✅ 1.5.0 (Browsertest offen) |
 | Zusätzlich in 1.5.0 | 2.2, 2.4, 2.6, 4.2 | ✅ 1.5.0 (Browsertest offen) |
+| Zusätzlich in 1.6.0 | 3.4, 3.5 | ✅ 1.6.0 (Browsertest offen) |
 | 4. Laufend | 4.1, 5.4 | offen (5.3 in 1.3.1, 5.1 in 1.4.1, 4.2 in 1.5.0 erledigt; 4.3 und 5.2 gestrichen) |
+
+### Was sich mit 1.6.0 geändert hat (Wissen für Folgeschritte)
+
+- **Übersichtskarte und Alles einpassen:** Geometrie in `diagram/overview.js` (`fitZoom` höchstens 100 %, `isFullyVisible`, `minimapFrame`/`toMinimap`/`fromMinimap`; Tests in `overview.test.js`). `diagram/overview-tracking.js` meldet `{ items, content, view }` höchstens einmal pro Frame (Graph-Änderungen, Scrollen, Zoom, Größe). `components/Minimap.jsx` ist eine eigene SVG-Zeichnung (kein zweites JointJS-Paper) und erscheint nur, wenn nicht alles sichtbar ist; ausgeblendet über `localStorage` `vhs-minimap-hidden`. `fitToView` in `DiagramCanvas.jsx` setzt den Zoom über `onZoomSet` und scrollt danach im Zoom-Effekt mittig (`fitAfterZoomRef`).
+- **Teilweises Anordnen** in `diagram/partial-layout.js` (ohne JointJS, Tests in `partial-layout.test.js`): `layoutSelection` (dagre nur für die Auswahl, verankert an deren linker oberer Ecke; mit Swimlanes nur waagerecht, y bleibt). Es liefert nur die betroffenen Positionen und die Anschlüsse der berührten Verbindungen.
+- Angewendet von `applyPartialLayout` in `DiagramCanvas.jsx` im Batch `layout`: Elemente mit Eltern-Lane bleiben eingebettet (`growLaneToFit`), freie Elemente laufen durch `assignLane`.
 
 ### Was sich mit 1.5.0 geändert hat (Wissen für Folgeschritte)
 
@@ -227,17 +234,17 @@ Formen und Farben nach Styleguide (`docs/Styleguide_für_KI_Agenten.md`), Farben
 
 Strg+F öffnet ein Suchfeld. Treffer werden nacheinander angesprungen und hervorgehoben; dafür `diagram/highlight.js` nutzen, also ohne Modelländerung. Hilfreich bei großen Diagrammen und in Workshops.
 
-### 3.4 Übersichtskarte und „Alles einpassen“ — M
+### 3.4 ✅ Übersichtskarte und „Alles einpassen“ — M (1.6.0)
 
 - **Übersichtskarte (Minimap):** unten rechts für große Diagramme, mit verschiebbarem Sichtfenster.
 - **„Alles einpassen“:** stellt den Zoom so ein, dass das ganze Diagramm sichtbar ist (`paper.scaleContentToFit`), z. B. per Strg+Umschalt+1. „Zentrieren“ gibt es bereits, es passt aber den Zoom nicht an.
 
-### 3.5 Teilweise automatisch anordnen — M
+### 3.5 ✅ Teilweise automatisch anordnen — M (1.6.0)
 
 „Automatisch anordnen“ ordnet heute immer das ganze Diagramm neu und verwirft alle Handanpassungen. Gewünscht:
 
 - nur die Auswahl anordnen,
-- neue, noch unverbundene Elemente einordnen, ohne den Rest zu verschieben.
+- ~~neue, noch unverbundene Elemente einordnen, ohne den Rest zu verschieben~~ (in 1.6.0 umgesetzt und auf Wunsch wieder entfernt).
 
 ### 3.6 ✅ Struktur-Check erweitern — S
 

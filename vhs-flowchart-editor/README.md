@@ -1,6 +1,6 @@
-# vhs Workflow Editor – Entwicklung
+# vhs FlowDesk – Entwicklung
 
-Quellcode des vhs Workflow-Algorithm Editors. Funktionsübersicht und Bedienung: [README im Hauptverzeichnis](../README.md). Änderungen: [CHANGELOG.md](../CHANGELOG.md).
+Quellcode des vhs FlowDesk. Funktionsübersicht und Bedienung: [README im Hauptverzeichnis](../README.md). Änderungen: [CHANGELOG.md](../CHANGELOG.md).
 
 ## Befehle
 

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 import * as joint from 'jointjs';
-import { PanelRightOpen } from 'lucide-react';
+import { Map as MapIcon, PanelRightOpen } from 'lucide-react';
 import { HistoryManager } from '../diagram/history';
 import { JSONConverter, setElementLane } from '../diagram/converter';
 import { DiagramLayout } from '../diagram/layout';
@@ -8,6 +8,7 @@ import { createLink, createNode, createNodeAt } from '../diagram/shapes';
 import { exportToPNG, exportToSVG, exportToPDF, exportToJSON, getDiagramJpegForPdf } from '../export/file-export';
 import { extractFragment, instantiateFragment, readClipboard, writeClipboard } from '../diagram/clipboard';
 import { alignBoxes, distributeBoxes } from '../diagram/arrange';
+import { layoutSelection } from '../diagram/partial-layout';
 import { generateUUID } from '../utils/uuid';
 import { addFocusHighlight, clearFocusHighlight, setPresentationDim } from '../diagram/highlight';
 import { attachWheelZoom, createAutoFit, pasteOffset, scrollToLocalRect, trackPointer, visibleCenterLocal, zoomAroundPoint } from '../diagram/viewport';
@@ -19,6 +20,9 @@ import { assignLane, attachLaneEmbedding, growLaneToFit, isLane, moveLane } from
 import { nextDecisionLabel, nextEdgePorts, placeNextNode } from '../diagram/add-next';
 import { getLinkLabelText, setLinkLabelText, setNodeText } from '../diagram/text-editing';
 import { attachSnaplines } from '../diagram/snapline-drag';
+import { attachOverviewTracking } from '../diagram/overview-tracking';
+import { fitZoom, isFullyVisible } from '../diagram/overview';
+import Minimap from './Minimap';
 import { bridgeEdges } from '../diagram/bridge';
 import { getNodeDetails } from '../diagram/converter';
 import { useDiagramSearch } from '../hooks/useDiagramSearch';
@@ -33,6 +37,24 @@ const PASTE_OFFSET = 30;
 const FOCUS_HIGHLIGHT_MS = 1800;
 // Eigenschaften-Leiste ausgeblendet (pro Browser gemerkt)
 const PANEL_HIDDEN_KEY = 'vhs-properties-panel-hidden';
+// Übersichtskarte ausgeblendet (pro Browser gemerkt)
+const MINIMAP_HIDDEN_KEY = 'vhs-minimap-hidden';
+
+const readFlag = (key) => {
+  try {
+    return localStorage.getItem(key) === '1';
+  } catch {
+    return false;
+  }
+};
+
+const writeFlag = (key, value) => {
+  try {
+    localStorage.setItem(key, value ? '1' : '0');
+  } catch {
+    // Ohne Speicher gilt die Einstellung nur bis zum Neuladen
+  }
+};
 
 const readPanelHidden = () => {
   try {
@@ -88,6 +110,12 @@ const DiagramCanvas = forwardRef(({
   const [panelHidden, setPanelHidden] = useState(readPanelHidden);
   // Menü am „+“-Griff: { x, y, sourceId, direction } in Koordinaten des Wrappers
   const [addMenu, setAddMenu] = useState(null);
+  // Übersichtskarte: { items, content, view } in Diagrammkoordinaten (siehe overview-tracking.js)
+  const [overview, setOverview] = useState(null);
+  const [minimapHidden, setMinimapHidden] = useState(() => readFlag(MINIMAP_HIDDEN_KEY));
+  const overviewRef = useRef(null);
+  // „Alles einpassen“: nach dem Zoomen den Inhalt mittig zeigen
+  const fitAfterZoomRef = useRef(false);
   const wrapperRef = useRef(null);
 
   const scrollContainer = () => canvasRef.current.parentNode;
@@ -281,6 +309,7 @@ const DiagramCanvas = forwardRef(({
     const detachLanes = attachLaneEmbedding({ graph, paper, getSelection });
     const detachVertexDrag = attachVertexDrag({ paper });
     const detachSnaplines = attachSnaplines({ paper, graph, getSelection });
+    overviewRef.current = attachOverviewTracking({ paper, graph, container, onChange: setOverview });
     const detachWheelZoom = attachWheelZoom(container, {
       getZoom: () => zoomRef.current,
       setZoom: (zoom, anchor) => {
@@ -322,6 +351,7 @@ const DiagramCanvas = forwardRef(({
       detachLanes();
       detachVertexDrag();
       detachSnaplines();
+      overviewRef.current?.detach();
       container.removeEventListener('scroll', commitOpenInlineEditor);
       container.removeEventListener('pointerdown', focusCanvas);
       detachWheelZoom();
@@ -339,6 +369,10 @@ const DiagramCanvas = forwardRef(({
     const anchor = zoomAnchorRef.current;
     zoomAnchorRef.current = null;
     zoomAroundPoint(paper, scrollContainer(), zoomLevel, anchor, () => autoFitRef.current?.fit());
+    if (fitAfterZoomRef.current) {
+      fitAfterZoomRef.current = false;
+      scrollToLocalRect(paper, scrollContainer(), paper.getContentArea({ useModelGeometry: true }), 'center');
+    }
   }, [zoomLevel]);
 
   const fitPaper = () => autoFitRef.current?.fit();
@@ -348,6 +382,35 @@ const DiagramCanvas = forwardRef(({
     if (!paper || !graphRef.current?.getElements().length) return;
     fitPaper();
     scrollToLocalRect(paper, scrollContainer(), paper.getContentArea({ useModelGeometry: true }), 'top');
+  };
+
+  // Zoom so wählen, dass das ganze Diagramm sichtbar ist (höchstens 100 %), und mittig zeigen
+  const fitToView = () => {
+    const paper = paperRef.current;
+    if (!paper || !graphRef.current?.getElements().length) return false;
+    const container = scrollContainer();
+    const content = paper.getContentArea({ useModelGeometry: true });
+    const zoom = fitZoom(content, { width: container.clientWidth, height: container.clientHeight });
+    if (zoom === zoomRef.current) {
+      fitPaper();
+      scrollToLocalRect(paper, container, content, 'center');
+    } else {
+      fitAfterZoomRef.current = true;
+      onZoomSetRef.current?.(zoom);
+    }
+    return true;
+  };
+
+  const setMinimapHiddenStored = (hidden) => {
+    setMinimapHidden(hidden);
+    writeFlag(MINIMAP_HIDDEN_KEY, hidden);
+  };
+
+  // Klick auf die Übersichtskarte: Ansicht auf diesen Punkt zentrieren
+  const navigateTo = (point) => {
+    const paper = paperRef.current;
+    if (!paper) return;
+    scrollToLocalRect(paper, scrollContainer(), { x: point.x, y: point.y, width: 0, height: 0 }, 'center', 0);
   };
 
   const notifyHistory = () => {
@@ -419,6 +482,36 @@ const DiagramCanvas = forwardRef(({
   const reassignLanes = (cells) => cells.forEach((cell) => assignLane(graphRef.current, cell));
 
   const selectedBoxes = () => selectedElements().map((cell) => ({ id: cell.id, ...cell.position(), ...cell.size() }));
+
+  // Ergebnis von layoutSelection anwenden: nur die betroffenen Elemente und Verbindungen ändern sich
+  const applyPartialLayout = (result) => {
+    const graph = graphRef.current;
+    const entries = Object.entries(result.positions);
+    if (!entries.length) return 0;
+    graph.startBatch('layout');
+    const moved = entries.map(([id, { x, y }]) => {
+      const cell = graph.getCell(id);
+      cell?.position(x, y, { deep: true });
+      return cell;
+    }).filter(Boolean);
+    Object.entries(result.ports).forEach(([id, ports]) => {
+      const link = graph.getCell(id);
+      if (!link?.isLink()) return;
+      link.vertices([]);
+      link.source({ id: link.source().id, port: ports.sourcePort });
+      link.target({ id: link.target().id, port: ports.targetPort });
+    });
+    // Elemente in einer Lane bleiben dort (die Lane wächst mit), freie Elemente werden neu zugeordnet
+    moved.forEach((cell) => {
+      const lane = cell.getParentCell();
+      if (isLane(lane)) growLaneToFit(lane);
+      else assignLane(graph, cell);
+    });
+    graph.stopBatch('layout');
+    setSelection(getSelection());
+    setTimeout(() => fitPaper(), 50);
+    return moved.length;
+  };
 
   const applyPositions = (positions) => {
     const entries = Object.entries(positions);
@@ -565,6 +658,13 @@ const DiagramCanvas = forwardRef(({
       return result.direction;
     },
 
+    // Nur die Auswahl anordnen; liefert { count, direction }
+    autoLayoutSelection: (direction = 'TB') => {
+      const ids = getSelection().filter((cell) => cell.isElement()).map((cell) => cell.id);
+      const result = layoutSelection(converterRef.current.toJson(), ids, { direction });
+      return { count: applyPartialLayout(result), direction: result.direction };
+    },
+
     // Tastatur-/Klick-Alternative zu Drag & Drop: Element in der Mitte des sichtbaren Bereichs einfügen
     addNodeAtCenter: (type) => {
       const paper = paperRef.current;
@@ -576,6 +676,7 @@ const DiagramCanvas = forwardRef(({
     },
 
     center: () => centerContent(),
+    fitToView: () => fitToView(),
 
     // Lane mit der Nachbarin oben/unten tauschen (Eigenschaften-Leiste)
     moveLane: (lane, direction) => moveLane(graphRef.current, lane, direction),
@@ -675,6 +776,19 @@ const DiagramCanvas = forwardRef(({
           Eigenschaften
         </button>
       )}
+      {overview && !isFullyVisible(overview.content, overview.view) && (minimapHidden ? (
+        <button
+          type="button"
+          onClick={() => setMinimapHiddenStored(false)}
+          className="absolute left-3 bottom-5 z-10 inline-flex items-center gap-1.5 rounded-md border border-[var(--color-vhs-blau-20)] bg-white px-2 py-1 text-xs font-bold text-[var(--color-vhs-blau)] shadow-md hover:bg-[var(--color-vhs-blau-10)] focus:outline-none focus:ring-2 focus:ring-[var(--color-vhs-orange-hell)]"
+          title="Übersichtskarte einblenden"
+        >
+          <MapIcon className="w-3.5 h-3.5" aria-hidden="true" />
+          Übersicht
+        </button>
+      ) : (
+        <Minimap overview={overview} onNavigate={navigateTo} onClose={() => setMinimapHiddenStored(true)} />
+      ))}
       {inlineEdit && (
         <InlineTextEditor
           key={inlineEdit.cellId}
