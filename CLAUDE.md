@@ -17,7 +17,7 @@ The app lives in `vhs-flowchart-editor/`; run npm scripts from there.
 
 Version follows SemVer in `package.json` (shown in the app via `__APP_VERSION__`); record every change in `CHANGELOG.md` at the repo root. Work on a `release/x.y.z` branch, merge to `master` via PR, then tag `vx.y.z`.
 
-Editor roadmap: `improvement.md` (repo root) lists open editor improvements and records what each release implemented. Read it before editor work and update its status section afterwards.
+Maintenance roadmap: `improvement.md` (repo root) lists technical maintenance tasks only (accessibility audit, refactoring, dependency upgrades, performance) -- no new features. Read it before such work and update its status table afterwards.
 
 ## Rules and gotchas
 
@@ -27,6 +27,12 @@ Editor roadmap: `improvement.md` (repo root) lists open editor improvements and 
 - **Canvas modules**: `components/DiagramCanvas.jsx` only wires things up. Interactions live in `src/diagram/` (`paper.js`, `selection.js`, `pan-select.js`, `lane-resize-tool.js`, `text-editing.js`, `viewport.js`). Each returns a `detach`/unsubscribe function that the init effect calls on cleanup. Add new interactions as a module of the same kind, tested with a fake paper (`diagram/canvas-parts.test.js`).
 
 - **Swimlanes are JointJS embeds** (`laneId` in JSON = parent cell, see `diagram/lane-embedding.js`). In JointJS 3.7 `position(x, y)` moves only the cell; use `{ deep: true }` (or `translate`) when a lane's content should move along. Node details (description, role …) live in the cell attribute `details`.
+
+- **Canvas events (found in browser tests)**: the paper calls `preventDefault` on pointerdown, so clicks don't move focus -- `DiagramCanvas` focuses the canvas itself, and `InlineTextEditor` commits on an outside click via its own window `pointerdown` listener (not just `onBlur`). Dragging a new link from a port also fires `link:pointerdown`; vertices are therefore added only by `diagram/vertex-drag.js` (after 5 px, on the line of a connected link), and JointJS `vertexAdd`/`vertexAdding` stay off. App shortcuts (F2/Enter/typing) only act when focus is on `#vhs-canvas-scroll` or `body`.
+
+- **Batches**: `attachLaneEmbedding` ignores changes inside the batches `import`, `layout` and `move-lane`; code that moves cells in those batches must call `assignLane`/`growLaneToFit` itself (see `applyPartialLayout`). `vhs.Lane.remove()` unembeds its content first, otherwise JointJS deletes it too.
+
+- **Shapes**: `createNode(type, …)` in `shapes.js` is the central factory. JointJS `calc()` works only in `d`, `x`, `y` etc., not in `refX`/`refY` (use `refX2`/`refY2`). New node detail fields go into `NODE_DETAIL_FIELDS` (`types.js`) and `NODE_FIELDS` (`PropertiesPanel.jsx`).
 
 - **Tool positions**: custom `ToolView`s render inside the transformed layer, so position them from `model.getBBox()` (local coordinates), never `view.getBBox()` (paper coordinates incl. translate/zoom).
 

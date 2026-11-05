@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen an vhs FlowDesk (früher „vhs Workflow-Algorithm Editor“). Die Versionsnummern folgen [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.6.1] – 2026-11-05
+
+### Geändert
+
+- **Neues Logo und Favicon für vhs FlowDesk** (Vorlagen in `pics/`). Das Favicon erscheint im Browser-Tab und als kleines App-Symbol in der Kopfzeile vor „FlowDesk“, das Logo im Kopf der Anleitung und als Symbol der installierbaren App (PWA, 192 und 512 px, Apple-Touch-Icon 180 px). Das vhs-Logo in der Kopfzeile und in den Exporten bleibt unverändert. Das Vite-Platzhaltersymbol entfällt.
+- `improvement.md` neu aufgesetzt: Die Liste der Editor-Verbesserungen ist abgeschlossen, die verbliebenen Punkte 4.1 und 5.4 werden nicht umgesetzt. Die neue Liste enthält nur technische Pflege (Barrierefreiheit prüfen, `App.jsx` und `DiagramCanvas.jsx` verschlanken, Upgrade auf `@joint/core`, Leistung messen). Wichtige Hinweise aus der alten Liste stehen jetzt in `CLAUDE.md`.
+
 ## [1.6.0] – 2026-11-05
 
 Punkte 3.4 (Übersichtskarte, Alles einpassen) und 3.5 (teilweise automatisch anordnen, ohne das Einordnen unverbundener Elemente) aus `improvement.md` sowie Umbenennung der App.

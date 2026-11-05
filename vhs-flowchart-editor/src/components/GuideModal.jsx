@@ -212,6 +212,7 @@ const GuideModal = ({ onClose }) => {
     >
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-4xl flex flex-col max-h-[85vh]">
         <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
+          <img src="/flowdesk-logo-160.png" alt="vhs FlowDesk Logo" className="w-14 h-14 mr-3 shrink-0" />
           <div>
             <h2 id={titleId} className="text-xl font-bold flex items-center text-[var(--color-vhs-blau)]">
               <BookOpen className="w-5 h-5 mr-2" aria-hidden="true" />
