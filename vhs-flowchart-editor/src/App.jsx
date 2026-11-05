@@ -352,6 +352,10 @@ function App() {
         } else if (e.key === '0') {
           e.preventDefault();
           setZoomLevel(1);
+        } else if (e.shiftKey && e.code === 'Digit1') {
+          // Strg + Umschalt + 1: Alles einpassen (e.key ist hier je nach Tastatur „!“)
+          e.preventDefault();
+          canvas?.fitToView();
         }
       }
     };
@@ -611,6 +615,17 @@ function App() {
     }
   };
 
+  const handleAutoLayoutSelection = (direction) => {
+    const result = diagramCanvasRef.current?.autoLayoutSelection(direction);
+    if (!result?.count) {
+      showNotification('Wähle mindestens zwei Elemente aus, die angeordnet werden sollen.', 'info');
+    } else if (result.direction !== direction) {
+      showNotification('Auswahl angeordnet. In Swimlane-Diagrammen läuft der Ablauf von links nach rechts; jeder Schritt bleibt in seiner Lane. Rückgängig mit Strg+Z.', 'info');
+    } else {
+      showNotification('Auswahl angeordnet. Rückgängig mit Strg+Z.', 'success');
+    }
+  };
+
   const handleExportDescription = async (format) => {
     const canvas = diagramCanvasRef.current;
     const data = canvas?.getCurrentData();
@@ -637,6 +652,10 @@ function App() {
 
   const handleCenter = () => {
     diagramCanvasRef.current?.center();
+  };
+
+  const handleFitToView = () => {
+    if (!diagramCanvasRef.current?.fitToView()) showNotification('Das Diagramm ist noch leer.', 'info');
   };
 
   // IDs der gespeicherten Diagramme, damit der Struktur-Check Teilprozess-Verknüpfungen prüfen kann
@@ -735,12 +754,14 @@ function App() {
          onZoomIn={handleZoomIn}
          onZoomOut={handleZoomOut}
          onCenterContent={handleCenter}
+         onFitToView={handleFitToView}
          onSearch={() => diagramCanvasRef.current?.openSearch()}
          onUndo={() => diagramCanvasRef.current?.undo()}
          onRedo={() => diagramCanvasRef.current?.redo()}
          canUndo={historyState.canUndo}
          canRedo={historyState.canRedo}
          onAutoLayout={handleAutoLayout}
+         onAutoLayoutSelection={handleAutoLayoutSelection}
          onAlign={(mode) => diagramCanvasRef.current?.alignSelection(mode)}
          onDistribute={(axis) => diagramCanvasRef.current?.distributeSelection(axis)}
          selectionCount={selectionCount}

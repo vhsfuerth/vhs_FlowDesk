@@ -1,5 +1,5 @@
 import React from 'react';
-import { Share2, Printer, CheckSquare, Trash2, FolderOpen, ZoomIn, ZoomOut, Maximize, Undo2, Redo2, Clock, CheckCircle2, CircleDot, CloudOff, HardDrive, LayoutGrid, FileText, Search } from 'lucide-react';
+import { Share2, Printer, CheckSquare, Trash2, FolderOpen, ZoomIn, ZoomOut, Maximize, Scan, Undo2, Redo2, Clock, CheckCircle2, CircleDot, CloudOff, HardDrive, LayoutGrid, FileText, Search } from 'lucide-react';
 import { SAVE_STATUS } from '../storage/autosave';
 import MenuButton from './MenuButton';
 
@@ -44,8 +44,10 @@ const ExportBar = ({
   onZoomIn,
   onZoomOut,
   onCenterContent,
+  onFitToView,
   onSearch,
   onAutoLayout,
+  onAutoLayoutSelection,
   onAlign,
   onDistribute,
   selectionCount = 0,
@@ -144,6 +146,14 @@ const ExportBar = ({
         >
           <Maximize className="w-4 h-4" />
         </button>
+        <button
+          onClick={onFitToView}
+          className="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-gray-500"
+          title="Alles einpassen (Strg+Umschalt+1)"
+          aria-label="Ganzes Diagramm einpassen"
+        >
+          <Scan className="w-4 h-4" />
+        </button>
         {onSearch && (
           <button
             onClick={onSearch}
@@ -164,6 +174,9 @@ const ExportBar = ({
             { heading: 'Gesamtes Diagramm' },
             { label: 'Automatisch anordnen – von oben nach unten', onSelect: () => onAutoLayout('TB') },
             { label: 'Automatisch anordnen – von links nach rechts', onSelect: () => onAutoLayout('LR') },
+            { heading: `Nur Auswahl anordnen${selectionCount < 2 ? ' (ab 2 Elementen)' : ''}`, separatorBefore: true },
+            { label: 'Auswahl anordnen – von oben nach unten', onSelect: () => onAutoLayoutSelection?.('TB'), disabled: selectionCount < 2 },
+            { label: 'Auswahl anordnen – von links nach rechts', onSelect: () => onAutoLayoutSelection?.('LR'), disabled: selectionCount < 2 },
             { heading: `Auswahl ausrichten${selectionCount < 2 ? ' (ab 2 Elementen)' : ''}`, separatorBefore: true },
             ...ALIGN_OPTIONS.map(({ mode, label }) => ({ label, onSelect: () => onAlign(mode), disabled: selectionCount < 2 })),
             { heading: `Auswahl verteilen${selectionCount < 3 ? ' (ab 3 Elementen)' : ''}`, separatorBefore: true },

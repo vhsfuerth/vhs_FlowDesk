@@ -63,8 +63,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'vhs Workflow-Algorithm Editor',
-        short_name: 'vhs Flowcharts',
+        name: 'vhs FlowDesk',
+        short_name: 'vhs FlowDesk',
         description: 'PWA-Tool zur Erstellung algorithmischer Ablaufpläne',
         lang: 'de',
         theme_color: '#00285a',

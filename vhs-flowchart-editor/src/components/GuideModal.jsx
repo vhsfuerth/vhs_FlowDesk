@@ -22,6 +22,7 @@ const SHORTCUTS = [
   ['Strg + Mausrad', 'Zoom'],
   ['Strg + + / Strg + -', 'Zoom rein / raus'],
   ['Strg + 0', 'Zoom zurücksetzen'],
+  ['Strg + Umschalt + 1', 'Alles einpassen (ganzes Diagramm sichtbar)'],
   ['Doppelklick / F2 / Enter', 'Text direkt auf der Fläche bearbeiten (Enter übernimmt, Esc bricht ab)'],
   ['Lostippen (Element ausgewählt)', 'Text des Elements ersetzen'],
   ['Rechtsklick auf ein Element', 'Eigenschaften ein- bzw. ausblenden'],
@@ -69,17 +70,19 @@ const sections = [
     icon: LayoutGrid,
     title: 'Anordnen & Ausrichten',
     text: 'Über „Anordnen" in der unteren Leiste räumst du das ganze Diagramm automatisch auf – von oben nach unten oder von links nach rechts. Bei Swimlanes bleibt jeder Schritt in seiner Lane, die Lanes werden passend vergrößert. Für mehrere ausgewählte Elemente gibt es dort außerdem Ausrichten und gleichmäßiges Verteilen.',
-    note: 'Alle Aktionen lassen sich mit Strg + Z rückgängig machen.'
+    note: 'Teilweise anordnen: „Nur Auswahl anordnen“ ordnet nur die ausgewählten Elemente neu, der Rest bleibt, wie du ihn angepasst hast. Alle Aktionen lassen sich mit Strg + Z rückgängig machen.'
   },
   {
     icon: Maximize,
     title: 'Ansicht & Zoom',
-    text: 'Verschiebe die Ansicht per Klick und Ziehen auf den Hintergrund. Nutze Strg + Mausrad oder die Zoom-Buttons unten. Strg + 0 setzt den Zoom zurück.'
+    text: 'Verschiebe die Ansicht per Klick und Ziehen auf den Hintergrund. Nutze Strg + Mausrad oder die Zoom-Buttons unten. Strg + 0 setzt den Zoom zurück, „Alles einpassen“ (Strg + Umschalt + 1) zeigt das ganze Diagramm.',
+    note: 'Ist das Diagramm größer als der sichtbare Bereich, erscheint unten links eine Übersichtskarte. Ein Klick oder Ziehen darin verschiebt die Ansicht; das orange Rechteck ist der sichtbare Ausschnitt. Mit dem X blendest du sie aus, über „Übersicht“ wieder ein.'
   },
   {
     icon: ArrowRight,
     title: 'Verbindungen erstellen',
-    text: 'Fahre mit der Maus über ein Element, um die Verbindungspunkte (Ports) anzuzeigen. Klicke auf einen Port und ziehe die Verbindung zum Zielelement.'
+    text: 'Fahre mit der Maus über ein Element, um die Verbindungspunkte (Ports) anzuzeigen. Klicke auf einen Port am Rand und ziehe die Verbindung zum Zielelement.',
+    note: 'Umhängen: Verbindung anklicken und ihr Ende (die Pfeilspitze) auf ein anderes Element ziehen.'
   },
   {
     icon: Undo2,
@@ -214,7 +217,7 @@ const GuideModal = ({ onClose }) => {
               <BookOpen className="w-5 h-5 mr-2" aria-hidden="true" />
               Anleitung
             </h2>
-            <p className="text-sm text-gray-500 mt-1">So funktioniert der vhs Workflow Editor.</p>
+            <p className="text-sm text-gray-500 mt-1">So funktioniert vhs FlowDesk.</p>
           </div>
           <div role="search" className="ml-auto mr-3 flex items-center gap-2 rounded-md border border-[var(--color-vhs-blau-20)] bg-white px-2 py-1.5 focus-within:ring-2 focus-within:ring-[var(--color-vhs-orange-hell)]">
             <Search className="w-4 h-4 text-gray-400 shrink-0" aria-hidden="true" />
@@ -314,7 +317,7 @@ const GuideModal = ({ onClose }) => {
         </div>
 
         <div className="p-4 border-t bg-gray-50 rounded-b-lg flex justify-between items-center">
-          <span className="text-xs text-gray-500">vhs Workflow Editor · Version {__APP_VERSION__}</span>
+          <span className="text-xs text-gray-500">vhs FlowDesk · Version {__APP_VERSION__}</span>
           <button
             onClick={onClose}
             className="px-6 py-2 bg-gray-200 text-gray-700 rounded-md font-medium hover:bg-gray-300 transition-colors"

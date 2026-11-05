@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**vhs Workflow-Algorithm Editor** -- a client-only PWA (React + Vite + JointJS) for creating algorithmic flowcharts for organizational processes at German adult education centers (Volkshochschulen). All data stays local (IndexedDB); the only external calls go to the AI provider the user picks in Settings.
+**vhs FlowDesk** -- a client-only PWA (React + Vite + JointJS) for creating algorithmic flowcharts for organizational processes at German adult education centers (Volkshochschulen). All data stays local (IndexedDB); the only external calls go to the AI provider the user picks in Settings.
 
 ## Commands
 

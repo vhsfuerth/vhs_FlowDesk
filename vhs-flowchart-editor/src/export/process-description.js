@@ -260,7 +260,7 @@ export function toMarkdown(description, { title, date = new Date() }) {
   const lines = [
     `# ${escapeMarkdown(title || 'Prozessbeschreibung')}`,
     '',
-    `Prozessbeschreibung · erstellt am ${formatDate(date)} mit dem vhs Workflow Editor`,
+    `Prozessbeschreibung · erstellt am ${formatDate(date)} mit vhs FlowDesk`,
     ''
   ];
 

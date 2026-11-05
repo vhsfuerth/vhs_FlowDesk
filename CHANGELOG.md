@@ -1,6 +1,25 @@
 # Changelog
 
-Alle nennenswerten Änderungen am vhs Workflow-Algorithm Editor. Die Versionsnummern folgen [Semantic Versioning](https://semver.org/lang/de/).
+Alle nennenswerten Änderungen an vhs FlowDesk (früher „vhs Workflow-Algorithm Editor“). Die Versionsnummern folgen [Semantic Versioning](https://semver.org/lang/de/).
+
+## [1.6.0] – 2026-11-05
+
+Punkte 3.4 (Übersichtskarte, Alles einpassen) und 3.5 (teilweise automatisch anordnen, ohne das Einordnen unverbundener Elemente) aus `improvement.md` sowie Umbenennung der App.
+
+### Neu
+
+- **Alles einpassen** (Schaltfläche neben „Zentrieren“ in der unteren Leiste, `Strg + Umschalt + 1`): stellt den Zoom so ein, dass das ganze Diagramm sichtbar ist, und zeigt es mittig. Vergrößert wird höchstens auf 100 %.
+- **Übersichtskarte** unten links auf der Arbeitsfläche, sobald das Diagramm größer als der sichtbare Bereich ist. Sie zeigt alle Elemente und Swimlanes verkleinert, das orange Rechteck ist der sichtbare Ausschnitt. Klicken oder Ziehen auf der Karte verschiebt die Ansicht. Mit dem X lässt sie sich ausblenden (wird pro Browser gemerkt), über „Übersicht“ wieder einblenden.
+- **Nur Auswahl anordnen** (Menü „Anordnen“, ab zwei ausgewählten Elementen, von oben nach unten oder von links nach rechts). Nur die ausgewählten Elemente werden neu angeordnet; das Ergebnis beginnt an der bisherigen linken oberen Ecke der Auswahl, alle anderen Elemente und ihre Handanpassungen bleiben erhalten. Ist eine Lane ausgewählt, zählt ihr Inhalt mit. In Swimlane-Diagrammen läuft der Ablauf von links nach rechts, jeder Schritt bleibt in seiner Lane und die Lane wächst bei Bedarf mit.
+- Die Aktion lässt sich mit `Strg + Z` rückgängig machen. Knickpunkte und Anschlüsse werden nur bei den Verbindungen neu gesetzt, die ein verschobenes Element berühren.
+
+### Geändert
+
+- Die App heißt jetzt **vhs FlowDesk** (vorher Platzhalter „vhs Workflow-Algorithm Editor“ bzw. „Workflow Editor“). Neu benannt sind Kopfzeile, Fenstertitel, installierbare App (PWA), Anleitung, Prozessbeschreibung (Word/Text), Fehlermeldungen beim Import, KI-Prompts und Dokumentation.
+- Standard-Dateinamen beim Export: `vhs-flowdesk.svg/png/pdf/json`.
+- Unverändert bleiben die technischen Kennungen (Backup-Format, Zwischenablage-Format, Projektordner), damit vorhandene Backups und Dateien weiter importiert werden können.
+- Die bisherige Standardfassung des KI-System-Prompts wird weiter als Standard erkannt (`LEGACY_SYSTEM_PROMPTS`).
+- Der Hilfekasten „Verbindungen erstellen“ unten in der linken Leiste entfällt. Der Hinweis zum Umhängen von Verbindungen steht jetzt in der Anleitung.
 
 ## [1.5.0] – 2026-11-05
 

@@ -288,7 +288,7 @@ export function parseImportFile(json, fallbackName = 'Importiertes Diagramm') {
     return { kind: 'project', record };
   }
 
-  throw new ImportValidationError('Die Datei enthält kein Diagramm im Format des vhs Workflow Editors.');
+  throw new ImportValidationError('Die Datei enthält kein Diagramm im Format von vhs FlowDesk.');
 }
 
 /**

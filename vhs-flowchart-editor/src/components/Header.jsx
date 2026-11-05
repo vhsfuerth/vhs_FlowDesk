@@ -86,7 +86,7 @@ const Header = ({ onSettingsClick, currentDiagram, onNewDiagram, onDiagramSelect
              <img src="/Logo_HQ_pos.png" alt="vhs Logo" className="h-full w-auto object-contain px-1" />
         </div>
         <div className="flex flex-col justify-center border-l border-white/20 pl-4">
-            <h1 className="text-sm font-black uppercase tracking-widest text-[var(--color-vhs-blau-20)] leading-none mb-1">Workflow Editor</h1>
+            <h1 className="text-sm font-black uppercase tracking-widest text-[var(--color-vhs-blau-20)] leading-none mb-1">FlowDesk</h1>
             <div className="flex items-center group">
               {isEditingName ? (
                 <div className="flex items-center">
