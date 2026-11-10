@@ -4,6 +4,7 @@
 // position(x, y) bewegt nur die Lane, position(x, y, { deep: true }) auch ihren Inhalt.
 import { setElementLane } from './converter';
 import { laneAtCenter } from './lanes';
+import { inBatch } from './batch';
 
 /** Höhe der Kopfzeile einer Lane (siehe shapes.js) */
 export const LANE_HEADER = 40;
@@ -128,11 +129,11 @@ export function moveLane(graph, lane, direction) {
     const u = upper.getBBox();
     const l = lower.getBBox();
     const gap = l.y - (u.y + u.height);
-    graph.startBatch('move-lane');
-    // deep: die eingebetteten Elemente wandern mit (wie beim Ziehen auf der Fläche)
-    lower.position(l.x, u.y, { deep: true });
-    upper.position(u.x, u.y + l.height + gap, { deep: true });
-    graph.stopBatch('move-lane');
+    inBatch(graph, 'move-lane', () => {
+        // deep: die eingebetteten Elemente wandern mit (wie beim Ziehen auf der Fläche)
+        lower.position(l.x, u.y, { deep: true });
+        upper.position(u.x, u.y + l.height + gap, { deep: true });
+    });
     return true;
 }
 

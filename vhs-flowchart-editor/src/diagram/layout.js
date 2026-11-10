@@ -1,5 +1,6 @@
 import { computeAutoLayout } from './auto-layout';
 import { JSONConverter } from './converter';
+import { inBatch } from './batch';
 
 // Wendet das berechnete Layout (siehe auto-layout.js) auf einen JointJS-Graphen an.
 export class DiagramLayout {
@@ -11,8 +12,11 @@ export class DiagramLayout {
     applyLayout(direction = 'TB') {
         const result = computeAutoLayout(this.converter.toJson(), { direction });
 
-        this.graph.startBatch('layout');
+        inBatch(this.graph, 'layout', () => this.apply(result));
+        return result;
+    }
 
+    apply(result) {
         Object.entries(result.lanes).forEach(([id, rect]) => {
             const lane = this.graph.getCell(id);
             if (!lane) return;
@@ -31,8 +35,5 @@ export class DiagramLayout {
             link.source({ id: link.source().id, port: ports.sourcePort });
             link.target({ id: link.target().id, port: ports.targetPort });
         });
-
-        this.graph.stopBatch('layout');
-        return result;
     }
 }

@@ -4,6 +4,8 @@
 import { COLORS } from '../utils/constants';
 import { computeSnap } from './snaplines';
 import { isLane } from './lane-embedding';
+import { hasSelectedAncestor } from './selection';
+import { snapToGridAnchor } from './grid-anchor';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -43,7 +45,21 @@ export function attachSnaplines({ paper, graph, getSelection }) {
     const onPointerMove = (elementView, evt) => {
         const model = elementView.model;
         const selection = getSelection();
-        if (evt?.altKey || isLane(model) || (selection.length > 1 && selection.includes(model))) {
+        const groupDrag = selection.length > 1 && selection.includes(model);
+        // Raster: JointJS rastet die linke obere Ecke ein; je nach GRID_ANCHOR (grid-anchor.js)
+        // hier stattdessen die Mitte. Nicht bei Lanes. Beim Ziehen einer Gruppe wandern alle
+        // Elemente um dieselbe Korrektur mit, damit ihre Abstände bleiben.
+        if (!isLane(model)) {
+            const box = model.getBBox();
+            const snapped = snapToGridAnchor(box);
+            const dx = snapped.x - box.x;
+            const dy = snapped.y - box.y;
+            if (dx || dy) {
+                const elements = groupDrag ? selection.filter((cell) => cell.isElement()) : [model];
+                elements.filter((cell) => !hasSelectedAncestor(cell, elements)).forEach((cell) => cell.translate(dx, dy));
+            }
+        }
+        if (evt?.altKey || isLane(model) || groupDrag) {
             clear();
             return;
         }

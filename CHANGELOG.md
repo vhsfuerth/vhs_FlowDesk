@@ -2,6 +2,100 @@
 
 Alle nennenswerten Änderungen an vhs FlowDesk (früher „vhs Workflow-Algorithm Editor“). Die Versionsnummern folgen [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.6.4] – 2026-11-10
+
+Punkt 3 aus `improvement.md`: `DiagramCanvas.jsx` verschlanken. Für Nutzende ändert sich nichts.
+
+### Code
+
+- `DiagramCanvas.jsx` von 791 auf 487 Zeilen. Die Komponente verdrahtet nur noch.
+  - `diagram/canvas-editing.js`: Bearbeitungsbefehle über dem Graphen, ohne React. Folgeschritt anhängen, Löschen mit Überbrücken, Verschieben, Ausrichten, Teil-Layout, Kopieren und Einfügen.
+  - `diagram/canvas-events.js`: Ereignisse der Fläche (Doppelklick, Rechtsklick, „+“-Griff, Teilprozess-Symbol, X am Element, Fokus, Scrollen). Sie werden jetzt beim Abbau auch abgemeldet.
+  - `hooks/useInlineEdit.js`: Text direkt auf der Fläche bearbeiten.
+  - `hooks/useCanvasViewport.js`: Zoom, Zentrieren, Alles einpassen, Springen zu einem Element, Präsentationsfokus, Navigation über die Übersichtskarte.
+- Der Init-Effekt meldet nur noch Module an und ab (eine Liste von `detach`-Funktionen).
+- Tests der neuen Module in `diagram/canvas-modules.test.js`: Paper-Attrappe für die Ereignisse, echter Graph für die Bearbeitungsbefehle.
+
+## [1.6.3] – 2026-11-06
+
+Punkt 2 aus `improvement.md`: `App.jsx` verschlanken, dazu Korrekturen aus Code-Reviews von `src/hooks`, `src/ai` und `src/storage`.
+
+### Behoben
+
+- Mehrfaches Strg+S kurz hintereinander (z. B. gedrückt gehaltene Taste nach einer Umbenennung) legte mehrere Speicherstände an. Es wird jetzt nur einmal gespeichert.
+- Nach „Direkt erzeugen“ wurde 0,5 s später automatisch gespeichert. Hatte man inzwischen ein anderes Diagramm geöffnet, wurde dieses unter dem Namen „KI Generiertes Diagramm“ gespeichert. Das verzögerte Speichern wird jetzt abgebrochen, sobald ein anderes Diagramm geöffnet wird.
+- Exportfehler ohne Fehlertext zeigen jetzt „Der Export ist fehlgeschlagen.“ statt still abzubrechen.
+- Tastenereignisse ohne Taste (z. B. Autofill des Browsers) lösen keinen Fehler mehr aus.
+- **Speicher und Sicherung:**
+  - Beim Einspielen einer Sicherung werden die Autosave-Entwürfe der eingespielten Diagramme verworfen. Bisher konnte danach ein älterer Entwurf zur Wiederherstellung angeboten werden und den eingespielten Stand ersetzen.
+  - Auch beim Einspielen bleiben höchstens 10 Versionen je Diagramm.
+  - Eine Sicherungsdatei mit mehreren Diagrammen derselben ID wird abgelehnt, statt Diagramme still zu überschreiben.
+  - Ein unlesbarer Datensatz (z. B. aus einer neueren App-Version) wird in Liste und Versionshistorie übersprungen, statt sie scheitern zu lassen. Die **Sicherung** bricht in diesem Fall dagegen weiter mit einer Fehlermeldung ab, damit nichts unbemerkt in ihr fehlt.
+  - Schlägt das Schreiben einer Version oder einer Sicherung fehl, bleibt kein unbehandelter Fehler zurück.
+  - Versionen ohne Inhalt erscheinen nicht mehr als leeres Diagramm in der Versionshistorie.
+  - Verweigert der Browser die Schätzung des freien Speichers, kann trotzdem gespeichert werden.
+- **KI „Direkt erzeugen“:**
+  - Fehlt in der Antwort der Start, wird ein Ablaufschritt ohne Vorgänger zum Start, möglichst keine Entscheidung. Bisher wurde einfach das erste Element zum Start, auch eine Swimlane, die dann als riesiges Start-Oval erschien.
+  - Doppelte Element-IDs in der Antwort ließen einen Schritt verschwinden. Jetzt bleibt das erste Element mit dieser ID erhalten.
+  - Verbindungen von oder zu einer Swimlane werden verworfen.
+- **KI-Copilot:**
+  - Fehlt einem Entscheidungsausgang die Beschriftung, wird sie passend zur anderen ergänzt (zu „Nein“ kommt „Ja“). Bisher konnten zwei gleich beschriftete Ausgänge entstehen.
+  - Ein Schritt mit der ID „ende“ oder „stop“ lässt sich wieder ansprechen. Bisher wurde der Verweis zum allgemeinen Ende.
+  - Die Selbstkorrektur nach Rückfragen bekommt jetzt auch die Antworten mitgeliefert.
+- **KI-Anbindung:**
+  - Hängt ein Server nach den Kopfzeilen, greifen Zeitlimit und Abbrechen jetzt auch beim Lesen der Antwort.
+  - Verbindungstest und Modellliste in den Einstellungen haben jetzt ein Zeitlimit statt endlos zu laden.
+  - OpenAI-Reasoning-Modelle (gpt-5…, o-Modelle) werden mit niedrigem Denkaufwand angefragt (wie Claude), damit Antworten im Zeitlimit von 30 s bleiben. Andere OpenAI-Modelle bekommen den Parameter nicht und behalten damit das Antwortschema.
+  - `http://[::1]` wird als Server-Adresse nicht mehr angenommen, weil die Sicherheitsrichtlinie (CSP) sie blockiert. Für lokale Server `http://localhost` oder `http://127.0.0.1` verwenden.
+
+### Geändert
+
+- **Elemente rasten mit ihrer Mitte im Raster ein** statt mit der linken oberen Ecke. Das gilt beim Ziehen, beim Einfügen per Klick oder Drag & Drop und beim Folgeschritt („+“). Untereinander gesetzte Elemente unterschiedlicher Breite liegen damit mittig übereinander, und Pfeile zwischen ihnen laufen gerade statt mit einem kleinen Haken. Alt schaltet weiterhin nur die Hilfslinien ab, nicht das Raster. Beim Ziehen einer Gruppe rastet das gezogene Element mit der Mitte ein, die übrigen wandern um dieselbe Korrektur mit.
+  - Zurückstellen auf das alte Verhalten: `GRID_ANCHOR` in `src/diagram/grid-anchor.js` auf `'topLeft'` setzen.
+- Export-Dateinamen umschreiben Umlaute und ß („Prüfung Übersicht“ → `pruefung_uebersicht`) statt sie durch Unterstriche zu ersetzen.
+- Die Meldung beim Anordnen eines Swimlane-Diagramms ist an die beim Anordnen einer Auswahl angeglichen.
+
+### Code
+
+- `App.jsx` von 823 auf 241 Zeilen. Abläufe in eigenen Hooks:
+  - `useDiagramDocument`: Laden, Speichern, Entwürfe, Nachfragen
+  - `useKeyboardShortcuts`
+  - `useDiagramExport`
+  - `useCanvasCommands`: Anordnen, Einpassen, Löschen mit Überbrücken
+  - `useSubprocess`
+  - `useDiagramValidation`
+  - `useNotification`
+  - `usePanelResize`
+- `LEGACY_SYSTEM_PROMPTS` enthält die Fassung 1.5.0 jetzt wörtlich statt aus dem aktuellen Prompt abgeleitet, damit spätere Prompt-Änderungen sie nicht verändern. Nie geworfene Fehlercodes in `ai-client.js` sind entfernt. Tests in `ai/review-fixes.test.js`.
+- `saveVersion` speichert und räumt alte Versionen in einer Transaktion auf und liest dafür nur die Rohdaten statt alle Schnappschüsse zu migrieren.
+- Der Struktur-Check liest für die Teilprozess-Prüfung nur noch die IDs der gespeicherten Diagramme (`indexeddb.getAllDiagramIds`) statt aller Inhalte.
+- Neuer Verhaltenstest `App.test.jsx` mit einer Attrappe der Arbeitsfläche, vor und nach dem Umbau grün, dazu Tests der einzelnen Hooks (`hooks/appHooks.test.jsx`).
+
+## [1.6.2] – 2026-11-06
+
+Punkt 1 aus `improvement.md`: Leistung bei großen Diagrammen messen und verbessern.
+
+### Geändert
+
+- **Flüssigeres Ziehen in großen Diagrammen:** Während ein Element oder eine Verbindung gezogen wird, rechnen Struktur-Check, Autosave und „Ablauf als Text“ nicht mehr in jedem Bildschirmbild neu, sondern einmal beim Loslassen.
+- **Flüssigeres Scrollen und Zoomen:** Die Übersichtskarte zeichnet sich selbst neu, ohne die ganze Arbeitsfläche samt Eigenschaftenleiste neu aufzubauen.
+- **„Ablauf als Text“** wird nur berechnet, solange der Bereich aufgeklappt ist.
+- **Schnelleres Laden:** Die Arbeitsfläche zeichnet beim Öffnen eines Diagramms erst, wenn alles eingelesen ist. Elemente und Verbindungen werden gesammelt eingefügt.
+
+### Code
+
+- Leistungsmessung mit `npm run bench` (`src/test/performance.bench.js`, Testdiagramme aus `src/test/large-diagram.js`). Die Messwerte stehen in `improvement.md`.
+- Neues Modul `diagram/change-notifier.js`, neue Komponente `components/MinimapOverlay.jsx`, Speicher `createOverviewStore` in `diagram/overview-tracking.js`.
+- Rückfallebene im Melder: Bleibt ein Batch oder ein Ziehvorgang versehentlich offen (Fehler, `pointercancel` bei Touch/Stift), wird spätestens 1 s nach der letzten Änderung trotzdem gemeldet. Autosave und die Markierung ungespeicherter Änderungen können so nicht dauerhaft ausfallen. Alle Batches laufen über `inBatch` (`diagram/batch.js`) und werden auch bei Fehlern geschlossen; das Ziehen eines Knickpunkts schließt seinen Batch auch bei `pointercancel`.
+- Der Verlauf meldet seinen Zustand selbst nach dem entprellten Sichern (`onStateChange`), auch wenn sich nichts geändert hat. So bleiben „Rückgängig“ und „Wiederholen“ nicht fälschlich aktiv.
+- Das Ein-/Ausblenden der Anschlusspunkte beim Überfahren gilt nicht als Änderung am Diagramm (löst keine Aktualisierung der App mehr aus).
+- Die Übersichtskarte bestimmt die Umrisse der Elemente nur nach Änderungen am Diagramm neu, beim Scrollen nur den Ausschnitt. Das automatische Anpassen der Fläche hängt nach `pointercancel` nicht mehr.
+- Ein-/Aus-Einstellungen im Browser-Speicher über eine gemeinsame Hilfe (`utils/stored-flag.js`).
+- Auch Batches (Laden, Anordnen, Einfügen, Löschen) werden zu einer Meldung zusammengefasst. Der Zustand von Rückgängig/Wiederholen wird nur noch bei echten Änderungen an die App gemeldet.
+- `fromJson` schließt den Import-Batch auch bei fehlerhaften Daten. Vorher konnten danach neue Elemente nicht mehr in Lanes aufgenommen werden.
+- `HistoryManager.destroy()` meldet seinen Listener jetzt korrekt ab und wird beim Abbau der Arbeitsfläche aufgerufen. Der wirkungslose Filter auf `batch:layout` ist entfernt.
+- Leistungs- und Verhaltenstests in `diagram/performance.test.js`.
+
 ## [1.6.1] – 2026-11-05
 
 ### Geändert

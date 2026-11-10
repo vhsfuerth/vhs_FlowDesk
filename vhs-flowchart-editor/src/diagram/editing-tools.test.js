@@ -38,12 +38,19 @@ describe('Hilfslinien beim Verschieben', () => {
     handlers['element:pointerup']();
     expect(front.querySelector('line')).toBeNull();
 
+    // Alt schaltet nur die Hilfslinien ab; das Raster (Mitte) gilt weiter
     b.position(104, 300);
     handlers['element:pointermove']({ model: b }, { altKey: true });
-    expect(b.position().x).toBe(104);
+    expect(b.position().x).toBe(100);
+    expect(front.querySelector('line')).toBeNull();
+    // Gruppe: das gezogene Element rastet mit der Mitte ein, die anderen wandern um dieselbe
+    // Korrektur mit (Abstände bleiben); keine Hilfslinien
+    b.position(104, 300);
     selection = [a, b];
     handlers['element:pointermove']({ model: b }, {});
-    expect(b.position().x).toBe(104);
+    expect(b.position().x).toBe(100);
+    expect(a.position().x).toBe(96);
+    expect(front.querySelector('line')).toBeNull();
     detach();
   });
 });

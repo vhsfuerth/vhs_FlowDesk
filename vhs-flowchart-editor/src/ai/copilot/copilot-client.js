@@ -89,6 +89,18 @@ export const analyzeProcess = (text, options = {}) => requestModel(
 export const refineProcess = (text, model, answers, options = {}) => requestModel(
   buildRefinePrompt({ variantId: options.variantId, hints: getCopilotHints() }),
   buildRefineMessage(text, model, answers),
-  text,
+  // Die Selbstkorrektur braucht auch die Antworten, sonst „repariert“ sie gegen sie
+  describeWithAnswers(text, answers),
   options
 );
+
+/**
+ * Beschreibung samt Antworten auf die Rückfragen (für die Selbstkorrektur).
+ * @param {string} text
+ * @param {{ question: string, answer: string }[]} answers
+ */
+export const describeWithAnswers = (text, answers) => {
+  const answered = answers.filter((a) => a.answer?.trim());
+  if (!answered.length) return text;
+  return `${text}\n\nErgänzungen aus den Rückfragen:\n${answered.map((a) => `- ${a.question} ${a.answer.trim()}`).join('\n')}`;
+};

@@ -6,19 +6,23 @@ export class HistoryManager {
         this.redoStack = [];
         this.isTracking = false;
 
-        this.graph.on('all', this.handleGraphChange.bind(this));
+        this.onGraphChange = this.handleGraphChange.bind(this);
+        this.graph.on('all', this.onGraphChange);
         
         // Push initial state
         this.saveState();
     }
 
     destroy() {
-         this.graph.off('all', this.handleGraphChange.bind(this));
+        if (this.saveTimeout) clearTimeout(this.saveTimeout);
+        this.saveTimeout = null;
+        this.graph.off('all', this.onGraphChange);
     }
 
     handleGraphChange(eventName) {
-        // Skip tracking if we're currently undoing/redoing or if it's a layout batch
-        if (!this.isTracking || eventName.startsWith('batch:layout')) return;
+        // Nicht während Rückgängig/Wiederholen. Änderungen im Batch „layout“ werden bewusst
+        // erfasst (entprellt als ein Schritt), damit Anordnen rückgängig gemacht werden kann.
+        if (!this.isTracking) return;
 
         // Track specific events that modify the graph structure
         const targetEvents = [
@@ -40,8 +44,12 @@ export class HistoryManager {
     saveState() {
         const state = JSON.stringify(this.graph.toJSON());
         
-        // Prevent duplicate states
-        if (this.undoStack.length > 0 && this.undoStack[this.undoStack.length - 1] === state) return;
+        // Gleicher Stand wie zuletzt: nichts sichern, aber den Zustand melden – „Rückgängig“ war
+        // während der Entprellung schon als möglich gemeldet
+        if (this.undoStack.length > 0 && this.undoStack[this.undoStack.length - 1] === state) {
+            this.onStateChange?.();
+            return;
+        }
 
         this.undoStack.push(state);
         this.redoStack = []; // Clear redo stack on new action
@@ -49,6 +57,7 @@ export class HistoryManager {
         if (this.undoStack.length > this.maxDepth) {
             this.undoStack.shift();
         }
+        this.onStateChange?.();
     }
 
     // Noch nicht gesicherte (entprellte) Änderung sofort übernehmen,

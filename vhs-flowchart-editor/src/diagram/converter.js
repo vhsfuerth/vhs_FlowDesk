@@ -1,6 +1,7 @@
 // @ts-check
 // Bidirektionale Umwandlung zwischen dem App-Format `{ nodes, edges }` und JointJS-Zellen.
 
+import { inBatch } from './batch';
 import { createLink, createNode } from './shapes';
 import { NODE_DETAIL_FIELDS } from './types';
 import { laneOf } from './lanes';
@@ -73,65 +74,73 @@ export class JSONConverter {
 
         /** @type {Map<string, Element>} */
         const nodesMap = new Map();
+        /** @type {Element[]} */
+        const elements = [];
 
-        this.graph.startBatch('import');
+        // inBatch schließt den Batch auch bei fehlerhaften Daten, sonst bliebe z. B. die Lane-Zuordnung aus
+        inBatch(this.graph, 'import', () => {
 
-        json.nodes.forEach((node) => {
-            const element = createNode(
-                node.type.toLowerCase(),
-                node.position?.x ?? 100,
-                node.position?.y ?? 100,
-                node.label || '',
-                node.laneColor || null
-            );
-            if (node.id) element.set('id', node.id);
-            if (node.size) element.resize(node.size.width, node.size.height);
-
-            /** @type {Record<string, string>} */
-            const details = {};
-            NODE_DETAIL_FIELDS.forEach((field) => {
-                const value = node[field];
-                if (typeof value === 'string' && value.trim()) details[field] = value;
-            });
-            if (Object.keys(details).length) element.set('details', details);
-
-            nodesMap.set(node.id, element);
-            this.graph.addCell(element);
-        });
-
-        // Swimlanes halten ihre Elemente (Einbettung)
-        const laneNodes = json.nodes.filter((n) => n.type === 'lane');
-        if (laneNodes.length) {
             json.nodes.forEach((node) => {
-                const lane = laneOf(node, laneNodes);
-                const element = nodesMap.get(node.id);
-                const laneElement = lane ? nodesMap.get(lane.id) : null;
-                if (element && laneElement) setElementLane(element, laneElement);
+                const element = createNode(
+                    node.type.toLowerCase(),
+                    node.position?.x ?? 100,
+                    node.position?.y ?? 100,
+                    node.label || '',
+                    node.laneColor || null
+                );
+                if (node.id) element.set('id', node.id);
+                if (node.size) element.resize(node.size.width, node.size.height);
+
+                /** @type {Record<string, string>} */
+                const details = {};
+                NODE_DETAIL_FIELDS.forEach((field) => {
+                    const value = node[field];
+                    if (typeof value === 'string' && value.trim()) details[field] = value;
+                });
+                if (Object.keys(details).length) element.set('details', details);
+
+                nodesMap.set(node.id, element);
+                elements.push(element);
             });
-        }
+            // Alle Elemente auf einmal einfügen (schneller als einzeln)
+            this.graph.addCells(elements);
 
-        (json.edges || []).forEach((edge) => {
-            const sourceNode = nodesMap.get(edge.from);
-            const targetNode = nodesMap.get(edge.to);
-            if (!sourceNode || !targetNode) {
-                console.warn(`Failed to create link: Missing source (${edge.from}) or target (${edge.to})`);
-                return;
+            // Swimlanes halten ihre Elemente (Einbettung)
+            const laneNodes = json.nodes.filter((n) => n.type === 'lane');
+            if (laneNodes.length) {
+                json.nodes.forEach((node) => {
+                    const lane = laneOf(node, laneNodes);
+                    const element = nodesMap.get(node.id);
+                    const laneElement = lane ? nodesMap.get(lane.id) : null;
+                    if (element && laneElement) setElementLane(element, laneElement);
+                });
             }
-            const link = createLink(sourceNode.id, targetNode.id, edge.label);
-            if (edge.sourcePort) link.source({ id: sourceNode.id, port: edge.sourcePort });
-            if (edge.targetPort) link.target({ id: targetNode.id, port: edge.targetPort });
-            if (edge.id) link.set('id', edge.id);
-            if (Array.isArray(edge.vertices) && edge.vertices.length) {
-                link.vertices(edge.vertices.map(({ x, y }) => ({ x, y })));
-            }
-            if (edge.routing === 'straight') link.router({ name: ROUTERS.straight });
-            if (edge.labelPosition && link.labels().length) {
-                link.prop(['labels', 0, 'position'], { ...edge.labelPosition });
-            }
-            this.graph.addCell(link);
+
+            /** @type {any[]} */
+            const links = [];
+            (json.edges || []).forEach((edge) => {
+                const sourceNode = nodesMap.get(edge.from);
+                const targetNode = nodesMap.get(edge.to);
+                if (!sourceNode || !targetNode) {
+                    console.warn(`Failed to create link: Missing source (${edge.from}) or target (${edge.to})`);
+                    return;
+                }
+                const link = createLink(sourceNode.id, targetNode.id, edge.label);
+                if (edge.sourcePort) link.source({ id: sourceNode.id, port: edge.sourcePort });
+                if (edge.targetPort) link.target({ id: targetNode.id, port: edge.targetPort });
+                if (edge.id) link.set('id', edge.id);
+                if (Array.isArray(edge.vertices) && edge.vertices.length) {
+                    link.vertices(edge.vertices.map(({ x, y }) => ({ x, y })));
+                }
+                if (edge.routing === 'straight') link.router({ name: ROUTERS.straight });
+                if (edge.labelPosition && link.labels().length) {
+                    link.prop(['labels', 0, 'position'], { ...edge.labelPosition });
+                }
+                links.push(link);
+            });
+            this.graph.addCells(links);
+
         });
-
-        this.graph.stopBatch('import');
     }
 
     /**

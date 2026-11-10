@@ -1,5 +1,6 @@
 // Einrichtung des JointJS-Papers für den Editor: Raster, Standardverbindung,
 // erlaubte Verbindungen und Anschlusspunkte beim Überfahren.
+import { GRID_SIZE } from './grid-anchor';
 import * as joint from 'jointjs';
 import { COLORS } from '../utils/constants';
 
@@ -47,7 +48,7 @@ export function createPaper(el, graph, size) {
         model: graph,
         width: size.width,
         height: size.height,
-        gridSize: 10,
+        gridSize: GRID_SIZE,
         drawGrid: { name: 'dot', args: { color: COLORS.vhsBlue20, thickness: 1 } },
         background: { color: COLORS.white },
         defaultLink: createDefaultLink,

@@ -64,7 +64,9 @@ const initDB = () => {
 /** Wirft einen Fehler mit deutscher Meldung, wenn weniger als 1 MB Speicher frei ist. */
 const checkStorageQuota = async () => {
   if (navigator.storage && navigator.storage.estimate) {
-    const { usage, quota } = await navigator.storage.estimate();
+    // Manche Browser-Modi verweigern die Schätzung; dann wie „unbekannt“ behandeln
+    const estimate = await navigator.storage.estimate().catch(() => null);
+    const { usage, quota } = estimate || {};
     if (quota === undefined || usage === undefined) return;
     if (quota - usage < MIN_FREE_BYTES) {
       throw new Error('Speicherplatz fast voll. Bitte alte Diagramme löschen.');
@@ -73,10 +75,47 @@ const checkStorageQuota = async () => {
 };
 
 /**
+ * Migriert gelesene Datensätze. Ein Datensatz, der sich nicht lesen lässt (z. B. aus einer
+ * neueren App-Version), wird übersprungen, statt die ganze Liste scheitern zu lassen.
+ * @template T, R
+ * @param {T[]} records
+ * @param {(record: T) => R} migrate
+ * @returns {R[]}
+ */
+const migrateAll = (records, migrate) => records.flatMap((record) => {
+  try {
+    return [migrate(record)];
+  } catch (error) {
+    console.warn('Gespeicherter Datensatz kann nicht gelesen werden und wird übersprungen:', error);
+    return [];
+  }
+});
+
+/**
+ * Version ohne Schnappschuss ist beschädigt und wird nicht als leeres Diagramm angezeigt.
  * @param {DiagramVersion} version
  * @returns {DiagramVersion}
  */
-const migrateVersion = (version) => ({ ...version, snapshot: migrateDiagramRecord(version.snapshot || {}) });
+const migrateVersion = (version) => {
+  if (!version.snapshot || typeof version.snapshot !== 'object') {
+    throw new Error(`Version ${version.id} enthält keinen Schnappschuss.`);
+  }
+  return { ...version, snapshot: migrateDiagramRecord(version.snapshot) };
+};
+
+/**
+ * Löscht in einer laufenden Transaktion die ältesten Versionen eines Diagramms, bis höchstens
+ * MAX_VERSIONS_PER_DIAGRAM übrig sind. Liest dafür nur die Rohdaten (keine Migration).
+ * @param {any} store  Objektspeicher der Versionen in einer readwrite-Transaktion
+ * @param {string} diagramId
+ */
+const pruneVersions = async (store, diagramId) => {
+  /** @type {DiagramVersion[]} */
+  const all = await store.index('diagramId').getAll(diagramId);
+  if (all.length <= MAX_VERSIONS_PER_DIAGRAM) return;
+  all.sort((a, b) => (a.savedAt || '').localeCompare(b.savedAt || ''));
+  await Promise.all(all.slice(0, all.length - MAX_VERSIONS_PER_DIAGRAM).map((v) => store.delete(v.id)));
+};
 
 export const indexeddb = {
   /**
@@ -92,11 +131,25 @@ export const indexeddb = {
     return copy;
   },
 
-  /** @returns {Promise<DiagramRecord[]>} aufsteigend nach `updatedAt` */
-  async getAllDiagrams() {
+  /**
+   * Alle Diagramme, aufsteigend nach `updatedAt`. Unlesbare Datensätze werden übersprungen;
+   * mit `strict` (für die Sicherung) bricht der Aufruf stattdessen ab, damit nichts still fehlt.
+   * @param {{ strict?: boolean }} [options]
+   * @returns {Promise<DiagramRecord[]>}
+   */
+  async getAllDiagrams({ strict = false } = {}) {
     const db = await initDB();
     const all = await db.getAllFromIndex(STORE_NAME, 'updatedAt');
-    return all.map(migrateDiagramRecord);
+    return strict ? all.map(migrateDiagramRecord) : migrateAll(all, migrateDiagramRecord);
+  },
+
+  /**
+   * Nur die IDs aller gespeicherten Diagramme (ohne die Inhalte zu lesen).
+   * @returns {Promise<string[]>}
+   */
+  async getAllDiagramIds() {
+    const db = await initDB();
+    return db.getAllKeys(STORE_NAME);
   },
 
   /**
@@ -133,15 +186,17 @@ export const indexeddb = {
    */
   async saveVersion(version) {
     const db = await initDB();
-    await db.put(VERSIONS_STORE_NAME, version);
-    const all = await this.getVersionsForDiagram(version.diagramId);
-    if (all.length > MAX_VERSIONS_PER_DIAGRAM) {
-      // all is sorted ascending by savedAt; delete oldest entries
-      const toDelete = all.slice(0, all.length - MAX_VERSIONS_PER_DIAGRAM);
-      for (const v of toDelete) {
-        await db.delete(VERSIONS_STORE_NAME, v.id);
-      }
-    }
+    // Speichern und Aufräumen in einer Transaktion: gelingt beides oder nichts
+    const tx = db.transaction(VERSIONS_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(VERSIONS_STORE_NAME);
+    // tx.done gehört mit in Promise.all, sonst bliebe sein Abbruch bei einem Fehler unbehandelt
+    await Promise.all([
+      (async () => {
+        await store.put(version);
+        await pruneVersions(store, version.diagramId);
+      })(),
+      tx.done
+    ]);
   },
 
   /**
@@ -151,13 +206,17 @@ export const indexeddb = {
   async getVersionsForDiagram(diagramId) {
     const db = await initDB();
     const all = await db.getAllFromIndex(VERSIONS_STORE_NAME, 'diagramId', diagramId);
-    return all.map(migrateVersion).sort((a, b) => (a.savedAt || '').localeCompare(b.savedAt || ''));
+    return migrateAll(all, migrateVersion).sort((a, b) => (a.savedAt || '').localeCompare(b.savedAt || ''));
   },
 
-  /** @returns {Promise<DiagramVersion[]>} */
-  async getAllVersions() {
+  /**
+   * @param {{ strict?: boolean }} [options]  `strict`: bei unlesbaren Versionen abbrechen (Sicherung)
+   * @returns {Promise<DiagramVersion[]>}
+   */
+  async getAllVersions({ strict = false } = {}) {
     const db = await initDB();
-    return (await db.getAll(VERSIONS_STORE_NAME)).map(migrateVersion);
+    const all = await db.getAll(VERSIONS_STORE_NAME);
+    return strict ? all.map(migrateVersion) : migrateAll(all, migrateVersion);
   },
 
   /**
@@ -216,17 +275,27 @@ export const indexeddb = {
 
   /**
    * Spielt eine geprüfte Sicherung ein. Diagramme und Versionen mit gleicher ID werden überschrieben.
+   * Autosave-Entwürfe der eingespielten Diagramme werden verworfen (sie gehören zum alten Stand),
+   * und je Diagramm bleiben höchstens die 10 neuesten Versionen.
    * @param {{ diagrams: DiagramRecord[], versions: DiagramVersion[] }} backup
    */
   async importBackup({ diagrams, versions }) {
     await checkStorageQuota();
     const db = await initDB();
-    const tx = db.transaction([STORE_NAME, VERSIONS_STORE_NAME], 'readwrite');
-    await Promise.all([
-      ...diagrams.map((record) => tx.objectStore(STORE_NAME).put(record)),
-      ...versions.map((version) => tx.objectStore(VERSIONS_STORE_NAME).put(version)),
-      tx.done
-    ]);
+    const tx = db.transaction([STORE_NAME, VERSIONS_STORE_NAME, DRAFTS_STORE_NAME], 'readwrite');
+    const versionStore = tx.objectStore(VERSIONS_STORE_NAME);
+    const writes = async () => {
+      await Promise.all([
+        ...diagrams.map((record) => tx.objectStore(STORE_NAME).put(record)),
+        ...diagrams.map((record) => tx.objectStore(DRAFTS_STORE_NAME).delete(record.id)),
+        ...versions.map((version) => versionStore.put(version))
+      ]);
+      for (const diagramId of new Set(versions.map((v) => v.diagramId))) {
+        await pruneVersions(versionStore, diagramId);
+      }
+    };
+    // tx.done gehört mit in Promise.all, sonst bliebe sein Abbruch bei einem Fehler unbehandelt
+    await Promise.all([writes(), tx.done]);
   }
 };
 

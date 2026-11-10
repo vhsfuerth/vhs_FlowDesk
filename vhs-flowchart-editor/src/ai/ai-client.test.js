@@ -125,7 +125,7 @@ describe('ai-client mit Gemini', () => {
 
   it('nutzt den Header auch für Status-Check und Modellliste', async () => {
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({}) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ models: [{ name: 'models/gemini-2.5-flash' }] }) });
     vi.stubGlobal('fetch', fetchMock);
 

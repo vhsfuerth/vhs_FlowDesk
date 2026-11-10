@@ -107,7 +107,8 @@ const DiagramListModal = ({ onClose, onSelect, onNotify }) => {
   const handleBackup = async () => {
     setIsBusy(true);
     try {
-      const [all, versions] = await Promise.all([indexeddb.getAllDiagrams(), indexeddb.getAllVersions()]);
+      // Streng: Lässt sich ein Datensatz nicht lesen, scheitert die Sicherung sichtbar, statt ihn still wegzulassen
+      const [all, versions] = await Promise.all([indexeddb.getAllDiagrams({ strict: true }), indexeddb.getAllVersions({ strict: true })]);
       if (all.length === 0) {
         onNotify?.('Es sind keine gespeicherten Diagramme vorhanden.', 'info');
         return;

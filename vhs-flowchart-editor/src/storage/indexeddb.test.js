@@ -1,10 +1,19 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { openDB } from 'idb';
 import { indexeddb } from './indexeddb';
 import { CURRENT_SCHEMA_VERSION } from './schema';
 import { makeRecord, makeVersion, resetDatabase } from '../test/db';
 
 beforeEach(async () => {
   await resetDatabase();
+});
+
+describe('getAllDiagramIds', () => {
+  it('liefert nur die IDs der gespeicherten Diagramme', async () => {
+    await indexeddb.saveDiagram(makeRecord({ id: 'a' }));
+    await indexeddb.saveDiagram(makeRecord({ id: 'b' }));
+    expect((await indexeddb.getAllDiagramIds()).sort()).toEqual(['a', 'b']);
+  });
 });
 
 describe('Diagramme', () => {
@@ -112,5 +121,77 @@ describe('Sicherung', () => {
     const all = await indexeddb.getAllDiagrams();
     expect(all.map((d) => d.name).sort()).toEqual(['Aus Sicherung', 'Neu']);
     expect(await indexeddb.getAllVersions()).toHaveLength(2);
+  });
+});
+
+describe('Robustheit (Code-Review src/storage)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Schreibt einen Datensatz unverändert an der App vorbei in die Datenbank
+  const putRaw = async (store, value) => {
+    await indexeddb.getAllDiagramIds(); // Datenbank anlegen
+    const db = await openDB('vhs-flowcharts-db');
+    await db.put(store, value);
+    db.close();
+  };
+
+  it('verwirft beim Einspielen einer Sicherung die Entwürfe der betroffenen Diagramme', async () => {
+    await indexeddb.saveDraft(makeRecord({ name: 'Entwurf' }));
+    await indexeddb.importBackup({ diagrams: [makeRecord({ name: 'Aus Sicherung' })], versions: [] });
+    expect(await indexeddb.getDraft('d1')).toBeNull();
+  });
+
+  it('hält beim Einspielen die Grenze von 10 Versionen je Diagramm ein', async () => {
+    for (let m = 0; m < 10; m++) await indexeddb.saveVersion(makeVersion(m));
+    await indexeddb.importBackup({
+      diagrams: [makeRecord()],
+      versions: Array.from({ length: 5 }, (_, i) => makeVersion(30 + i))
+    });
+    const versions = await indexeddb.getVersionsForDiagram('d1');
+    expect(versions).toHaveLength(10);
+    expect(versions[0].id).toBe('v5');
+    expect(versions[9].id).toBe('v34');
+  });
+
+  it('überspringt unlesbare Diagramme, statt die ganze Liste scheitern zu lassen', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await indexeddb.saveDiagram(makeRecord({ id: 'ok', name: 'Lesbar' }));
+    await putRaw('diagrams', { ...makeRecord({ id: 'neu', name: 'Aus neuerer Version' }), schemaVersion: 99 });
+    const all = await indexeddb.getAllDiagrams();
+    expect(all.map((d) => d.id)).toEqual(['ok']);
+  });
+
+  it('bricht für die Sicherung ab, statt unlesbare Diagramme still wegzulassen', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await indexeddb.saveDiagram(makeRecord({ id: 'ok', name: 'Lesbar' }));
+    await putRaw('diagrams', { ...makeRecord({ id: 'neu', name: 'Aus neuerer Version' }), schemaVersion: 99 });
+    await expect(indexeddb.getAllDiagrams({ strict: true })).rejects.toThrow();
+    expect(await indexeddb.getAllDiagrams()).toHaveLength(1);
+  });
+
+  it('zeigt Versionen ohne Schnappschuss nicht als leeres Diagramm an', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await indexeddb.saveVersion(makeVersion(1));
+    await putRaw('diagram-versions', { id: 'kaputt', diagramId: 'd1', savedAt: '2026-01-01T11:00:00.000Z', note: '' });
+    const versions = await indexeddb.getVersionsForDiagram('d1');
+    expect(versions.map((v) => v.id)).toEqual(['v1']);
+  });
+
+  it('speichert eine Version auch dann, wenn eine andere Version unlesbar ist', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await putRaw('diagram-versions', { ...makeVersion(1), snapshot: { ...makeRecord(), schemaVersion: 99 } });
+    await expect(indexeddb.saveVersion(makeVersion(2))).resolves.toBeUndefined();
+  });
+
+  it('speichert auch, wenn der Browser die Speicherschätzung verweigert', async () => {
+    const original = navigator.storage;
+    Object.defineProperty(navigator, 'storage', { value: { estimate: () => Promise.reject(new Error('verweigert')) }, configurable: true });
+    try {
+      await expect(indexeddb.saveDiagram(makeRecord())).resolves.toMatchObject({ id: 'd1' });
+    } finally {
+      Object.defineProperty(navigator, 'storage', { value: original, configurable: true });
+    }
   });
 });
