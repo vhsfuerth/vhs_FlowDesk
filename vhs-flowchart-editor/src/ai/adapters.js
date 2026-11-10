@@ -8,6 +8,9 @@ import { toJsonSchema } from './providers';
 const MAX_OUTPUT_TOKENS = 16000;
 const ANTHROPIC_VERSION = '2023-06-01';
 
+// OpenAI-Modelle, die `reasoning_effort` kennen
+const REASONING_MODEL = /^(gpt-5|o\d)/i;
+
 const jsonHeaders = (extra) => ({ 'Content-Type': 'application/json', ...extra });
 
 const authHeaders = (kind, apiKey) => {
@@ -85,6 +88,9 @@ export function buildGenerateRequest({ preset, baseUrl, model, apiKey, system, u
       ? { type: 'json_schema', json_schema: { name: 'antwort', schema: toJsonSchema(options.responseSchema), strict: false } }
       : { type: 'json_object' };
     if (preset.sendTemperature) body.temperature = temperature;
+    // Niedriger Denkaufwand hält die Antwortzeit innerhalb der Zeitlimits der App (wie bei Claude).
+    // Nur für Reasoning-Modelle (gpt-5…, o1/o3/o4…); andere lehnen den Parameter mit 400 ab.
+    if (preset.reasoningEffort && REASONING_MODEL.test(model)) body.reasoning_effort = preset.reasoningEffort;
   }
   return {
     url: `${baseUrl}/chat/completions`,

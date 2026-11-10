@@ -1,3 +1,4 @@
+import { snapToGridAnchor } from './grid-anchor';
 import * as joint from 'jointjs';
 import { COLORS, FONTS, LANE_COLORS } from '../utils/constants';
 import { estimateNodeSize } from './node-size';
@@ -605,6 +606,7 @@ export const createNodeAt = (type, x, y) => {
     const node = createNode(NODE_DEFAULTS[type] ? type : 'process', 0, 0);
     // Erst nach der automatischen Größenanpassung zentrieren
     const size = node.size();
-    node.position(Math.round(x - size.width / 2), Math.round(y - size.height / 2));
+    const snapped = snapToGridAnchor({ x: x - size.width / 2, y: y - size.height / 2, ...size });
+    node.position(snapped.x, snapped.y);
     return node;
 };

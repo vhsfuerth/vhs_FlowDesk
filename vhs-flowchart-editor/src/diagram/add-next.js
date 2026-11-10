@@ -1,6 +1,7 @@
 // @ts-check
 // Folgeschritt direkt anhängen (ohne JointJS): Lage des neuen Elements,
 // Anschlüsse der Verbindung und Beschriftung bei Entscheidungen.
+import { GRID_SIZE, snapToGridAnchor } from './grid-anchor';
 
 /** @typedef {{ x: number, y: number, width: number, height: number }} Rect */
 /** @typedef {'right' | 'bottom'} AddDirection */
@@ -9,7 +10,6 @@
 export const NEXT_GAP = { right: 80, bottom: 70 };
 const MAX_TRIES = 12;
 const CLEARANCE = 10;
-const GRID = 10;
 
 /** Elementtypen, an die ein Folgeschritt angehängt werden kann */
 export const CAN_HAVE_NEXT = ['start', 'process', 'decision', 'document', 'system', 'subprocess', 'wait'];
@@ -21,8 +21,6 @@ export const NEXT_STEP_TYPES = ['process', 'decision', 'document', 'system', 'wa
 const overlaps = (a, b) => a.x < b.x + b.width + CLEARANCE && b.x < a.x + a.width + CLEARANCE
   && a.y < b.y + b.height + CLEARANCE && b.y < a.y + a.height + CLEARANCE;
 
-/** @param {number} value */
-const snap = (value) => Math.round(value / GRID) * GRID;
 
 /**
  * Position des neuen Elements rechts bzw. unterhalb der Quelle.
@@ -40,10 +38,10 @@ export function placeNextNode(source, size, direction, obstacles) {
   const step = direction === 'right' ? { x: 0, y: size.height + 30 } : { x: size.width + 40, y: 0 };
 
   for (let i = 0; i < MAX_TRIES; i += 1) {
-    const candidate = { x: snap(base.x + step.x * i), y: snap(base.y + step.y * i), ...size };
+    const candidate = { ...snapToGridAnchor({ x: base.x + step.x * i, y: base.y + step.y * i, ...size }, { grid: GRID_SIZE }), ...size };
     if (!obstacles.some((o) => overlaps(candidate, o))) return { x: candidate.x, y: candidate.y };
   }
-  return { x: snap(base.x), y: snap(base.y) };
+  return snapToGridAnchor({ ...base, ...size }, { grid: GRID_SIZE });
 }
 
 /**

@@ -20,6 +20,7 @@
  * @property {string} keyPlaceholder
  * @property {string} [keyUrl]           Seite, auf der man einen API-Key erhält
  * @property {boolean} sendTemperature   manche Modelle (z. B. OpenAI GPT-5) lehnen eigene Werte ab
+ * @property {string} [reasoningEffort]  Denkaufwand (OpenAI `reasoning_effort`), hält Antworten im Zeitlimit
  */
 
 /** @type {ProviderPreset[]} */
@@ -45,6 +46,7 @@ export const PROVIDERS = [
     keyRequired: true,
     keyPlaceholder: 'sk-…',
     keyUrl: 'https://platform.openai.com/api-keys',
+    reasoningEffort: 'low',
     sendTemperature: false
   },
   {
@@ -95,7 +97,8 @@ export const getProviderPreset = (id) =>
 export const parseModelList = (text) =>
   (text || '').split(/[,\n]/).map((m) => m.trim()).filter(Boolean);
 
-const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
+// Genau die Adressen, die die CSP in vercel.json (connect-src) per HTTP erlaubt
+const LOCAL_HOSTS = ['localhost', '127.0.0.1'];
 
 /**
  * Prüft eine eingetragene Server-Adresse. Erlaubt sind HTTPS-Adressen und – für lokal

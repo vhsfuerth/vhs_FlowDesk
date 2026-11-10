@@ -3,10 +3,11 @@
 // anlegen würde. Erst ab DRAG_THRESHOLD Pixeln Mausweg entsteht ein Knickpunkt.
 // Vorhandene Knickpunkte verschiebt bzw. entfernt (Doppelklick) linkTools.Vertices (selection.js).
 
-const DRAG_THRESHOLD = 5;
-const GRID = 10;
+import { GRID_SIZE } from './grid-anchor';
 
-const snap = (value) => Math.round(value / GRID) * GRID;
+const DRAG_THRESHOLD = 5;
+
+const snap = (value) => Math.round(value / GRID_SIZE) * GRID_SIZE;
 
 // Teile der Linie (standard.Link), auf denen Ziehen einen Knickpunkt setzt
 const CONNECTION_SELECTORS = ['wrapper', 'line'];
@@ -58,12 +59,15 @@ export function attachVertexDrag({ paper }) {
     paper.on('link:pointerdown', onLinkPointerDown);
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', finish);
+    // Touch/Stift: Übernimmt der Browser die Geste (z. B. Scrollen), kommt pointercancel statt pointerup
+    window.addEventListener('pointercancel', finish);
     window.addEventListener('blur', finish);
     return () => {
         finish();
         paper.off('link:pointerdown', onLinkPointerDown);
         window.removeEventListener('pointermove', onPointerMove);
         window.removeEventListener('pointerup', finish);
+        window.removeEventListener('pointercancel', finish);
         window.removeEventListener('blur', finish);
     };
 }

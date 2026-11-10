@@ -268,6 +268,10 @@ export function parseImportFile(json, fallbackName = 'Importiertes Diagramm') {
       return parsed;
     });
     const diagramIds = new Set(diagrams.map((d) => d.id));
+    if (diagramIds.size !== diagrams.length) {
+      // Sonst würden sich Diagramme mit gleicher ID beim Einspielen still überschreiben
+      throw new ImportValidationError('Die Sicherungsdatei enthält mehrere Diagramme mit derselben ID.');
+    }
     const versions = (Array.isArray(json.versions) ? json.versions : [])
       .filter((v) => isObject(v) && typeof v.id === 'string' && diagramIds.has(v.diagramId) && isObject(v.snapshot))
       .map((v) => ({ ...v, snapshot: migrateDiagramRecord(v.snapshot) }));

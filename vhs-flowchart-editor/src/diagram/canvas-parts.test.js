@@ -6,6 +6,9 @@ import { attachPortHover, validateConnection } from './paper';
 import { applyGroupDrag, createSelectionController, isAdditiveEvent, startGroupDrag, toggleSelection } from './selection';
 import { attachPanAndRubberBand, rectBetween } from './pan-select';
 import { attachWheelZoom, createAutoFit, trackPointer } from './viewport';
+import { attachChangeNotifier, FALLBACK_MS } from './change-notifier';
+import { attachVertexDrag } from './vertex-drag';
+import { inBatch } from './batch';
 import { decisionLabelSuggestions, getLinkLabelText, setLaneLabelAndColor, setLinkLabelText, setNodeText } from './text-editing';
 
 // Paper-Attrappe: nur Ereignisse und Koordinaten (1:1), ohne SVG-Darstellung
@@ -396,5 +399,142 @@ describe('Texte bearbeiten', () => {
     expect(lane.attr('header/fill')).toBe('#111111');
     expect(lane.attr('body/fill')).toBe('#eeeeee');
     expect(lane.attr('body/stroke')).toBe('#111111');
+  });
+});
+
+describe('attachChangeNotifier', () => {
+  let detach;
+  afterEach(() => {
+    detach?.();
+    detach = null;
+    vi.useRealTimers();
+  });
+
+  const setup = () => {
+    vi.useFakeTimers();
+    const graph = new joint.dia.Graph({}, { cellNamespace: joint.shapes });
+    const paper = fakePaper();
+    const onGraphChange = vi.fn();
+    const onHistoryChange = vi.fn();
+    detach = attachChangeNotifier({ graph, paper, onGraphChange, onHistoryChange });
+    const cell = createProcessNode(0, 0, 'A');
+    graph.addCell(cell);
+    onGraphChange.mockClear();
+    onHistoryChange.mockClear();
+    return { graph, paper, cell, onGraphChange, onHistoryChange };
+  };
+  const release = () => {
+    window.dispatchEvent(new Event('pointerup'));
+    vi.runAllTimers();
+  };
+
+  it('meldet Änderungen sofort, wenn nichts gezogen wird', () => {
+    const { cell, onGraphChange, onHistoryChange } = setup();
+    cell.position(20, 20);
+    expect(onGraphChange).toHaveBeenCalledTimes(1);
+    expect(onHistoryChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('meldet beim Ziehen erst nach dem Loslassen – samt Änderungen beim Ablegen – genau einmal', () => {
+    const { paper, cell, onGraphChange, onHistoryChange } = setup();
+    paper.trigger('cell:pointerdown');
+    for (let i = 1; i <= 30; i++) cell.position(i, i);
+    window.dispatchEvent(new Event('pointerup'));
+    // JointJS ordnet erst im folgenden mouseup zu (z. B. die Lane) – das gehört noch dazu
+    cell.attr('label/text', 'B');
+    expect(onGraphChange).not.toHaveBeenCalled();
+    expect(onHistoryChange).not.toHaveBeenCalled();
+    vi.runAllTimers();
+    expect(onGraphChange).toHaveBeenCalledTimes(1);
+    expect(onHistoryChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('fasst einen Batch zu einer Meldung zusammen', () => {
+    const { graph, cell, onGraphChange } = setup();
+    graph.startBatch('layout');
+    graph.startBatch('inner');
+    for (let i = 1; i <= 10; i++) cell.position(i * 10, 0);
+    graph.stopBatch('inner');
+    expect(onGraphChange).not.toHaveBeenCalled();
+    graph.stopBatch('layout');
+    expect(onGraphChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('meldet trotzdem, wenn ein Batch versehentlich offen bleibt (Rückfallebene)', () => {
+    const { graph, cell, onGraphChange } = setup();
+    graph.startBatch('nie-geschlossen');
+    cell.position(40, 40);
+    expect(onGraphChange).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(FALLBACK_MS);
+    expect(onGraphChange).toHaveBeenCalledTimes(1);
+    cell.position(60, 60);
+    vi.advanceTimersByTime(FALLBACK_MS);
+    expect(onGraphChange).toHaveBeenCalledTimes(2);
+  });
+
+  it('meldet trotzdem, wenn das Loslassen nie ankommt', () => {
+    const { paper, cell, onGraphChange } = setup();
+    paper.trigger('cell:pointerdown');
+    cell.position(40, 40);
+    vi.advanceTimersByTime(FALLBACK_MS);
+    expect(onGraphChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('meldet das Ein-/Ausblenden der Anschlusspunkte beim Überfahren nicht', () => {
+    const { cell, onGraphChange } = setup();
+    cell.trigger('change:ports', cell);
+    cell.portProp(cell.getPorts()[0]?.id || 'x', 'attrs/circle/opacity', 1);
+    expect(onGraphChange).not.toHaveBeenCalled();
+  });
+
+  it('meldet nach einem Klick ohne Änderung nichts', () => {
+    const { paper, onGraphChange } = setup();
+    paper.trigger('cell:pointerdown');
+    release();
+    expect(onGraphChange).not.toHaveBeenCalled();
+  });
+
+  it('meldet sich vollständig ab, auch von den Fenster-Ereignissen', () => {
+    const { paper, cell, onGraphChange } = setup();
+    paper.trigger('cell:pointerdown');
+    cell.position(5, 5);
+    detach();
+    detach = null;
+    release();
+    cell.position(50, 50);
+    expect(onGraphChange).not.toHaveBeenCalled();
+    expect(paper.count('cell:pointerdown')).toBe(0);
+  });
+});
+
+describe('inBatch', () => {
+  it('schließt den Batch auch bei einem Fehler', () => {
+    const graph = new joint.dia.Graph({}, { cellNamespace: joint.shapes });
+    expect(() => inBatch(graph, 'test', () => { throw new Error('kaputt'); })).toThrow('kaputt');
+    expect(graph.hasActiveBatch()).toBe(false);
+    expect(inBatch(graph, 'test', () => 42)).toBe(42);
+  });
+});
+
+describe('attachVertexDrag', () => {
+  it('schließt den Batch auch, wenn der Browser die Geste abbricht (pointercancel)', () => {
+    const graph = new joint.dia.Graph({}, { cellNamespace: joint.shapes });
+    const a = createProcessNode(0, 0, 'A');
+    const b = createProcessNode(0, 300, 'B');
+    const link = createLink(a.id, b.id, '');
+    graph.addCells([a, b, link]);
+    const paper = fakePaper();
+    const detach = attachVertexDrag({ paper });
+    const el = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const target = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    target.setAttribute('joint-selector', 'line');
+    el.appendChild(target);
+    const linkView = { el, model: link, getVertexIndex: () => 0 };
+    paper.trigger('link:pointerdown', linkView, { target, clientX: 0, clientY: 0 });
+    window.dispatchEvent(Object.assign(new Event('pointermove'), { clientX: 20, clientY: 20 }));
+    expect(graph.hasActiveBatch('vertex-add')).toBe(true);
+    window.dispatchEvent(new Event('pointercancel'));
+    expect(graph.hasActiveBatch('vertex-add')).toBe(false);
+    detach();
   });
 });

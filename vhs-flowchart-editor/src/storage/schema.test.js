@@ -195,3 +195,11 @@ describe('Format 2', () => {
     expect(errors.join('\n')).toMatch(/Linienführung „kurvig“/);
   });
 });
+
+describe('Sicherungsdatei mit doppelten IDs', () => {
+  it('wird abgelehnt, statt Diagramme still zu überschreiben', () => {
+    const record = { id: 'a', name: 'A', diagram: { nodes: [], edges: [] } };
+    expect(() => parseImportFile({ format: BACKUP_FORMAT, diagrams: [record, { ...record, name: 'B' }] }))
+      .toThrow('mehrere Diagramme mit derselben ID');
+  });
+});

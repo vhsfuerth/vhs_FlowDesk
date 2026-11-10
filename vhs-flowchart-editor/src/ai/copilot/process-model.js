@@ -138,6 +138,34 @@ function readTransitions(step) {
 }
 
 /**
+ * Ergänzt fehlende Beschriftungen von Entscheidungsausgängen, ohne eine vorhandene zu
+ * wiederholen: Zu „Nein“ gehört „Ja“ (und umgekehrt), sonst „Ja“/„Nein“ bzw. „Fall n“.
+ * @param {{ label: string }[]} branches
+ */
+export function fillBranchLabels(branches) {
+  if (branches.length < 2) return;
+  const used = new Set(branches.map((b) => b.label.trim().toLowerCase()).filter(Boolean));
+  /** @param {string} label */
+  const take = (label) => {
+    used.add(label.toLowerCase());
+    return label;
+  };
+  /** @param {number} i */
+  const candidates = (i) => (branches.length === 2 ? (i === 0 ? ['Ja', 'Nein'] : ['Nein', 'Ja']) : []);
+  branches.forEach((branch, i) => {
+    if (branch.label.trim()) return;
+    const free = candidates(i).find((label) => !used.has(label.toLowerCase()));
+    if (free) {
+      branch.label = take(free);
+      return;
+    }
+    let n = i + 1;
+    while (used.has(`fall ${n}`)) n++;
+    branch.label = take(`Fall ${n}`);
+  });
+}
+
+/**
  * Wandelt eine KI-Antwort in ein vollständiges Prozessmodell um.
  * `warnings` sind für Nutzende formuliert; `issues` beschreiben strukturelle Mängel der
  * KI-Antwort so, dass sie der KI zur Selbstkorrektur zurückgegeben werden können.
@@ -205,9 +233,10 @@ export function normalizeProcessModel(raw) {
   const resolveRef = (ref, fallback, stepLabel) => {
     const text = cleanText(ref, 40);
     if (!text) return fallback;
-    if (EXPLICIT_END.test(text)) return END;
+    // Ein Schritt darf „ende“ oder „stop“ heißen; erst danach gilt das Wort als allgemeines Ende
     const target = idMap.get(text);
     if (target) return target;
+    if (EXPLICIT_END.test(text)) return END;
     warnings.push(`„${stepLabel}“ verwies auf einen unbekannten Schritt; der Ablauf wurde mit dem folgenden Schritt fortgesetzt.`);
     issues.push(`Schritt „${stepLabel}“ verweist auf die unbekannte id „${text}“.`);
     return fallback;
@@ -240,9 +269,7 @@ export function normalizeProcessModel(raw) {
         .map((t) => ({ label: t.label, next: resolveRef(t.ref, following, label) }));
       if (branches.length === 0) branches = [{ label: '', next: following }];
       if (branches.length < 2) incompleteDecisions.add(id);
-      branches.forEach((branch, i) => {
-        if (!branch.label && branches.length >= 2) branch.label = branches.length === 2 ? (i === 0 ? 'Ja' : 'Nein') : `Fall ${i + 1}`;
-      });
+      fillBranchLabels(branches);
     }
 
     if (kind === 'task') {

@@ -169,6 +169,8 @@ export function createAutoFit({ paper, graph, container }) {
     paper.on('cell:pointerdown', onCellPointerDown);
     graph.on(FIT_EVENTS, schedule);
     window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+    window.addEventListener('blur', onPointerUp);
     const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
     resizeObserver?.observe(container);
 
@@ -180,6 +182,8 @@ export function createAutoFit({ paper, graph, container }) {
             paper.off('cell:pointerdown', onCellPointerDown);
             graph.off(FIT_EVENTS, schedule);
             window.removeEventListener('pointerup', onPointerUp);
+            window.removeEventListener('pointercancel', onPointerUp);
+            window.removeEventListener('blur', onPointerUp);
             resizeObserver?.disconnect();
         }
     };

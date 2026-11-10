@@ -1,16 +1,10 @@
 import React, { useId, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, ListOrdered } from 'lucide-react';
 import { buildProcessDescription, describeTransitions } from '../export/process-description';
+import { NON_FLOW_TYPES } from '../diagram/types';
+import { readFlag, writeFlag } from '../utils/stored-flag';
 
 const OPEN_KEY = 'vhs-text-alternative-open';
-
-const readOpen = () => {
-    try {
-        return localStorage.getItem(OPEN_KEY) === '1';
-    } catch {
-        return false;
-    }
-};
 
 /**
  * Ausblendbare Textfassung des Diagramms unter der Arbeitsfläche: nummerierte Schritte
@@ -18,19 +12,18 @@ const readOpen = () => {
  * hilft aber auch beim Gegenlesen. Ein Klick auf einen Schritt springt zum Element.
  */
 const DiagramTextAlternative = ({ diagram, onFocusNode }) => {
-    const [isOpen, setIsOpen] = useState(readOpen);
+    const [isOpen, setIsOpen] = useState(() => readFlag(OPEN_KEY));
     const headingId = useId();
     const contentId = useId();
-    const description = useMemo(() => buildProcessDescription(diagram), [diagram]);
-    const count = description.steps.length;
+    // Die Beschreibung wird nur aufgebaut, solange der Bereich aufgeklappt ist
+    const description = useMemo(() => (isOpen ? buildProcessDescription(diagram) : null), [diagram, isOpen]);
+    const count = description
+        ? description.steps.length
+        : (diagram?.nodes || []).filter((n) => !NON_FLOW_TYPES.includes(n.type)).length;
 
     const toggle = () => {
         setIsOpen((open) => {
-            try {
-                localStorage.setItem(OPEN_KEY, open ? '0' : '1');
-            } catch {
-                // Ohne Speicher gilt die Einstellung nur bis zum Neuladen
-            }
+            writeFlag(OPEN_KEY, !open);
             return !open;
         });
     };
@@ -51,7 +44,7 @@ const DiagramTextAlternative = ({ diagram, onFocusNode }) => {
                     {isOpen ? <ChevronDown className="ml-auto w-4 h-4" aria-hidden="true" /> : <ChevronUp className="ml-auto w-4 h-4" aria-hidden="true" />}
                 </button>
             </h2>
-            {isOpen && (
+            {description && (
                 <div id={contentId} className="max-h-[35vh] overflow-y-auto px-4 pb-3 text-sm text-gray-800">
                     {description.warnings.map((warning, i) => (
                         <p key={i} className="mb-2 rounded bg-amber-50 px-2 py-1 text-xs text-amber-800">{warning}</p>

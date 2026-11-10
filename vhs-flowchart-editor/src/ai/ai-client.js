@@ -45,6 +45,11 @@ const getActiveConfig = (overrides = {}) => {
     return { ...resolved, apiKey };
 };
 
+/**
+ * Schickt eine Anfrage und liest die Antwort als JSON – beides innerhalb des Zeitlimits und
+ * abbrechbar. Ein Server, der nur die Kopfzeilen schickt und dann hängt, blockiert so nicht.
+ * @returns {Promise<{ ok: boolean, status: number, statusText: string, data: any }>}
+ */
 async function sendRequest({ url, init }, modelName, options = {}) {
     const timeoutMs = options.timeoutMs || API_TIMEOUT_MS;
     const controller = new AbortController();
@@ -59,7 +64,12 @@ async function sendRequest({ url, init }, modelName, options = {}) {
     options.signal?.addEventListener('abort', abortFromOutside);
 
     try {
-        return await fetch(url, { ...init, signal: controller.signal });
+        const response = await fetch(url, { ...init, signal: controller.signal });
+        const data = await response.json().catch((error) => {
+            if (error?.name === 'AbortError') throw error;
+            return null;
+        });
+        return { ok: response.ok, status: response.status, statusText: response.statusText, data };
     } catch (error) {
         if (error.name === 'AbortError') {
             if (!timedOut) throw new Error(AI_ABORTED);
@@ -97,8 +107,7 @@ export async function generateWithFallback(prompt, userText, parseResult, option
         }
 
         if (response.ok) {
-            const data = await response.json().catch(() => null);
-            const contentText = extractText(preset.kind, data);
+            const contentText = extractText(preset.kind, response.data);
             if (!contentText) throw new Error('INVALID_JSON_RESPONSE');
             return parseResult(parseJsonText(contentText));
         }
@@ -113,8 +122,7 @@ export async function generateWithFallback(prompt, userText, parseResult, option
             continue;
         }
 
-        const errorData = await response.json().catch(() => ({}));
-        console.error(`KI-API-Fehler ${preset.label} (${response.status}):`, errorData.error?.message || response.statusText);
+        console.error(`KI-API-Fehler ${preset.label} (${response.status}):`, response.data?.error?.message || response.statusText);
         throw new Error(mapApiStatusToMessage(response.status));
     }
 
@@ -125,9 +133,7 @@ export async function generateWithFallback(prompt, userText, parseResult, option
 }
 
 const ERROR_MESSAGES = {
-    API_KEY_INVALID: 'Der API-Key ist ungültig oder abgelaufen.',
     API_KEY_MISSING: 'API-Key fehlt. Bitte in den Einstellungen hinterlegen.',
-    RATE_LIMIT: 'Anfragelimit beim KI-Anbieter erreicht. Bitte kurz warten.',
     INVALID_JSON_RESPONSE: 'Die KI-Antwort konnte nicht verarbeitet werden. Bitte versuchen Sie es erneut.',
     AI_REFUSED: 'Das KI-Modell hat die Anfrage abgelehnt. Bitte die Beschreibung umformulieren.',
     [NETWORK_ERROR]: 'Keine Verbindung zum KI-Dienst. Bitte Internetverbindung und Server-Adresse prüfen. Manche Anbieter erlauben keinen direkten Zugriff aus dem Browser (CORS).',
@@ -187,19 +193,16 @@ export const checkApiStatus = async (overrides = {}) => {
 
     try {
         if (preset.kind === 'gemini') {
-            const { url, init } = buildGeminiHealthcheckRequest({ baseUrl, model: models[0], apiKey });
-            const response = await fetch(url, init);
+            const response = await sendRequest(buildGeminiHealthcheckRequest({ baseUrl, model: models[0], apiKey }), models[0]);
             if (response.ok) return { status: 'ok', message: 'API-Key ist aktiv und bereit.' };
-            const errorData = await response.json().catch(() => ({}));
-            console.error('API-Status-Check Fehler:', errorData.error?.message || response.statusText);
+            console.error('API-Status-Check Fehler:', response.data?.error?.message || response.statusText);
             return statusFromHttp(response.status, models[0]);
         }
 
         // Bei den übrigen Anbietern genügt die (kostenlose) Modellliste als Test
-        const { url, init } = buildListModelsRequest({ preset, baseUrl, apiKey });
-        const response = await fetch(url, init);
+        const response = await sendRequest(buildListModelsRequest({ preset, baseUrl, apiKey }), preset.label);
         if (!response.ok) return statusFromHttp(response.status);
-        const available = parseModelIds(preset.kind, await response.json().catch(() => null));
+        const available = parseModelIds(preset.kind, response.data);
         const missing = available.length > 0 ? models.filter((m) => !available.includes(m)) : [];
         if (missing.length === models.length) {
             return { status: 'warning', message: `Verbindung steht, aber Modell ${models[0]} wird nicht angeboten.`, models: available };
@@ -207,7 +210,8 @@ export const checkApiStatus = async (overrides = {}) => {
         return { status: 'ok', message: 'Verbindung steht, KI-Dienst ist bereit.' };
     } catch (error) {
         console.error('API-Status-Check Fehler:', error);
-        return { status: 'error', message: describeAiError(new Error(NETWORK_ERROR)) };
+        // Zeitüberschreitung mit eigenem Text, sonst die Meldung für Netzwerkfehler
+        return { status: 'error', message: describeAiError(error?.message?.startsWith('Zeitüberschreitung') ? error : new Error(NETWORK_ERROR)) };
     }
 };
 
@@ -217,10 +221,9 @@ export const listAvailableModels = async (overrides = {}) => {
     if (problem || (preset.keyRequired && !apiKey)) return [];
 
     try {
-        const { url, init } = buildListModelsRequest({ preset, baseUrl, apiKey });
-        const response = await fetch(url, init);
+        const response = await sendRequest(buildListModelsRequest({ preset, baseUrl, apiKey }), preset.label);
         if (!response.ok) return [];
-        return parseModelIds(preset.kind, await response.json());
+        return parseModelIds(preset.kind, response.data);
     } catch {
         return [];
     }
@@ -232,8 +235,15 @@ export const validateApiResponse = (json) => {
     }
 
     // Elemente bereinigen: unbekannte Typen und Teilprozesse (ohne Verknüpfung) werden Prozessschritte,
-    // Zusatzangaben nur als Text, laneId nur auf vorhandene Lanes
-    json.nodes = json.nodes.filter((n) => n && typeof n === 'object' && n.id !== undefined && n.id !== null).map((n) => {
+    // Zusatzangaben nur als Text, laneId nur auf vorhandene Lanes. Doppelte IDs: nur das erste Element bleibt.
+    const seenIds = new Set();
+    json.nodes = json.nodes.filter((n) => {
+        if (!n || typeof n !== 'object' || n.id === undefined || n.id === null) return false;
+        const id = String(n.id);
+        if (seenIds.has(id)) return false;
+        seenIds.add(id);
+        return true;
+    }).map((n) => {
         const type = String(n.type || '').toLowerCase();
         const node = { ...n, id: String(n.id), type: NODE_TYPES.includes(type) && type !== 'subprocess' ? type : 'process', label: String(n.label ?? '') };
         NODE_DETAIL_FIELDS.forEach((field) => {
@@ -247,10 +257,16 @@ export const validateApiResponse = (json) => {
         else if (n.laneId !== undefined) n.laneId = String(n.laneId);
     });
 
-    // Ensure minimal viable graph
-    const hasStart = json.nodes.some(n => n.type === 'start');
-    if (!hasStart && json.nodes.length > 0) {
-        json.nodes[0].type = 'start';
+    // Ohne Start wird ein Ablaufschritt zum Start: bevorzugt einer ohne eingehende Verbindung und
+    // keine Entscheidung; nie eine Lane, Notiz oder ein Ende
+    if (!json.nodes.some((n) => n.type === 'start')) {
+        const targets = new Set((Array.isArray(json.edges) ? json.edges : []).map((e) => String(e?.to)));
+        const flow = json.nodes.filter((n) => !['lane', 'annotation', 'end'].includes(n.type));
+        const first = flow.find((n) => !targets.has(n.id) && n.type !== 'decision')
+            || flow.find((n) => !targets.has(n.id))
+            || flow.find((n) => n.type !== 'decision')
+            || flow[0];
+        if (first) first.type = 'start';
     }
 
     // Filter out bad edges
@@ -258,11 +274,12 @@ export const validateApiResponse = (json) => {
         json.edges = json.edges
             .filter((edge) => edge && typeof edge === 'object')
             .map((edge) => ({ ...edge, from: String(edge.from), to: String(edge.to) }))
-            .filter(edge => {
-            const hasSource = json.nodes.some(n => n.id === edge.from);
-            const hasTarget = json.nodes.some(n => n.id === edge.to);
-            return hasSource && hasTarget;
-        });
+            // Nur Verbindungen zwischen vorhandenen Elementen, nie von oder zu einer Lane
+            .filter((edge) => {
+                const source = json.nodes.find((n) => n.id === edge.from);
+                const target = json.nodes.find((n) => n.id === edge.to);
+                return Boolean(source && target) && source.type !== 'lane' && target.type !== 'lane';
+            });
     } else {
         json.edges = [];
     }
