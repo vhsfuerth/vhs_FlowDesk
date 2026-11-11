@@ -75,7 +75,7 @@ export default defineConfig({
           { src: 'pwa-512.png', sizes: '512x512', type: 'image/png' }
         ]
       },
-      includeAssets: ['favicon-32.png', 'favicon-64.png', 'apple-touch-icon.png', 'flowdesk-logo-160.png']
+      includeAssets: ['favicon-32.png', 'favicon-64.png', 'apple-touch-icon.png', 'flowdesk-logo-160.png', 'flowdesk-logo-320.png']
     }),
   ],
 })

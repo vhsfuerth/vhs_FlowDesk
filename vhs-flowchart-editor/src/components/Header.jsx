@@ -81,15 +81,18 @@ const Header = ({ onSettingsClick, currentDiagram, onNewDiagram, onDiagramSelect
 
   return (
     <header className="bg-[var(--color-vhs-blau)] text-white shadow-md w-full h-16 flex items-center justify-between px-6 z-40 relative border-b border-white/10">
-      <div className="flex items-center space-x-4">
-        <div className="bg-white rounded p-1 overflow-hidden h-10 flex items-center shadow-md">
-             <img src="/Logo_HQ_pos.png" alt="vhs Logo" className="h-full w-auto object-contain px-1" />
+      <div className="flex items-center min-w-0 flex-1 mr-4">
+        {/* Marke: Logo und Programmname */}
+        <div className="flex items-center gap-3 pr-5 shrink-0">
+          <img src="/flowdesk-logo-160.png" alt="" aria-hidden="true" className="h-11 w-11 rounded-lg shadow-md" />
+          <h1 className="text-xl xl:text-2xl leading-none tracking-tight whitespace-nowrap">
+            <span className="font-normal text-[var(--color-vhs-blau-20)]">vhs </span>
+            <span className="font-black">FlowDesk</span>
+          </h1>
         </div>
-        <div className="flex flex-col justify-center border-l border-white/20 pl-4">
-            <h1 className="flex items-center gap-1.5 text-sm font-black uppercase tracking-widest text-[var(--color-vhs-blau-20)] leading-none mb-1">
-              <img src="/favicon-64.png" alt="" aria-hidden="true" className="w-4 h-4 rounded-sm bg-white" />
-              FlowDesk
-            </h1>
+        {/* Geöffnetes Diagramm */}
+        <div className="flex flex-col justify-center border-l border-white/20 pl-5 min-w-0">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-vhs-blau-20)] leading-none mb-1">Diagramm</span>
             <div className="flex items-center group">
               {isEditingName ? (
                 <div className="flex items-center">
@@ -111,7 +114,7 @@ const Header = ({ onSettingsClick, currentDiagram, onNewDiagram, onDiagramSelect
                   onClick={startEditingName}
                   title="Diagramm umbenennen"
                 >
-                  <span className="text-lg font-bold leading-none truncate max-w-[300px]">
+                  <span className="text-base font-bold leading-none truncate max-w-[160px] lg:max-w-[240px] xl:max-w-[300px]">
                     {currentDiagram?.name || 'Unbenanntes Diagramm'}
                   </span>
                   <Edit2 className="w-3 h-3 ml-2 text-white/50 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity" aria-hidden="true" />
@@ -122,7 +125,7 @@ const Header = ({ onSettingsClick, currentDiagram, onNewDiagram, onDiagramSelect
         </div>
       </div>
 
-      <nav className="flex items-center space-x-2" aria-label="Hauptmenü">
+      <nav className="flex items-center space-x-2 shrink-0" aria-label="Hauptmenü">
         <button
           onClick={onTemplateOpen}
           className="flex items-center px-4 py-2 hover:bg-[var(--color-vhs-blau-80)] rounded-md transition-colors font-medium border border-transparent hover:border-[var(--color-vhs-blau-60)]"
