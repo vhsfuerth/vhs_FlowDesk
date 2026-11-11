@@ -1,9 +1,15 @@
+import { COLORS } from '../utils/constants';
+
 // jsPDF (inkl. html2canvas/DOMPurify) ist groß und wird nur für PDF-Exporte
 // gebraucht – daher erst beim ersten Export nachladen.
 const loadJsPDF = async () => (await import('jspdf')).jsPDF;
 
-// Compress an image dataUrl to JPEG and cap resolution for smaller PDF embeds
-const compressForPdf = (dataUrl, maxPx = 1200, quality = 0.78) =>
+// Logo im Kopf der Exporte (quadratisch, 320 px für scharfe PDFs)
+const EXPORT_LOGO = '/flowdesk-logo-320.png';
+
+// Compress an image dataUrl to JPEG and cap resolution for smaller PDF embeds.
+// JPEG kennt keine Transparenz: transparente Bereiche werden mit `background` gefüllt.
+const compressForPdf = (dataUrl, maxPx = 1200, quality = 0.78, background = '#ffffff') =>
   new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -13,7 +19,7 @@ const compressForPdf = (dataUrl, maxPx = 1200, quality = 0.78) =>
       const c = document.createElement('canvas');
       c.width = w; c.height = h;
       const ctx = c.getContext('2d');
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = background;
       ctx.fillRect(0, 0, w, h);
       ctx.drawImage(img, 0, 0, w, h);
       resolve(c.toDataURL('image/jpeg', quality));
@@ -22,11 +28,14 @@ const compressForPdf = (dataUrl, maxPx = 1200, quality = 0.78) =>
     img.src = dataUrl;
   });
 
-// Helper to convert an image URL to Base64
+// Lädt ein Bild als Data-URL; null, wenn es fehlt oder kein Bild ist. Vercel beantwortet
+// unbekannte Adressen mit index.html (Status 200) – deshalb auch den Typ prüfen.
 const getBase64Image = async (url) => {
     try {
         const response = await fetch(url);
+        if (!response.ok) return null;
         const blob = await response.blob();
+        if (!blob.type.startsWith('image/')) return null;
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onloadend = () => resolve(reader.result);
@@ -89,13 +98,13 @@ const getSvgString = async (paper, title = '') => {
     const headerGroup = document.createElementNS(svgNS, "g");
     
     // CRITICAL: Embed Logo as Base64 to avoid tainted canvas issues
-    const logoBase64 = await getBase64Image('/Logo_HQ_pos.png');
+    const logoBase64 = await getBase64Image(EXPORT_LOGO);
     if (logoBase64) {
         const logoImg = document.createElementNS(svgNS, "image");
         logoImg.setAttributeNS(null, "href", logoBase64);
         logoImg.setAttributeNS(null, "x", vx + padding);
         logoImg.setAttributeNS(null, "y", vy + padding + 10);
-        logoImg.setAttributeNS(null, "width", "100");
+        logoImg.setAttributeNS(null, "width", "40");
         logoImg.setAttributeNS(null, "height", "40");
         headerGroup.appendChild(logoImg);
     }
@@ -103,12 +112,12 @@ const getSvgString = async (paper, title = '') => {
     // Title Text
     if (title) {
         const titleText = document.createElementNS(svgNS, "text");
-        titleText.setAttributeNS(null, "x", vx + padding + 115);
+        titleText.setAttributeNS(null, "x", vx + padding + 55);
         titleText.setAttributeNS(null, "y", vy + padding + 40);
-        titleText.setAttributeNS(null, "font-family", "Outfit, sans-serif");
+        titleText.setAttributeNS(null, "font-family", "Arial, Calibri, Helvetica, sans-serif");
         titleText.setAttributeNS(null, "font-size", "22px");
         titleText.setAttributeNS(null, "font-weight", "900");
-        titleText.setAttributeNS(null, "fill", "#00285A");
+        titleText.setAttributeNS(null, "fill", COLORS.vhsBlue);
         titleText.textContent = title;
         headerGroup.appendChild(titleText);
     }
@@ -398,14 +407,15 @@ export const exportQualityReportPDF = async (
 
   // Load logo with correct aspect ratio
   const loadLogoProportional = async (maxW, maxH) => {
-    const b64 = await getBase64Image('/Logo_HQ_pos.png');
+    const b64 = await getBase64Image(EXPORT_LOGO);
     if (!b64) return null;
     const dims = await new Promise((resolve) => {
       const img = new Image();
       img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-      img.onerror = () => resolve({ w: maxW * 4, h: maxH }); // fallback: assume wide logo
+      img.onerror = () => resolve(null); // kein lesbares Bild: Text statt Logo
       img.src = b64;
     });
+    if (!dims) return null;
     const scale = Math.min(maxW / dims.w, maxH / dims.h);
     return { b64, w: dims.w * scale, h: dims.h * scale };
   };
@@ -467,7 +477,7 @@ export const exportQualityReportPDF = async (
     doc.setTextColor(...WHITE);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
-    doc.text('vhs Flowchart-Editor  -  Prozessanalyse & Selbstbewertung', M, PH - 4);
+    doc.text('vhs FlowDesk  -  Prozessanalyse & Selbstbewertung', M, PH - 4);
     doc.text(`Seite ${pageNum}`, PW - M, PH - 4, { align: 'right' });
   };
 
@@ -504,13 +514,14 @@ export const exportQualityReportPDF = async (
   const logo = await loadLogoProportional(48, 20);
   if (logo) {
     const logoY = (HEADER_H - logo.h) / 2;
-    const logoJpeg = await compressForPdf(logo.b64, 400, 0.90);
+    // Halbtransparente Ecken des Logos auf vhs-Blau statt Weiß, sonst entsteht ein heller Kasten
+    const logoJpeg = await compressForPdf(logo.b64, 400, 0.90, COLORS.vhsBlue);
     doc.addImage(logoJpeg, 'JPEG', M, logoY, logo.w, logo.h);
   } else {
     doc.setTextColor(...WHITE);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
-    doc.text('vhs', M, 21);
+    doc.text('FlowDesk', M, 21);
   }
 
   doc.setTextColor(...WHITE);

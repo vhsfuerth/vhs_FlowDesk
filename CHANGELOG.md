@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an vhs FlowDesk (früher „vhs Workflow-Algorithm Editor“). Die Versionsnummern folgen [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.6.5] – 2026-11-11
+
+### Geändert
+
+- **FlowDesk-Logo statt vhs-Fürth-Logo:** vhs FlowDesk ist kein reines Projekt der vhs Fürth mehr. Das Logo der vhs Fürth ist aus der Kopfzeile und aus den Exporten entfernt, an seiner Stelle steht das FlowDesk-Logo.
+  - Kopfzeile: FlowDesk-Logo links.
+  - Bildexport (SVG, PNG, PDF): FlowDesk-Logo im Kopf neben dem Titel. Der Titel steht jetzt in der Hausschrift (Arial) statt in der nicht geladenen Schrift „Outfit“.
+  - PDF-Qualitätsbericht: FlowDesk-Logo im blauen Kopf, mit blauem statt weißem Hintergrund an den abgerundeten Ecken. Kann es nicht geladen werden, steht dort „FlowDesk“ statt „vhs“. In der Fußzeile jeder Seite steht jetzt „vhs FlowDesk“ statt des alten Namens „vhs Flowchart-Editor“.
+  - Die Bilddateien `Logo_HQ_pos.png` und `logo_HQ_neg.png` sind entfernt. Neu ist `flowdesk-logo-320.png` für scharfe Exporte, es ist auch offline verfügbar.
+- **Programmname prominenter:** In der Kopfzeile steht „vhs FlowDesk“ jetzt groß neben dem Logo (Hauptüberschrift der Seite). Rechts davon, durch eine Linie getrennt, folgt das geöffnete Diagramm mit der kleinen Überschrift „Diagramm“. Bisher stand „FlowDesk“ nur klein und blass über dem Dateinamen. Das kleine Symbol vor „FlowDesk“ entfällt. Bei mittleren Bildschirmbreiten werden Programmname und Diagrammname kleiner bzw. früher gekürzt, damit das Menü rechts sichtbar bleibt.
+
+### Behoben
+
+- Fehlt das Logo für einen Export oder liefert der Server statt eines Bildes eine andere Seite, wird es weggelassen (bzw. durch „FlowDesk“ ersetzt). Bisher konnte der PDF-Qualitätsbericht in diesem Fall ganz scheitern.
+
 ## [1.6.4] – 2026-11-10
 
 Punkt 3 aus `improvement.md`: `DiagramCanvas.jsx` verschlanken. Für Nutzende ändert sich nichts.
