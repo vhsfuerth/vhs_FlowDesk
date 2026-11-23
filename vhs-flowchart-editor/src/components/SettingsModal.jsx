@@ -358,6 +358,9 @@ const SettingsModal = ({ onClose }) => {
             <p className="text-xs text-gray-500 mt-1">
               &copy; 2026 Tobias Götz, vhs Fürth gGmbH
             </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Entwickelt mithilfe von Claude Code (KI-Programmierassistent von Anthropic).
+            </p>
           </div>
         </div>
 

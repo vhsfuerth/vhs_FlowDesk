@@ -6,3 +6,17 @@
 
 # Claude Code Konfiguration
 .claude/
+
+# KI-Agenten-Anweisungen (nur lokal)
+CLAUDE.md
+docs/Styleguide_für_KI_Agenten.md
+
+# Interne Roadmap und Ideensammlung
+improvement.md
+docs/zukünftige Anpassungen.md
+
+# Logo-Vorlagen (App nutzt die Kopien in vhs-flowchart-editor/public/)
+pics/
+
+# CI-Workflows
+.github/
