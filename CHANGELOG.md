@@ -7,6 +7,7 @@ Alle nennenswerten Änderungen an vhs FlowDesk (früher „vhs Workflow-Algorith
 ### Geändert
 
 - **Schlankeres Repository:** Interne Arbeitsdateien (Anweisungen für KI-Agenten, Wartungs-Roadmap, Ideensammlung, Logo-Vorlagen, lokale Claude-Einstellungen) und der GitHub-CI-Workflow werden nicht mehr versioniert. Die Prüfungen vor dem Deploy laufen weiterhin im Vercel-Build (`npm run check`).
+- **Hinweis auf Claude Code:** In den Einstellungen unter „Version, Lizenz & Urheber“ und in der README steht jetzt, dass die Software mithilfe von Claude Code (KI-Programmierassistent von Anthropic) entstanden ist.
 
 ## [1.6.5] – 2026-11-11
 

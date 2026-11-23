@@ -258,4 +258,4 @@ Bei eigenem Hosting die Sicherheits-Header aus `vercel.json` (insbesondere die C
 MIT License – siehe [LICENSE](LICENSE).
 
 ---
-Erstellt für die vhs im Rahmen der Prozess-Digitalisierung 2026.
+Erstellt für die vhs im Rahmen der Prozess-Digitalisierung 2026. Die Software ist mithilfe von [Claude Code](https://claude.com/claude-code), dem KI-Programmierassistenten von Anthropic, entstanden.
