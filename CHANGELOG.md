@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen an vhs FlowDesk (früher „vhs Workflow-Algorithm Editor“). Die Versionsnummern folgen [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.6.7] – 2026-11-23
+
+### Sicherheit
+
+- **Abhängigkeiten aktualisiert** (`npm audit fix`, ohne Breaking Changes). Unter anderem behebt jsPDF 4.2.1 eine kritische Lücke (PDF-Objekt- und HTML-Injection); die App nutzte die betroffenen Funktionen nicht. Außerdem aktualisiert: Vite, PostCSS, Babel, DOMPurify, uuid und weitere Build-Werkzeuge.
+- Offen (erfordern größere Updates): JointJS 3.7 bringt eine ältere lodash-Version mit; Vitest (nur für Tests) und die Workbox-Abhängigkeiten von vite-plugin-pwa (nur beim Build) benötigen Major-Updates.
+
 ## [1.6.6] – 2026-11-12
 
 ### Geändert
