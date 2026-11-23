@@ -169,7 +169,7 @@ Details zu Architektur und Datenformat: [docs/Technische_Spezifikationen.md](doc
 
 **Versionierung:** Die Versionsnummer folgt [Semantic Versioning](https://semver.org/lang/de/) und steht in `vhs-flowchart-editor/package.json`. Sie wird in den Einstellungen und in der Anleitung angezeigt. Jede Änderung wird in [CHANGELOG.md](CHANGELOG.md) dokumentiert.
 
-**Continuous Integration:** Bei jedem Push und Pull Request auf GitHub laufen Lint, Typprüfung, Tests und Build (`.github/workflows/ci.yml`). Der Vercel-Build führt dieselben Prüfungen aus (`npm run check`) – schlägt ein Test fehl, wird nicht deployt.
+**Prüfungen vor dem Deploy:** Der Vercel-Build führt Lint, Typprüfung, Tests und Build aus (`npm run check`) – schlägt ein Test fehl, wird nicht deployt. Lokal lässt sich dasselbe mit `npm run check` prüfen.
 
 ---
 

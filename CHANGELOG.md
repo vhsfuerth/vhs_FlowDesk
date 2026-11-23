@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an vhs FlowDesk (früher „vhs Workflow-Algorithm Editor“). Die Versionsnummern folgen [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.6.6] – 2026-11-12
+
+### Geändert
+
+- **Schlankeres Repository:** Interne Arbeitsdateien (Anweisungen für KI-Agenten, Wartungs-Roadmap, Ideensammlung, Logo-Vorlagen, lokale Claude-Einstellungen) und der GitHub-CI-Workflow werden nicht mehr versioniert. Die Prüfungen vor dem Deploy laufen weiterhin im Vercel-Build (`npm run check`).
+
 ## [1.6.5] – 2026-11-11
 
 ### Geändert

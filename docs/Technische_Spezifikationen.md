@@ -140,10 +140,9 @@ Orientierung an WCAG 2.1 AA, soweit mit einem grafischen Editor sinnvoll: Dialog
 
 ```
 202601_vhs_Flowcharts/
-├── .github/workflows/ci.yml     # CI: Lint, Typprüfung, Tests, Build
 ├── build.bat                    # Erstellt den Produktions-Build
 ├── vercel.json                  # Hosting, Build-Befehl und Sicherheits-Header
-├── docs/                        # Spezifikation, Styleguide, geplante Erweiterungen
+├── docs/                        # Technische Spezifikation
 └── vhs-flowchart-editor/
     ├── install.bat / start.bat  # Installation und lokaler Start
     └── src/
